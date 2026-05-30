@@ -1,0 +1,57 @@
+# ─────────────────────────────────────────────────────────────
+# DietTrace .gitignore
+# Public repo = the agent loop, evals harness, API, and frontend.
+# Hidden = secrets, raw data, the food-DB pipeline/schema, curated
+# mappings, all planning/context docs, and local build tooling.
+# ─────────────────────────────────────────────────────────────
+
+# --- Secrets (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*-key.json
+service-account*.json
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# --- Planning & context docs (kept locally, never tracked) ---
+docs/
+
+# --- Autonomous build tooling (kept locally, never tracked) ---
+run-session.sh
+tools/
+
+# --- Nutrition data & DB implementation (obscured; sourced from USDA FDC, see README) ---
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.dump
+*.sql
+src/dietrace/nutrition/mappings/
+src/dietrace/nutrition/schema.sql
+
+# --- Frontend build artifacts ---
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+src/dietrace/web/static/assets/
+
+# --- OS / editor ---
+.DS_Store
+.idea/
+.vscode/
+*.log
