@@ -27,8 +27,8 @@ def test_run_wires_task_and_default_evaluators() -> None:
     kwargs = client.experiments.run_experiment.call_args.kwargs
     assert kwargs["dataset"] == "ds"
     assert kwargs["experiment_name"] == "exp-1"
-    assert kwargs["evaluators"] == runner.EVALUATORS
-    # The wrapped task unwraps the example input and calls the agent.
+    assert kwargs["evaluators"] == runner.PHOENIX_EVALUATORS
+    # The wrapped task binds the example input and calls the agent.
     assert kwargs["task"]({"text": "2 eggs"}) == {"totals": [], "echo": "2 eggs"}
 
 

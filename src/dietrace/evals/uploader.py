@@ -48,7 +48,7 @@ def upload(
     inputs, expected, metadata = _rows(cases)
     return client.datasets.create_dataset(
         name=name,
-        description=description,
+        dataset_description=description,
         inputs=inputs,
         outputs=expected,
         metadata=metadata,

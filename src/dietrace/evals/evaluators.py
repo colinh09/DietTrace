@@ -15,6 +15,8 @@ against the default ±15% band.
 
 from __future__ import annotations
 
+import functools
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel
@@ -248,3 +250,41 @@ def micro_panel_accuracy(
         explanation=f"micro mean |%error| {mean_error:.1%} over {len(per_micro)} nutrients",
         metadata={"per_micro": per_micro, "mean_pct_error": mean_error},
     )
+
+
+# ---------------------------------------------------------------------------
+# Phoenix experiment adapters
+# ---------------------------------------------------------------------------
+
+# The numeric evaluators in Phoenix-run order. Phoenix binds the (output,
+# expected, metadata) params to the task output, the example's ground-truth
+# output, and the example metadata respectively.
+_NUMERIC_EVALUATORS: list[Callable[..., EvalResult]] = [
+    macro_pct_error,
+    calorie_accuracy,
+    within_tolerance,
+    portion_error,
+    micro_panel_accuracy,
+]
+
+
+def _as_phoenix_evaluator(fn: Callable[..., EvalResult]) -> Callable[..., tuple]:
+    """Adapt an EvalResult evaluator to Phoenix's ``(score, label, explanation)``.
+
+    Phoenix accepts a tuple return and uses the function's name as the eval name;
+    ``functools.wraps`` preserves the original name and signature so the
+    ``output``/``expected``/``metadata`` params still bind correctly.
+    """
+
+    @functools.wraps(fn)
+    def evaluator(output: Any, expected: Any, metadata: dict[str, Any] | None = None) -> tuple:
+        result = fn(output, expected, metadata)
+        return result.score, result.label, result.explanation
+
+    return evaluator
+
+
+# Drop-in evaluator list for client.experiments.run_experiment(evaluators=...).
+PHOENIX_EVALUATORS: list[Callable[..., tuple]] = [
+    _as_phoenix_evaluator(fn) for fn in _NUMERIC_EVALUATORS
+]
