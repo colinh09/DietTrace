@@ -1,0 +1,17 @@
+{
+  "input": { "text": "a small handful of almonds, about 28 grams" },
+  "expected": {
+    "calories": 162.1,
+    "protein_g": 5.92,
+    "fat_g": 13.98,
+    "carb_g": 6.03,
+    "grams": 28.0,
+    "micros": { "304": 76.0, "301": 75.0, "306": 200.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 170567,
+    "source": "USDA SR Legacy — Nuts, almonds",
+    "notes": "1 oz ~28 g."
+  }
+}

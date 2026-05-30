@@ -1,0 +1,17 @@
+{
+  "input": { "text": "a container of plain nonfat Greek yogurt, 170 grams" },
+  "expected": {
+    "calories": 100.0,
+    "protein_g": 17.0,
+    "fat_g": 0.7,
+    "carb_g": 6.0,
+    "grams": 170.0
+  },
+  "metadata": {
+    "nutrient_tier": "label",
+    "fdc_id": 330137,
+    "tolerance": 0.2,
+    "source": "USDA Branded — label nutrients per 170 g container",
+    "notes": "Branded label data; macros only."
+  }
+}

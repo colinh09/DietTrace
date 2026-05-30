@@ -1,0 +1,17 @@
+{
+  "input": { "text": "4 oz grilled chicken breast" },
+  "expected": {
+    "calories": 187.0,
+    "protein_g": 35.02,
+    "fat_g": 4.07,
+    "carb_g": 0.0,
+    "grams": 113.0,
+    "micros": { "307": 83.0, "306": 287.0, "305": 220.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 171477,
+    "source": "USDA SR Legacy — Chicken, breast, meat only, cooked, roasted",
+    "notes": "4 oz cooked ~113 g."
+  }
+}

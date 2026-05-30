@@ -1,0 +1,17 @@
+{
+  "input": { "text": "1 medium banana" },
+  "expected": {
+    "calories": 105.0,
+    "protein_g": 1.29,
+    "fat_g": 0.39,
+    "carb_g": 26.95,
+    "grams": 118.0,
+    "micros": { "306": 422.0, "401": 10.3, "304": 32.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 173944,
+    "source": "USDA SR Legacy — Bananas, raw",
+    "notes": "1 medium banana ~118 g."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "input": { "text": "half an avocado" },
+  "expected": {
+    "calories": 108.8,
+    "protein_g": 1.36,
+    "fat_g": 9.97,
+    "carb_g": 5.8,
+    "grams": 68.0,
+    "micros": { "306": 330.0, "304": 19.0, "307": 5.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 171705,
+    "source": "USDA SR Legacy — Avocados, raw, all commercial varieties",
+    "notes": "Half a ~136 g California avocado, edible portion."
+  }
+}

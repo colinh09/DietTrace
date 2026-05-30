@@ -9,7 +9,14 @@ exercise known values so the arithmetic is locked, not just the plumbing. No DB
 or network is touched.
 """
 
-from dietrace.evals.evaluators import EvalResult, macro_pct_error
+from dietrace.evals.evaluators import (
+    EvalResult,
+    calorie_accuracy,
+    macro_pct_error,
+    micro_panel_accuracy,
+    portion_error,
+    within_tolerance,
+)
 from dietrace.evals.schema import ExpectedNutrition
 
 
@@ -104,3 +111,111 @@ def test_eval_result_to_phoenix_carries_metadata() -> None:
     assert payload["label"] == "pass"
     assert payload["explanation"] == "x"
     assert payload["metadata"] == {"mean_pct_error": 0.5}
+
+
+# --- calorie_accuracy (4.3) ---------------------------------------------------
+
+
+def test_calorie_accuracy_normalizes_and_passes() -> None:
+    """Calories 10% over: score 0.9, raw error in metadata, within the band."""
+    output = _totals(calories=440.0, protein_g=18.0, fat_g=34.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = calorie_accuracy(output, expected)
+
+    assert result.metadata["calorie_pct_error"] == 0.10
+    assert result.score == 0.9
+    assert result.label == "pass"
+
+
+def test_calorie_accuracy_fails_outside_band() -> None:
+    """A 50% calorie overestimate fails the default ±15% band."""
+    output = _totals(calories=600.0, protein_g=20.0, fat_g=40.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    assert calorie_accuracy(output, expected).label == "fail"
+
+
+# --- within_tolerance (4.4) ---------------------------------------------------
+
+
+def test_within_tolerance_passes_when_all_macros_inside_band() -> None:
+    """Every macro 5% off → pass at score 1.0."""
+    output = _totals(calories=420.0, protein_g=21.0, fat_g=42.0, carb_g=10.5)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = within_tolerance(output, expected, {"tolerance": 0.15})
+
+    assert result.label == "pass"
+    assert result.score == 1.0
+
+
+def test_within_tolerance_fails_when_one_macro_exceeds() -> None:
+    """Fat 50% over → fail, and the offending macro is named in metadata."""
+    output = _totals(calories=400.0, protein_g=20.0, fat_g=60.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = within_tolerance(output, expected, {"tolerance": 0.15})
+
+    assert result.label == "fail"
+    assert result.score == 0.0
+    assert "fat_g" in result.metadata["failing"]
+
+
+# --- portion_error (4.5) ------------------------------------------------------
+
+
+def test_portion_error_scores_grams() -> None:
+    """Estimated 55 g vs ground-truth 50 g → 10% error, passes."""
+    output = {"per_item": [{"grams": 55.0}], "totals": []}
+    expected = ExpectedNutrition(
+        calories=72, protein_g=6.3, fat_g=4.8, carb_g=0.4, grams=50.0
+    )
+
+    result = portion_error(output, expected)
+
+    assert result.metadata["expected_grams"] == 50.0
+    assert abs(result.metadata["portion_pct_error"] - 0.1) < 1e-9
+    assert result.label == "pass"
+
+
+def test_portion_error_na_without_ground_truth_grams() -> None:
+    """No expected grams → n/a, not a spurious score."""
+    output = {"per_item": [{"grams": 55.0}], "totals": []}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1}
+
+    assert portion_error(output, expected).label == "n/a"
+
+
+# --- micro_panel_accuracy (4.6, two-tier dispatch) ----------------------------
+
+
+def test_micro_panel_na_for_label_tier() -> None:
+    """A branded label-tier case scores micros as n/a."""
+    output = {"totals": [{"code": "307", "name": "Sodium", "amount": 70.0, "unit": "mg"}]}
+    expected = {
+        "calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {"307": 71.0}
+    }
+
+    result = micro_panel_accuracy(output, expected, {"nutrient_tier": "label"})
+
+    assert result.label == "n/a"
+
+
+def test_micro_panel_scores_full_tier() -> None:
+    """A full-tier case scores the micro panel against ground truth."""
+    output = {
+        "totals": [
+            {"code": "307", "name": "Sodium", "amount": 70.0, "unit": "mg"},
+            {"code": "301", "name": "Calcium", "amount": 28.0, "unit": "mg"},
+        ]
+    }
+    expected = {
+        "calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1,
+        "micros": {"307": 71.0, "301": 28.0},
+    }
+
+    result = micro_panel_accuracy(output, expected, {"nutrient_tier": "full"})
+
+    assert result.label == "pass"
+    assert result.score > 0.9

@@ -111,3 +111,140 @@ def macro_pct_error(
         explanation=explanation,
         metadata={"per_macro": per_macro, "mean_pct_error": mean_error},
     )
+
+
+def _expected_value(expected: Any, key: str) -> Any:
+    """Read *key* from an ExpectedNutrition model or a plain dict."""
+    data = expected.model_dump() if hasattr(expected, "model_dump") else expected
+    return data.get(key)
+
+
+def _per_macro_errors(output: Any, expected: Any) -> dict[str, float]:
+    """The |%error| of each scored macro (calories/protein/fat/carb)."""
+    by_code = _output_by_code(output)
+    exp = _expected_macros(expected)
+    return {key: _pct_error(by_code.get(code, 0.0), exp[key]) for key, code in _MACROS}
+
+
+def _tolerance(metadata: dict[str, Any] | None) -> float:
+    """The per-case ±band, defaulting to ±15%."""
+    return float((metadata or {}).get("tolerance", _DEFAULT_TOLERANCE))
+
+
+def _not_applicable(explanation: str) -> EvalResult:
+    """An evaluator that does not apply to this case (e.g. micros on a label tier).
+
+    Follows axon's convention: a non-penalizing ``n/a`` label kept out of the
+    accuracy aggregation by filtering on label, not score.
+    """
+    return EvalResult(score=1.0, label="n/a", explanation=explanation)
+
+
+def calorie_accuracy(
+    output: Any,
+    expected: Any,
+    metadata: dict[str, Any] | None = None,
+) -> EvalResult:
+    """Calorie closeness as a normalized [0,1] score.
+
+    Calories (USDA code 208) are the headline number, so they get a dedicated
+    evaluator: ``1 - min(|%error|, 1)`` for the Phoenix chart, raw error in
+    ``metadata``, and a pass/fail label against the case's ±band.
+    """
+    actual = _output_by_code(output).get("208", 0.0)
+    target = float(_expected_value(expected, "calories"))
+    err = _pct_error(actual, target)
+    tol = _tolerance(metadata)
+    return EvalResult(
+        score=1.0 - min(err, 1.0),
+        label="pass" if err <= tol else "fail",
+        explanation=f"calorie |%error| {err:.1%} ({actual:.0f} vs {target:.0f} kcal)",
+        metadata={"calorie_pct_error": err, "actual": actual, "expected": target},
+    )
+
+
+def within_tolerance(
+    output: Any,
+    expected: Any,
+    metadata: dict[str, Any] | None = None,
+) -> EvalResult:
+    """Pass iff every scored macro is within the ±band.
+
+    A strict gate over calories/protein/fat/carb: ``score`` is 1.0 when all are
+    inside the tolerance (default ±15%, overridable per case) and 0.0 otherwise,
+    with the offending macros named in ``metadata`` and the explanation.
+    """
+    tol = _tolerance(metadata)
+    per_macro = _per_macro_errors(output, expected)
+    failing = {key: err for key, err in per_macro.items() if err > tol}
+    if failing:
+        joined = ", ".join(f"{key} {err:.1%}" for key, err in failing.items())
+        explanation = f"over ±{tol:.0%}: {joined}"
+    else:
+        explanation = f"all macros within ±{tol:.0%}"
+    return EvalResult(
+        score=0.0 if failing else 1.0,
+        label="fail" if failing else "pass",
+        explanation=explanation,
+        metadata={"tolerance": tol, "per_macro": per_macro, "failing": failing},
+    )
+
+
+def portion_error(
+    output: Any,
+    expected: Any,
+    metadata: dict[str, Any] | None = None,
+) -> EvalResult:
+    """Portion-weight closeness vs ground-truth grams.
+
+    A surface distinct from lookup error: it scores the total grams the agent
+    estimated against the case's ground-truth ``grams``. Returns ``n/a`` when the
+    case carries no ground-truth weight.
+    """
+    target = _expected_value(expected, "grams")
+    if target is None:
+        return _not_applicable("no ground-truth grams for this case")
+    actual = sum(float(_amount(item, "grams")) for item in _amount(output, "per_item"))
+    err = _pct_error(actual, float(target))
+    tol = _tolerance(metadata)
+    return EvalResult(
+        score=1.0 - min(err, 1.0),
+        label="pass" if err <= tol else "fail",
+        explanation=f"portion |%error| {err:.1%} ({actual:.0f} vs {float(target):.0f} g)",
+        metadata={
+            "portion_pct_error": err,
+            "actual_grams": actual,
+            "expected_grams": float(target),
+        },
+    )
+
+
+def micro_panel_accuracy(
+    output: Any,
+    expected: Any,
+    metadata: dict[str, Any] | None = None,
+) -> EvalResult:
+    """Micronutrient accuracy, scored only on the ``full`` tier.
+
+    Implements the two-tier dispatch: branded ``label`` cases (or any
+    case without an expected micro panel) return ``n/a``; ``full`` whole-food
+    cases score the mean |%error| across the expected micro codes, normalized to
+    [0,1] with the raw per-micro errors in ``metadata``.
+    """
+    meta = metadata or {}
+    micros = _expected_value(expected, "micros") or {}
+    if meta.get("nutrient_tier") == "label" or not micros:
+        return _not_applicable("micros not scored for label tier")
+    by_code = _output_by_code(output)
+    per_micro = {
+        code: _pct_error(by_code.get(code, 0.0), float(amount))
+        for code, amount in micros.items()
+    }
+    mean_error = sum(per_micro.values()) / len(per_micro)
+    tol = _tolerance(metadata)
+    return EvalResult(
+        score=1.0 - min(mean_error, 1.0),
+        label="pass" if mean_error <= tol else "fail",
+        explanation=f"micro mean |%error| {mean_error:.1%} over {len(per_micro)} nutrients",
+        metadata={"per_micro": per_micro, "mean_pct_error": mean_error},
+    )

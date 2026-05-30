@@ -1,0 +1,17 @@
+{
+  "input": { "text": "one large egg" },
+  "expected": {
+    "calories": 71.5,
+    "protein_g": 6.28,
+    "fat_g": 4.76,
+    "carb_g": 0.36,
+    "grams": 50.0,
+    "micros": { "307": 71.0, "306": 69.0, "301": 28.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 748967,
+    "source": "USDA SR Legacy — Egg, whole, raw, fresh",
+    "notes": "1 large egg ~50 g edible."
+  }
+}

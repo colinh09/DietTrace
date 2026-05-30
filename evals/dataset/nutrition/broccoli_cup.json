@@ -1,0 +1,17 @@
+{
+  "input": { "text": "1 cup of chopped raw broccoli" },
+  "expected": {
+    "calories": 30.9,
+    "protein_g": 2.57,
+    "fat_g": 0.34,
+    "carb_g": 6.04,
+    "grams": 91.0,
+    "micros": { "401": 81.2, "306": 288.0, "301": 43.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 170379,
+    "source": "USDA SR Legacy — Broccoli, raw",
+    "notes": "1 cup chopped ~91 g."
+  }
+}
