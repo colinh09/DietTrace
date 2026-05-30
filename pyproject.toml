@@ -11,6 +11,7 @@ dependencies = [
     "google-adk>=1.0.0",
     "google-genai>=1.0.0",
     "arize-phoenix-otel>=0.6.0",
+    "opentelemetry-sdk>=1.20.0",
     "arize-phoenix-client>=0.1.0",
     "openinference-instrumentation-google-adk>=0.1.0",
     "openinference-instrumentation-google-genai>=0.1.0",
