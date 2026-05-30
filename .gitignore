@@ -30,6 +30,8 @@ docs/
 
 # --- Autonomous build tooling (kept locally, never tracked) ---
 run-session.sh
+run-awake.sh
+run-overnight.sh
 tools/
 
 # --- Nutrition data & DB implementation (obscured; sourced from USDA FDC, see README) ---
