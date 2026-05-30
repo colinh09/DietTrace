@@ -133,3 +133,7 @@ def create_app(
         return {"trace_id": trace_id, "spans": get_buffer().get_trace(trace_id)}
 
     return app
+
+
+# Module-level ASGI app for `uvicorn dietrace.web.app:app` (the Cloud Run entrypoint).
+app = create_app()

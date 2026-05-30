@@ -28,6 +28,9 @@ class MealLogStore:
 
     def __init__(self, db_path: str | Path) -> None:
         self._db_path = str(db_path)
+        parent = Path(self._db_path).parent
+        if str(parent) not in ("", "."):
+            parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(_SCHEMA)
 
