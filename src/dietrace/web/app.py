@@ -3,12 +3,11 @@
 One Cloud Run service: log a meal, read history, see the aggregate analysis, and
 inspect the agent's reasoning spans from the in-process trace buffer. The
 meal-logging callable is injectable so the API is testable offline; the default
-wires the live ADK nutrition agent. Tracing init is best-effort.
+runs one Gemini parse then the deterministic pipeline. Tracing is best-effort (§8).
 """
 
 from __future__ import annotations
 
-import json
 import os
 from collections import defaultdict
 from collections.abc import Callable
@@ -33,59 +32,18 @@ class LogRequest(BaseModel):
     text: str
 
 
-def default_meal_logger(text: str) -> dict:  # pragma: no cover — live agent + Gemini
-    """Run the live ADK nutrition agent over *text* and parse its logged output.
+def default_meal_logger(text: str) -> dict:  # pragma: no cover — live Gemini call
+    """Production ``/log`` path: one Gemini parse, then the deterministic pipeline.
 
-    The deferred live wiring: builds the agent over the food DB and runs
-    a turn, returning the agent's structured ``{per_item, totals}`` output.
+    Gemini parses the meal into items; ``log_meal`` then runs search → portion →
+    calculation deterministically against the food DB, returning the
+    ``{per_item, totals}`` the web layer and evaluators read.
     """
-    import asyncio
-
-    from google.genai import types
-
-    from dietrace.agents.nutrition.agent import APP_NAME, build_nutrition_agent
+    from dietrace.agents.nutrition.orchestrator import log_meal
     from dietrace.nutrition.repository import FoodRepository
 
-    repo = FoodRepository(os.environ.get("DIETRACE_FOOD_DB", "data/food.sqlite"))
-    agent = build_nutrition_agent(repo)
-
-    async def _run() -> str:
-        session = await agent.session_service.create_session(
-            app_name=APP_NAME, user_id="web"
-        )
-        message = types.Content(role="user", parts=[types.Part(text=text)])
-        final = ""
-        async for event in agent.runner.run_async(
-            user_id="web", session_id=session.id, new_message=message
-        ):
-            if event.is_final_response() and event.content and event.content.parts:
-                final = event.content.parts[0].text or ""
-        return final
-
-    return _parse_agent_output(asyncio.run(_run()))
-
-
-def _parse_agent_output(raw: str) -> dict[str, Any]:
-    """Parse the agent's final message into ``{per_item, totals}``.
-
-    Tolerant of the model wrapping its JSON in a ```` ```json ```` fence (which it
-    does in practice). Falls back to an empty result carrying the ``raw`` text
-    when the output is not valid JSON, so a bad turn never raises.
-    """
-    text = raw.strip()
-    if text.startswith("```"):
-        lines = text.splitlines()
-        lines = lines[1:]  # drop the opening ``` / ```json line
-        if lines and lines[-1].strip().startswith("```"):
-            lines = lines[:-1]
-        text = "\n".join(lines)
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        return {"totals": [], "per_item": [], "raw": raw}
-    parsed.setdefault("totals", [])
-    parsed.setdefault("per_item", [])
-    return parsed
+    repository = FoodRepository(os.environ.get("DIETRACE_FOOD_DB", "data/food.sqlite"))
+    return log_meal(text, repository).model_dump()
 
 
 def _aggregate(meals: list[dict[str, Any]]) -> list[dict[str, Any]]:
