@@ -54,3 +54,19 @@ class Food(BaseModel):
             if nutrient.code == code:
                 return nutrient
         return None
+
+
+class SearchCandidate(BaseModel):
+    """A ranked hit from :meth:`FoodRepository.search`.
+
+    Lightweight by design — it carries enough to pick a reproducible ``fdc_id``
+    (then hydrate the full :class:`Food` via ``get``) plus the ``score`` and the
+    ``matched_on`` text (the description or alias that produced the best score)
+    so name and alias matches rank correctly.
+    """
+
+    fdc_id: int
+    description: str
+    data_type: str
+    score: int
+    matched_on: str
