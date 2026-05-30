@@ -6,7 +6,7 @@ persistence entirely offline.
 
 from fastapi.testclient import TestClient
 
-from dietrace.web.app import create_app
+from dietrace.web.app import _parse_agent_output, create_app
 from dietrace.web.store import MealLogStore
 
 _STUB_TOTALS = [{"code": "208", "name": "Energy", "amount": 105.0, "unit": "kcal"}]
@@ -71,3 +71,24 @@ def test_reasoning_unknown_trace_is_empty(tmp_path) -> None:
     response = client.get("/reasoning/deadbeef")
     assert response.status_code == 200
     assert response.json()["spans"] == []
+
+
+def test_parse_agent_output_strips_json_fences() -> None:
+    # The live agent wraps its final JSON in a ```json fence; parsing must handle it.
+    raw = '```json\n{"per_item": [{"description": "egg", "grams": 100.0}], "totals": []}\n```'
+    parsed = _parse_agent_output(raw)
+    assert parsed["per_item"][0]["description"] == "egg"
+    assert parsed["totals"] == []
+
+
+def test_parse_agent_output_handles_bare_json_and_defaults() -> None:
+    parsed = _parse_agent_output('{"per_item": []}')
+    assert parsed["per_item"] == []
+    assert parsed["totals"] == []  # defaulted when absent
+
+
+def test_parse_agent_output_falls_back_on_garbage() -> None:
+    parsed = _parse_agent_output("sorry, I could not parse that")
+    assert parsed["totals"] == []
+    assert parsed["per_item"] == []
+    assert "raw" in parsed

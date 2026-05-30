@@ -107,15 +107,20 @@ def parse_meal(text: str, client: Any | None = None) -> MealParse:
     """Parse free-text *text* into structured meal items via Gemini.
 
     *client* is a ``google.genai`` client (a mock in tests); when omitted a
-    Vertex client is built lazily. Returns a :class:`MealParse` whose ``items``
-    are the foods the model recovered. Any failure to get well-formed JSON — no
-    text, non-JSON, wrong shape — degrades to an empty parse rather than raising.
+    Vertex client is built lazily. The live default path asks Gemini for
+    structured output (``responseMimeType`` + ``responseSchema=MealParse``) so the
+    model returns schema-valid JSON directly. Returns a :class:`MealParse` whose
+    ``items`` are the foods the model recovered. Any failure to get well-formed
+    JSON — no text, non-JSON, wrong shape — degrades to an empty parse rather than
+    raising.
     """
     if client is None:
         client = _default_client()
 
     response = client.models.generate_content(
-        model=GEMINI_MODEL, contents=_PROMPT.format(text=text)
+        model=GEMINI_MODEL,
+        contents=_PROMPT.format(text=text),
+        config=_structured_config(),
     )
 
     raw_text = getattr(response, "text", None)
@@ -128,6 +133,20 @@ def parse_meal(text: str, client: Any | None = None) -> MealParse:
         return MealParse()
 
     return MealParse(items=_coerce_items(_raw_items(payload)))
+
+
+def _structured_config() -> Any:
+    """Build the structured-output config that pins Gemini to schema-valid JSON.
+
+    Lazy import so this module stays import-cheap and credential-free; mock
+    clients in tests ignore the config and still return their canned text.
+    """
+    from google import genai
+
+    return genai.types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=MealParse,
+    )
 
 
 def _default_client() -> Any:

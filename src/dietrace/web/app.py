@@ -8,6 +8,7 @@ wires the live ADK nutrition agent. Tracing init is best-effort.
 
 from __future__ import annotations
 
+import json
 import os
 from collections import defaultdict
 from collections.abc import Callable
@@ -39,7 +40,6 @@ def default_meal_logger(text: str) -> dict:  # pragma: no cover — live agent +
     a turn, returning the agent's structured ``{per_item, totals}`` output.
     """
     import asyncio
-    import json
 
     from google.genai import types
 
@@ -62,11 +62,30 @@ def default_meal_logger(text: str) -> dict:  # pragma: no cover — live agent +
                 final = event.content.parts[0].text or ""
         return final
 
-    raw = asyncio.run(_run())
+    return _parse_agent_output(asyncio.run(_run()))
+
+
+def _parse_agent_output(raw: str) -> dict[str, Any]:
+    """Parse the agent's final message into ``{per_item, totals}``.
+
+    Tolerant of the model wrapping its JSON in a ```` ```json ```` fence (which it
+    does in practice). Falls back to an empty result carrying the ``raw`` text
+    when the output is not valid JSON, so a bad turn never raises.
+    """
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        lines = lines[1:]  # drop the opening ``` / ```json line
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        text = "\n".join(lines)
     try:
-        return json.loads(raw)
+        parsed = json.loads(text)
     except json.JSONDecodeError:
         return {"totals": [], "per_item": [], "raw": raw}
+    parsed.setdefault("totals", [])
+    parsed.setdefault("per_item", [])
+    return parsed
 
 
 def _aggregate(meals: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -24,3 +24,14 @@ if not _project and not _in_test:
     )
 
 GEMINI_PROJECT: str = _project
+
+# Google ADK's Gemini wrapper picks its backend (Vertex vs Developer API) from
+# Google's standard env vars, not from an explicit client — so the agent's
+# orchestrating model would otherwise default to the Developer API and fail on a
+# missing key. Mirror our config into those vars so the whole agent uses Vertex.
+# Guarded on GEMINI_PROJECT so tests (no project set) never touch them; setdefault
+# so an explicit override still wins.
+if GEMINI_PROJECT:
+    os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
+    os.environ.setdefault("GOOGLE_CLOUD_PROJECT", GEMINI_PROJECT)
+    os.environ.setdefault("GOOGLE_CLOUD_LOCATION", GEMINI_LOCATION)
