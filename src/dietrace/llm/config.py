@@ -8,8 +8,10 @@ import os
 import sys
 
 # Gemini 3 by default. Override with DIETRACE_GEMINI_MODEL.
-GEMINI_MODEL: str = os.environ.get("DIETRACE_GEMINI_MODEL", "gemini-3-pro-preview")
-GEMINI_LOCATION: str = os.environ.get("DIETRACE_GEMINI_LOCATION", "us-central1")
+GEMINI_MODEL: str = os.environ.get("DIETRACE_GEMINI_MODEL", "gemini-3.1-pro-preview")
+# Gemini 3 preview models are served from the "global" location on Vertex — regional
+# endpoints (e.g. us-central1) return 404 for them.
+GEMINI_LOCATION: str = os.environ.get("DIETRACE_GEMINI_LOCATION", "global")
 
 _project = os.environ.get("DIETRACE_GEMINI_PROJECT", "")
 # True during pytest collection AND execution (PYTEST_CURRENT_TEST is only set
