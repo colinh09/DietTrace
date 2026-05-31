@@ -60,6 +60,59 @@ def _aggregate(meals: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{"code": code, **vals} for code, vals in agg.items()]
 
 
+def _build_trace(
+    per_item: list[dict[str, Any]],
+    totals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Reconstruct the agent's ordered steps for the ``/log`` response.
+
+    Deterministic and LLM-free: ``parse_meal`` → for each logged food
+    ``search_nutrition`` (the matched USDA food + its ``fdc_id``) →
+    ``estimate_portion`` (grams) → ``log_entry`` (the summed totals). Rebuilt from
+    the structured ``per_item`` the pipeline already returns, so it adds no model
+    calls — it just names, in order, what the agent did to produce the numbers.
+    """
+    foods = [item.get("description") or item.get("name") for item in per_item]
+    trace: list[dict[str, Any]] = [
+        {
+            "step": "parse_meal",
+            "foods": foods,
+            "summary": f"Parsed {len(foods)} food(s): "
+            + ", ".join(str(food) for food in foods),
+        }
+    ]
+    for item in per_item:
+        food = item.get("description") or item.get("name")
+        fdc_id = item.get("fdc_id", item.get("id"))
+        grams = item.get("grams")
+        trace.append(
+            {
+                "step": "search_nutrition",
+                "food": food,
+                "matched": food,
+                "fdc_id": fdc_id,
+                "summary": f"Matched '{food}' to USDA food {fdc_id}",
+            }
+        )
+        trace.append(
+            {
+                "step": "estimate_portion",
+                "food": food,
+                "grams": grams,
+                "summary": f"Estimated {grams} g for '{food}'",
+            }
+        )
+    trace.append(
+        {
+            "step": "log_entry",
+            "totals": totals,
+            "summary": f"Logged {len(per_item)} item(s) into "
+            f"{len(totals)} nutrient total(s)",
+        }
+    )
+    return trace
+
+
 def create_app(
     *,
     meal_logger: MealLogger | None = None,
@@ -89,8 +142,9 @@ def create_app(
     def log_meal(req: LogRequest) -> dict[str, Any]:
         result = logger_fn(req.text)
         totals = result.get("totals", [])
+        per_item = result.get("per_item", [])
         entry_id = log_store.add(req.text, totals)
-        return {"id": entry_id, **result}
+        return {"id": entry_id, **result, "trace": _build_trace(per_item, totals)}
 
     @app.get("/history")
     def history(limit: int = 50) -> dict[str, Any]:

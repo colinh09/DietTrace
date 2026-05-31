@@ -71,3 +71,55 @@ def test_reasoning_unknown_trace_is_empty(tmp_path) -> None:
     response = client.get("/reasoning/deadbeef")
     assert response.status_code == 200
     assert response.json()["spans"] == []
+
+
+def _trace_logger(text: str) -> dict:
+    """A logger whose per_item carries the matched USDA food + id and grams."""
+    return {
+        "totals": _STUB_TOTALS,
+        "per_item": [
+            {"description": "Rice, white, cooked", "fdc_id": 168878, "grams": 158.0},
+            {"description": "Egg, whole, cooked", "fdc_id": 173424, "grams": 50.0},
+        ],
+    }
+
+
+def test_log_response_carries_ordered_trace(tmp_path) -> None:
+    client, _ = _client(tmp_path, logger=_trace_logger)
+
+    body = client.post("/log", json={"text": "rice and an egg"}).json()
+    trace = body["trace"]
+
+    # parse_meal, then (search_nutrition, estimate_portion) per food, then log_entry.
+    assert [step["step"] for step in trace] == [
+        "parse_meal",
+        "search_nutrition",
+        "estimate_portion",
+        "search_nutrition",
+        "estimate_portion",
+        "log_entry",
+    ]
+
+    # Each search step names the matched USDA food + its fdc_id.
+    assert trace[1]["matched"] == "Rice, white, cooked"
+    assert trace[1]["fdc_id"] == 168878
+    assert trace[3]["matched"] == "Egg, whole, cooked"
+    assert trace[3]["fdc_id"] == 173424
+
+    # Each portion step names the food + its grams.
+    assert trace[2]["food"] == "Rice, white, cooked"
+    assert trace[2]["grams"] == 158.0
+    assert trace[4]["food"] == "Egg, whole, cooked"
+    assert trace[4]["grams"] == 50.0
+
+    # The per-food steps stay ordered by food across the whole trace.
+    assert [step["food"] for step in trace if "food" in step] == [
+        "Rice, white, cooked",
+        "Rice, white, cooked",
+        "Egg, whole, cooked",
+        "Egg, whole, cooked",
+    ]
+
+    # The final step carries the summed totals.
+    assert trace[-1]["step"] == "log_entry"
+    assert trace[-1]["totals"] == _STUB_TOTALS
