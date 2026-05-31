@@ -98,14 +98,28 @@ def _validate_diff(diff: str) -> None:
         )
 
 
+def _is_fence(line: str) -> bool:
+    """A wrapper fence is a column-zero ```` ``` ````; diff body lines are prefixed
+    with a space/+/- so backticks inside the diff never match here."""
+    return line.rstrip("\r\n").startswith("```")
+
+
 def _strip_fences(text: str) -> str:
-    """Remove markdown code fences if the LLM wrapped the diff in them."""
+    """Return the diff with any markdown code fence wrapper removed.
+
+    The LLM is asked for raw diff text, but often wraps it in a ```` ```diff ````
+    block and surrounds that with prose ("Here is the fix: …"). When a column-zero
+    fence is present, return only the content of the first fenced block so neither
+    the fence markers nor the surrounding chatter reach ``git apply``. With no
+    fence the text is returned unchanged (and validated downstream)."""
     lines = text.splitlines(keepends=True)
-    if lines and lines[0].rstrip("\r\n").startswith("```"):
-        lines = lines[1:]
-    if lines and lines[-1].rstrip("\r\n").startswith("```"):
-        lines = lines[:-1]
-    return "".join(lines)
+    opens = [i for i, line in enumerate(lines) if _is_fence(line)]
+    if not opens:
+        return text
+    start = opens[0]
+    closes = [i for i in opens if i > start]
+    end = closes[0] if closes else len(lines)
+    return "".join(lines[start + 1 : end])
 
 
 def propose_patch(
