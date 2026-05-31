@@ -199,6 +199,35 @@ body {
 .meal-exp { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .27s ease; }
 .meal-exp[data-open="true"] { grid-template-rows: 1fr; }
 .meal-exp-inner { overflow: hidden; min-height: 0; }
+.meal-exp-empty { margin-left: 25px; padding: 4px 0 calc(var(--meal-py) + 4px); font-size: 13px; color: var(--muted-ink); }
+
+/* agent's-work trace */
+.mealtrace { margin-left: 25px; padding: 2px 0 calc(var(--meal-py) + 4px); }
+.mealtrace-head { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-bottom: 12px; }
+.trace-list { display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
+.tstep { display: grid; grid-template-columns: 24px 1fr; }
+.tstep-rail { position: relative; }
+.tstep-glyph { position: relative; z-index: 1; height: 24px; width: 22px; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.tstep-line { position: absolute; left: 11px; transform: translateX(-50%); top: 0; bottom: 0; width: 1px; background: var(--line-strong); z-index: 0; }
+.tstep-body { padding-left: 6px; min-width: 0; }
+.tstep-line-btn { display: flex; align-items: center; gap: 9px; width: 100%; padding: 0 0 var(--step-py); text-align: left; min-height: 24px; }
+.tstep-fn { font-size: 13px; color: var(--ink); font-weight: 500; white-space: nowrap; }
+.tstep-arrow { font-size: 13px; color: var(--muted-ink); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.exp-pad { background: var(--accent-softer); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 6px 0 var(--step-py); }
+.item-grid { display: grid; grid-template-columns: minmax(0,1fr) 82px 50px 44px 44px 44px; align-items: center; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.item-grid:last-child { border-bottom: none; }
+.item-head { padding: 0 0 7px; }
+.item-head div { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+.item-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.item-name-txt { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.num { text-align: right; font-size: 13px; }
+.dim { color: var(--muted-ink); }
+.grams-edit { display: inline-flex; align-items: baseline; gap: 3px; justify-content: flex-end; }
+.grams-edit input { width: 44px; text-align: right; border: none; border-bottom: 1px dashed var(--line-strong); background: transparent; font-size: 13px; color: var(--accent-ink); padding: 1px 2px; -moz-appearance: textfield; transition: border-color .16s ease; }
+.grams-edit input::-webkit-outer-spin-button, .grams-edit input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.grams-edit input:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }
+.grams-edit span { font-size: 11px; color: var(--faint); }
 
 /* responsive — stack the band on narrow screens */
 @media (max-width: 640px) {

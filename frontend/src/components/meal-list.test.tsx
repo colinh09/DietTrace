@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { MealList } from "@/components/meal-list";
-import type { Meal } from "@/lib/api";
+import type { LoggedItem, Meal, TraceStep } from "@/lib/api";
 
 // Two days-worth of /history meals: one whose macros reconcile cleanly (High)
 // and one whose macros diverge from its calorie total (Medium).
@@ -90,5 +90,36 @@ describe("MealList", () => {
     render(<MealList meals={[]} />);
     expect(screen.getByText(/nothing logged/i)).toBeInTheDocument();
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  it("reveals the agent's-work trace from the /log detail when a row is expanded", () => {
+    const perItem: LoggedItem[] = [
+      {
+        fdc_id: 171477,
+        description: "grilled chicken",
+        grams: 140,
+        nutrients: [{ code: "208", name: "Energy", amount: 231, unit: "kcal" }],
+      },
+    ];
+    const trace: TraceStep[] = [
+      { step: "parse_meal", summary: "Parsed 1 food(s): grilled chicken", foods: ["grilled chicken"] },
+      { step: "log_entry", summary: "Logged 1 item(s) into 1 nutrient total(s)", totals: perItem[0].nutrients },
+    ];
+    render(<MealList meals={meals} detailsById={{ 2: { trace, perItem } }} />);
+    // Collapsed by default: the trace is not in the DOM.
+    expect(screen.queryByText(/the agent's work/i)).not.toBeInTheDocument();
+
+    const row = screen.getByText("grilled chicken salad with olive oil").closest("li") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: /expand/i }));
+    expect(within(row).getByText(/the agent's work/i)).toBeInTheDocument();
+    expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
+    expect(within(row).getByLabelText(/grams of grilled chicken/i)).toBeInTheDocument();
+  });
+
+  it("shows a calm note when an expanded row has no trace detail", () => {
+    render(<MealList meals={meals} />);
+    const row = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: /expand/i }));
+    expect(within(row).getByText(/no agent trace/i)).toBeInTheDocument();
   });
 });

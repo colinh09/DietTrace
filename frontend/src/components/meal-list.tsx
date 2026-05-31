@@ -3,19 +3,36 @@
 // The day's logged meals as compact rows. Each row is
 // one line: ✦ meal text · time, then kcal · P/C/F inline, a confidence chip, an
 // edit affordance, and an expand chevron. Layout follows 
-// (`.meals` / `.meal`). Expanding a row reveals the agent's-work trace — that
-// content lands in 9.7; this task builds the rows and the collapsed shell.
+// (`.meals` / `.meal`). Expanding a row reveals the agent's-work trace — its
+// ordered steps plus the per-item editable table — from that meal's `/log`
+// detail when we have it.
 import { useState } from "react";
 import { ChevronDown, Sparkle } from "lucide-react";
-import type { Meal } from "@/lib/api";
+import type { LoggedItem, Meal, TraceStep } from "@/lib/api";
 import { confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
+import { MealTrace } from "@/components/meal-trace";
+
+// The agent's-work detail for a meal, captured from its `/log` response: the
+// reconstructed trace steps and the per-item nutrient panels.
+export interface MealDetail {
+  trace: TraceStep[];
+  perItem: LoggedItem[];
+}
 
 const fmt = new Intl.NumberFormat("en-US");
 
 // One compact meal row. Owns only its open/closed state; the expanded trace is
 // filled in 9.7, so for now the chevron toggles an empty region.
-function MealRow({ meal, onEdit }: { meal: Meal; onEdit?: (meal: Meal) => void }) {
+function MealRow({
+  meal,
+  detail,
+  onEdit,
+}: {
+  meal: Meal;
+  detail?: MealDetail;
+  onEdit?: (meal: Meal) => void;
+}) {
   const [open, setOpen] = useState(false);
   const macros = macrosOf(meal.totals);
   const conf = confidenceOf(macros);
@@ -67,8 +84,16 @@ function MealRow({ meal, onEdit }: { meal: Meal; onEdit?: (meal: Meal) => void }
         </span>
       </div>
       <div className="meal-exp" data-open={open ? "true" : "false"}>
-        {/* The agent's-work trace + editable per-item table land in 9.7. */}
-        <div className="meal-exp-inner" />
+        <div className="meal-exp-inner">
+          {open &&
+            (detail ? (
+              <MealTrace trace={detail.trace} perItem={detail.perItem} />
+            ) : (
+              <div className="meal-exp-empty">
+                No agent trace for this meal — log it again to see the agent&apos;s work.
+              </div>
+            ))}
+        </div>
       </div>
     </li>
   );
@@ -77,10 +102,12 @@ function MealRow({ meal, onEdit }: { meal: Meal; onEdit?: (meal: Meal) => void }
 export function MealList({
   meals,
   heading = "Logged",
+  detailsById,
   onEdit,
 }: {
   meals: Meal[];
   heading?: string;
+  detailsById?: Record<number, MealDetail>;
   onEdit?: (meal: Meal) => void;
 }) {
   return (
@@ -98,7 +125,12 @@ export function MealList({
       ) : (
         <ul className="meals-list">
           {meals.map((meal) => (
-            <MealRow key={meal.id} meal={meal} onEdit={onEdit} />
+            <MealRow
+              key={meal.id}
+              meal={meal}
+              detail={detailsById?.[meal.id]}
+              onEdit={onEdit}
+            />
           ))}
         </ul>
       )}

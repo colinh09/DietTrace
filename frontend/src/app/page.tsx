@@ -3,13 +3,13 @@
 // The DietTrace day view: a centered single-column page that owns the selected
 // day, renders the ✦ DietTrace header, the day-macros band (calories + P/C/F vs
 // targets), the inline log input, and the day's logged meals as compact rows
-// read from /history. The agent's-work trace behind
-// each row's expand lands in 9.7.
+// read from /history. Expanding a row reveals that
+// meal's agent's-work trace, kept from its /log response.
 import { useCallback, useEffect, useState } from "react";
 import { Header } from "@/components/header";
 import { DayMacros } from "@/components/day-macros";
 import { LogInput } from "@/components/log-input";
-import { MealList } from "@/components/meal-list";
+import { MealList, type MealDetail } from "@/components/meal-list";
 import {
   getAnalysis,
   getGoals,
@@ -23,6 +23,9 @@ export default function Home() {
   const [date, setDate] = useState(() => new Date());
   const [goals, setGoals] = useState<GoalProgress[]>([]);
   const [meals, setMeals] = useState<Meal[]>([]);
+  // The agent's-work detail per meal id, captured from each /log response so an
+  // expanded row can show the trace + per-item table the backend just produced.
+  const [details, setDetails] = useState<Record<number, MealDetail>>({});
 
   // /goals gives the targets immediately so the band isn't empty; /analysis
   // then layers the day's consumed/remaining on top. Each is fail-soft — a
@@ -75,8 +78,16 @@ export default function Home() {
           onPickDate={setDate}
         />
         <DayMacros goals={goals} />
-        <LogInput onLogged={() => loadHistory()} />
-        <MealList meals={meals} heading={heading} />
+        <LogInput
+          onLogged={(_text, result) => {
+            setDetails((current) => ({
+              ...current,
+              [result.id]: { trace: result.trace, perItem: result.per_item },
+            }));
+            loadHistory();
+          }}
+        />
+        <MealList meals={meals} heading={heading} detailsById={details} />
       </main>
     </div>
   );
