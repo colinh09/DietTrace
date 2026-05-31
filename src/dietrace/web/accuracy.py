@@ -89,7 +89,7 @@ def _experiment_means(client: Any, experiment_id: str) -> dict[str, float]:
 
 def _fetch_live_scores() -> dict[str, Any] | None:
     """Read the eval experiments from Phoenix; baseline = oldest run, current =
-    best-overall run (an injected regression demo shouldn't be the headline).
+    latest run.
 
     Returns ``{baseline, current, experiments}`` keyed by evaluator name, or None
     when Phoenix is unreachable / unconfigured (caller falls back to measured).
@@ -111,21 +111,14 @@ def _fetch_live_scores() -> dict[str, Any] | None:
             created = (exp.get("created_at") if isinstance(exp, dict) else "") or ""
             scores = _experiment_means(client, exp_id)
             if scores:
-                runs.append(
-                    {
-                        "created": created,
-                        "scores": scores,
-                        "overall": sum(scores.values()) / len(scores),
-                    }
-                )
+                runs.append({"created": created, "scores": scores})
         if not runs:
             return None
 
-        baseline = min(runs, key=lambda r: r["created"])
-        current = max(runs, key=lambda r: r["overall"])
+        runs.sort(key=lambda r: r["created"])
         return {
-            "baseline": baseline["scores"],
-            "current": current["scores"],
+            "baseline": runs[0]["scores"],
+            "current": runs[-1]["scores"],
             "experiments": len(runs),
         }
     except Exception:
