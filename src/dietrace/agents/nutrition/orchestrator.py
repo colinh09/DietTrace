@@ -6,11 +6,17 @@ search/calculation split: the model never invents a number a tool can
 look up, so the result is fast, reproducible, and accurate. The ADK tool-calling
 agent (``build_nutrition_agent``) remains the traced "agent" artifact; this is
 the production path the web ``/log`` endpoint calls.
+
+When the USDA DB can't honor a *branded* item (it rarely carries restaurant
+meals), resolution falls back to a grounded web lookup (``web_nutrition``) rather
+than logging some other chain's lookalike — the one place the agent reads a
+number it didn't compute, kept narrow and fail-soft.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import re
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from dietrace.agents.nutrition.estimate_portion import (
@@ -18,49 +24,112 @@ from dietrace.agents.nutrition.estimate_portion import (
     representative_serving,
 )
 from dietrace.agents.nutrition.log_entry import LoggedMeal, MealItem, log_entry
-from dietrace.agents.nutrition.parse_meal import parse_meal
+from dietrace.agents.nutrition.parse_meal import ParsedItem, parse_meal
 from dietrace.agents.nutrition.search_nutrition import search_nutrition
+from dietrace.agents.nutrition.web_nutrition import web_nutrition
 from dietrace.nutrition.models import Food
 from dietrace.nutrition.repository import FoodRepository
 
+# A web lookup: (food, brand, client) -> a synthetic Food or None. Injectable so
+# the orchestration logic is testable without a live grounded call.
+WebLookup = Callable[[str, str, Any | None], Food | None]
+
+
+def _default_web_lookup(food: str, brand: str, client: Any | None) -> Food | None:
+    return web_nutrition(food, brand, client=client)
+
+
+def _brand_satisfied(brand: str, description: str) -> bool:
+    """True when every significant word of *brand* appears in *description*.
+
+    The signal that a DB match actually *is* the branded item the user named: a
+    search for "bacon cheeseburger" happily returns McDonald's, but its
+    description won't contain "five" and "guys", so a Five Guys order is correctly
+    judged unsatisfied and routed to the web. Short tokens (≤2 chars) are ignored
+    so "in"/"n'" style filler doesn't decide the match.
+    """
+    brand_tokens = {t for t in re.findall(r"[a-z0-9]+", brand.lower()) if len(t) > 2}
+    if not brand_tokens:
+        return True  # no brand named — the plain DB match stands
+    desc_tokens = set(re.findall(r"[a-z0-9]+", description.lower()))
+    return brand_tokens <= desc_tokens
+
+
+def _resolve_food(
+    repository: FoodRepository,
+    item: ParsedItem,
+    web_lookup: WebLookup,
+    client: Any | None,
+) -> tuple[Food | None, str, str | None]:
+    """Resolve one parsed item to a ``(Food, source, label)`` the pipeline can log.
+
+    Prefers a USDA DB match; for a branded item the DB can't honor, or one it
+    misses entirely, falls back to the grounded web lookup. Keeps the DB match as a
+    last resort over dropping the item. ``source`` is "usda" | "web" | "none".
+    """
+    match = search_nutrition(repository, item.food)
+    usda_food = repository.get(match.fdc_id) if match else None
+
+    if match and usda_food and _brand_satisfied(item.brand, match.description):
+        return usda_food, "usda", match.description
+
+    # Branded item the DB didn't satisfy, or no match at all — try the web.
+    web_food = web_lookup(item.food, item.brand, client)
+    if web_food is not None:
+        return web_food, "web", web_food.description
+
+    if usda_food and match:
+        return usda_food, "usda", match.description  # weak match beats dropping it
+    return None, "none", None
+
+
+def _grams_for(food: Food, item: ParsedItem) -> float:
+    """Grams for *item* against *food*, with the orchestrator's serving fallback."""
+    estimate = estimate_portion(food, item.quantity, item.unit)
+    if estimate.grams is not None:
+        return estimate.grams
+    return _fallback_grams(food, item.quantity)
+
 
 def log_meal(
-    text: str, repository: FoodRepository, *, client: Any | None = None
+    text: str,
+    repository: FoodRepository,
+    *,
+    client: Any | None = None,
+    web_lookup: WebLookup = _default_web_lookup,
 ) -> LoggedMeal:
     """Log *text* into scaled nutrient totals via parse → search → portion → calc.
 
-    One Gemini call parses the meal (mockable via *client*); every later step is a
-    deterministic read/computation against the food DB. Items that do not resolve
-    (no food match, or no gram estimate) are skipped rather than raising, so a
-    partially-understood meal still logs what it can.
+    One Gemini call parses the meal (mockable via *client*); each item then resolves
+    against the food DB, falling back to a grounded web lookup for a branded item the
+    DB can't honor. Items that resolve to nothing are skipped rather than raising, so
+    a partially-understood meal still logs what it can.
     """
     parsed = parse_meal(text, client=client)
 
     meal_items: list[MealItem] = []
     for item in parsed.items:
-        match = search_nutrition(repository, item.food)
-        if match is None:
-            continue
-        food = repository.get(match.fdc_id)
+        food, _source, _label = _resolve_food(repository, item, web_lookup, client)
         if food is None:
             continue
-        estimate = estimate_portion(food, item.quantity, item.unit)
-        grams = estimate.grams
-        if grams is None:
-            grams = _fallback_grams(food, item.quantity)
-        meal_items.append(MealItem(food=food, grams=grams))
+        meal_items.append(MealItem(food=food, grams=_grams_for(food, item)))
 
     return log_entry(meal_items)
 
 
 def stream_meal(
-    text: str, repository: FoodRepository, *, client: Any | None = None
+    text: str,
+    repository: FoodRepository,
+    *,
+    client: Any | None = None,
+    web_lookup: WebLookup = _default_web_lookup,
 ) -> Iterator[dict[str, Any]]:
     """Run the meal pipeline as a live event stream — one event per step.
 
     Mirrors :func:`log_meal` step for step, but yields as it goes so the UI can
     show the agent's work as it happens: a ``parse_meal`` start then its result,
-    then per-food ``search_nutrition`` + ``estimate_portion``, then ``log_entry``.
+    then per-food ``search_nutrition`` (and a ``web_search`` step when the item
+    falls back to the grounded lookup) + ``estimate_portion``, then ``log_entry``.
     The final ``{"type": "result"}`` event carries the same {per_item, totals,
     trace} a /log call returns.
     """
@@ -84,8 +153,8 @@ def stream_meal(
 
     meal_items: list[MealItem] = []
     for item in parsed.items:
-        match = search_nutrition(repository, item.food)
-        if match is None:
+        food, source, label = _resolve_food(repository, item, web_lookup, client)
+        if food is None:
             yield step(
                 step="search_nutrition",
                 status="done",
@@ -93,21 +162,33 @@ def stream_meal(
                 summary=f"no match for “{item.food}”",
             )
             continue
-        food = repository.get(match.fdc_id)
-        if food is None:
-            continue
-        yield step(
-            step="search_nutrition",
-            status="done",
-            food=item.food,
-            matched=match.description,
-            fdc_id=match.fdc_id,
-            summary=f"{item.food} → {match.description}",
-        )
-        estimate = estimate_portion(food, item.quantity, item.unit)
-        grams = estimate.grams
-        if grams is None:
-            grams = _fallback_grams(food, item.quantity)
+
+        named = f"{item.brand} {item.food}".strip() if item.brand else item.food
+        if source == "web":
+            yield step(
+                step="search_nutrition",
+                status="done",
+                food=item.food,
+                summary=f"“{named}” isn't in USDA — searching the web",
+            )
+            yield step(
+                step="web_search",
+                status="done",
+                food=item.food,
+                matched=label,
+                summary=f"{named} → {label}",
+            )
+        else:
+            yield step(
+                step="search_nutrition",
+                status="done",
+                food=item.food,
+                matched=label,
+                fdc_id=food.fdc_id,
+                summary=f"{named} → {label}",
+            )
+
+        grams = _grams_for(food, item)
         yield step(
             step="estimate_portion",
             status="done",

@@ -123,7 +123,7 @@ def test_parse_meal_tool_delegates_to_the_model(repository) -> None:
 
     items = parse_meal.func("two eggs")
 
-    assert items == [{"food": "egg", "quantity": 2.0, "unit": "each"}]
+    assert items == [{"food": "egg", "quantity": 2.0, "unit": "each", "brand": ""}]
 
 
 def test_search_nutrition_tool_delegates_to_the_repository(repository) -> None:

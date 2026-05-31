@@ -41,7 +41,10 @@ class ParsedItem(BaseModel):
     """One food parsed from free text: its name, quantity, and household unit.
 
     ``quantity`` defaults to 1 and ``unit`` to "" so a bare food name (the model
-    omitting either) still yields a usable item for the deterministic tools. The
+    omitting either) still yields a usable item for the deterministic tools.
+    ``brand`` carries a restaurant/brand qualifier when the user named one ("Five
+    Guys", "Chipotle") — the USDA DB rarely has restaurant meals, so a branded
+    item routes to the grounded web fallback when USDA can't honor the brand. The
     model stays a clean schema (no validation constraints) because it is also sent
     to Gemini as the structured-output ``response_schema``, which rejects JSON
     Schema keywords like ``exclusiveMinimum``; the positive/finite-quantity guard
@@ -51,6 +54,7 @@ class ParsedItem(BaseModel):
     food: str
     quantity: float = 1.0
     unit: str = ""
+    brand: str = ""
 
 
 class MealParse(BaseModel):

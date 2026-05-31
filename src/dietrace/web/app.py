@@ -141,15 +141,26 @@ def _build_trace(
         food = item.get("description") or item.get("name")
         fdc_id = item.get("fdc_id", item.get("id"))
         grams = item.get("grams")
-        trace.append(
-            {
-                "step": "search_nutrition",
-                "food": food,
-                "matched": food,
-                "fdc_id": fdc_id,
-                "summary": f"Matched '{food}' to USDA food {fdc_id}",
-            }
-        )
+        if fdc_id == 0:
+            # fdc_id 0 marks a grounded web lookup — the food USDA didn't carry.
+            trace.append(
+                {
+                    "step": "web_search",
+                    "food": food,
+                    "matched": food,
+                    "summary": f"Searched the web for '{food}' (not in USDA)",
+                }
+            )
+        else:
+            trace.append(
+                {
+                    "step": "search_nutrition",
+                    "food": food,
+                    "matched": food,
+                    "fdc_id": fdc_id,
+                    "summary": f"Matched '{food}' to USDA food {fdc_id}",
+                }
+            )
         trace.append(
             {
                 "step": "estimate_portion",

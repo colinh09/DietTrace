@@ -82,7 +82,14 @@ def test_unresolvable_item_is_skipped(tmp_path) -> None:
         ]
     )
 
-    meal = log_meal("an egg and some unicorn meat", _repo(tmp_path), client=client)
+    # No brand named, so the unmatched "unicorn meat" has nowhere to fall back —
+    # a no-op web lookup keeps the test hermetic and proves the item is dropped.
+    meal = log_meal(
+        "an egg and some unicorn meat",
+        _repo(tmp_path),
+        client=client,
+        web_lookup=lambda food, brand, client: None,
+    )
 
     assert len(meal.per_item) == 1
     assert meal.per_item[0].description.startswith("Egg")

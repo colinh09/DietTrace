@@ -9,9 +9,18 @@
 //   2. the per-item table, whose grams are editable and rescale the row's
 //      kcal/P/C/F live (the portion is the one number a person actually corrects).
 import { useState } from "react";
-import { Sparkle } from "lucide-react";
+import { Globe, Sparkle } from "lucide-react";
 import type { LoggedItem, TraceStep } from "@/lib/api";
 import { macrosOf } from "@/lib/meal";
+
+// The web-search fallback gets its own glyph — it's the moment the agent leaves
+// the USDA DB for a grounded web lookup, so it should read distinctly.
+export function StepGlyph({ step }: { step?: string }) {
+  if (step === "web_search") {
+    return <Globe size={11} color="var(--accent)" />;
+  }
+  return <Sparkle size={11} fill="var(--accent)" color="var(--accent)" />;
+}
 
 // One trace step as a calm rail line: the step name, then its summary.
 function StepLine({ step, isLast }: { step: TraceStep; isLast: boolean }) {
@@ -19,7 +28,7 @@ function StepLine({ step, isLast }: { step: TraceStep; isLast: boolean }) {
     <li className="tstep">
       <div className="tstep-rail">
         <span className="tstep-glyph">
-          <Sparkle size={11} fill="var(--accent)" color="var(--accent)" />
+          <StepGlyph step={step.step} />
         </span>
         {!isLast && <span className="tstep-line" />}
       </div>

@@ -81,6 +81,21 @@ def test_defaults_quantity_and_unit_when_omitted() -> None:
     assert item.food == "oatmeal"
     assert item.quantity == 1.0
     assert item.unit == ""
+    assert item.brand == ""
+
+
+def test_captures_a_named_brand_separately_from_the_food() -> None:
+    """A restaurant/brand qualifier is kept in ``brand``, not folded into ``food``."""
+    client = _client(
+        _items_json(
+            [{"food": "bacon cheeseburger", "quantity": 1, "unit": "", "brand": "Five Guys"}]
+        )
+    )
+
+    item = parse_meal("a Five Guys bacon cheeseburger", client=client).items[0]
+
+    assert item.food == "bacon cheeseburger"
+    assert item.brand == "Five Guys"
 
 
 def test_malformed_output_fails_soft() -> None:

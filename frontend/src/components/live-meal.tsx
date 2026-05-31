@@ -6,6 +6,7 @@
 // normal logged meal. Mirrors the MealTrace step rail so it reads identically.
 import { Sparkle } from "lucide-react";
 import type { StreamEvent } from "@/lib/api";
+import { StepGlyph } from "@/components/meal-trace";
 
 export interface LiveEntry {
   text: string;
@@ -41,11 +42,7 @@ export function LiveMeal({ entry }: { entry: LiveEntry }) {
                     <li key={i} className="tstep">
                       <div className="tstep-rail">
                         <span className="tstep-glyph">
-                          <Sparkle
-                            size={11}
-                            fill="var(--accent)"
-                            color="var(--accent)"
-                          />
+                          <StepGlyph step={s.step} />
                         </span>
                         {i < steps.length - 1 && <span className="tstep-line" />}
                       </div>

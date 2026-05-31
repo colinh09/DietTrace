@@ -215,6 +215,32 @@ def test_log_response_carries_ordered_trace(tmp_path) -> None:
     assert trace[-1]["totals"] == _STUB_TOTALS
 
 
+def _web_trace_logger(text: str) -> dict:
+    """A logger whose item came from the grounded web fallback (fdc_id 0)."""
+    return {
+        "totals": _STUB_TOTALS,
+        "per_item": [
+            {"description": "Five Guys Bacon Cheeseburger", "fdc_id": 0, "grams": 317.0}
+        ],
+    }
+
+
+def test_log_trace_marks_a_web_grounded_food_as_a_web_search(tmp_path) -> None:
+    client, _ = _client(tmp_path, logger=_web_trace_logger)
+
+    trace = client.post("/log", json={"text": "a Five Guys bacon cheeseburger"}).json()["trace"]
+
+    # The fdc_id-0 item is reported as a web search, not a USDA match.
+    assert [step["step"] for step in trace] == [
+        "parse_meal",
+        "web_search",
+        "estimate_portion",
+        "log_entry",
+    ]
+    assert "web" in trace[1]["summary"].lower()
+    assert "USDA food 0" not in trace[1]["summary"]
+
+
 def test_delete_meal_removes_it(tmp_path) -> None:
     client, store = _client(tmp_path)
     client.post("/log", json={"text": "1 banana"})
