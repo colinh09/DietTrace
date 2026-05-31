@@ -20,6 +20,22 @@ _GOAL_DEFS: list[tuple[str, str, str, str, float]] = [
 ]
 
 
+def _target(env_var: str, default: float) -> float:
+    """The daily target for *env_var*, falling back to *default* fail-soft.
+
+    A non-numeric override (e.g. ``DIETRACE_GOAL_PROTEIN=abc``) must not crash
+    ``/goals`` or ``/analysis`` — degrade to the built-in default rather than
+    letting ``float()`` raise.
+    """
+    raw = os.environ.get(env_var)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 def load_goals() -> list[dict[str, Any]]:
     """Daily macro/calorie targets, env-overridable.
 
@@ -29,7 +45,7 @@ def load_goals() -> list[dict[str, Any]]:
         {
             "code": code,
             "name": name,
-            "target": float(os.environ.get(env_var, default)),
+            "target": _target(env_var, default),
             "unit": unit,
         }
         for env_var, code, name, unit, default in _GOAL_DEFS
