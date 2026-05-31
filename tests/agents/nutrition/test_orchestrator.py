@@ -12,7 +12,10 @@ import sqlite3
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from dietrace.agents.nutrition.orchestrator import log_meal
+import pytest
+
+from dietrace.agents.nutrition.orchestrator import _fallback_grams, log_meal
+from dietrace.nutrition.models import Food, ServingSize
 from dietrace.nutrition.repository import FoodRepository
 from tests.nutrition.fixtures_food_db import build_food_db
 
@@ -83,3 +86,26 @@ def test_unresolvable_item_is_skipped(tmp_path) -> None:
 
     assert len(meal.per_item) == 1
     assert meal.per_item[0].description.startswith("Egg")
+
+
+def test_fallback_grams_prefers_nlea_over_oversized_package() -> None:
+    # When no unit resolves, the fallback must scale by the edible NLEA serving
+    # (55 g) rather than the oversized package serving (340 g) listed first.
+    food = Food(
+        fdc_id=42,
+        description="Granola, oats and honey",
+        data_type="branded_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="package", gram_weight=340.0, description="1 package"),
+            ServingSize(amount=1.0, unit="cup", gram_weight=55.0, description="1 NLEA serving"),
+        ],
+    )
+
+    assert _fallback_grams(food, 1.0) == pytest.approx(55.0)
+
+
+def test_fallback_grams_defaults_to_100g_without_servings() -> None:
+    # A food with no serving sizes still resolves, at 100 g per unit.
+    food = Food(fdc_id=99, description="Mystery powder", data_type="branded_food")
+
+    assert _fallback_grams(food, 2.0) == pytest.approx(200.0)

@@ -12,7 +12,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from dietrace.agents.nutrition.estimate_portion import estimate_portion
+from dietrace.agents.nutrition.estimate_portion import (
+    estimate_portion,
+    representative_serving,
+)
 from dietrace.agents.nutrition.log_entry import LoggedMeal, MealItem, log_entry
 from dietrace.agents.nutrition.parse_meal import parse_meal
 from dietrace.agents.nutrition.search_nutrition import search_nutrition
@@ -54,9 +57,10 @@ def _fallback_grams(food: Food, quantity: float) -> float:
 
     Better to log an approximate portion (and let the evals score it) than to drop
     the item entirely when Gemini emits a unit no serving matches (e.g. "large").
+    Prefers the food's edible/NLEA serving over an oversized package one.
     """
-    if food.serving_sizes:
-        primary = food.serving_sizes[0]
+    primary = representative_serving(food.serving_sizes)
+    if primary:
         per_unit = primary.gram_weight / primary.amount if primary.amount else primary.gram_weight
         return quantity * per_unit
     return quantity * 100.0

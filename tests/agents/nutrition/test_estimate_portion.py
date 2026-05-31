@@ -129,3 +129,77 @@ def test_unknown_unit_reports_no_grams() -> None:
     assert est.grams is None
     assert est.source == "unknown"
     assert est.confidence == pytest.approx(0.0)
+
+
+def _granola() -> Food:
+    """A food whose first serving is an oversized package, with an NLEA one after.
+
+    USDA branded data often lists a whole-package serving before the FDA label
+    (NLEA) serving; a bare count should scale by the edible NLEA serving, not the
+    whole package ( — "NLEA/edible-portion servings preferred over
+    oversized package servings").
+    """
+    return Food(
+        fdc_id=42,
+        description="Granola, oats and honey",
+        data_type="branded_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="package", gram_weight=340.0, description="1 package"),
+            ServingSize(amount=1.0, unit="cup", gram_weight=55.0, description="1 NLEA serving"),
+        ],
+    )
+
+
+def _cereal_no_nlea() -> Food:
+    """An oversized box serving listed before a normal edible cup serving."""
+    return Food(
+        fdc_id=43,
+        description="Cereal flakes",
+        data_type="branded_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="box", gram_weight=500.0, description="1 box"),
+            ServingSize(amount=1.0, unit="cup", gram_weight=30.0, description="1 cup"),
+        ],
+    )
+
+
+def test_whole_item_prefers_nlea_over_oversized_package() -> None:
+    """A bare count scales by the NLEA serving, not the oversized package listed first."""
+    est = estimate_portion(_granola(), 1.0, "serving")
+
+    assert est.grams == pytest.approx(55.0)
+    assert est.source == "whole_item"
+
+
+def test_whole_item_prefers_edible_serving_over_oversized() -> None:
+    """Without an NLEA marker, a bare count still avoids the oversized package serving."""
+    est = estimate_portion(_cereal_no_nlea(), 1.0, "serving")
+
+    assert est.grams == pytest.approx(30.0)
+    assert est.source == "whole_item"
+
+
+def test_only_oversized_serving_still_resolves() -> None:
+    """When the only serving is an oversized package, it is still used (fail-soft)."""
+    food = Food(
+        fdc_id=44,
+        description="Cola, carbonated beverage",
+        data_type="branded_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="bottle", gram_weight=591.0, description="1 bottle")
+        ],
+    )
+
+    est = estimate_portion(food, 1.0, "serving")
+
+    assert est.grams == pytest.approx(591.0)
+    assert est.source == "whole_item"
+
+
+def test_explicit_package_unit_is_honored() -> None:
+    """An explicit "package" unit still resolves to the package — the preference for
+    edible servings only governs *bare* counts, not a unit the user named outright."""
+    est = estimate_portion(_granola(), 1.0, "package")
+
+    assert est.grams == pytest.approx(340.0)
+    assert est.source == "serving_size"

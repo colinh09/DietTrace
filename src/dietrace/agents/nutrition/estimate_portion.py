@@ -8,7 +8,8 @@ away from the math. Resolution is tried in descending order of trust:
 1. an explicit **mass** unit (g, oz, lb …) is converted directly;
 2. a unit that matches one of the food's **serving sizes** is scaled by quantity;
 3. a **whole-item** count (the food's own name, or "each"/"whole"/…) uses the
-   food's primary serving size;
+   food's representative serving — an NLEA/edible serving in preference to an
+   oversized whole-package one;
 4. otherwise a generic **fallback table** of household measures is consulted.
 
 Each result reports its ``source`` and a ``confidence`` in [0, 1] so the eval
@@ -21,7 +22,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from dietrace.nutrition.models import Food
+from dietrace.nutrition.models import Food, ServingSize
 
 # Mass units → grams per unit. The agent reads/scales nutrients per 100 g, so a
 # mass portion needs no food context and is the most trustworthy source.
@@ -53,6 +54,19 @@ _FALLBACK_GRAMS: dict[str, float] = {
 
 # Units that denote a whole piece of the food rather than a named measure.
 _WHOLE_ITEM_WORDS = frozenset({"", "whole", "each", "piece", "item", "unit", "serving"})
+
+# Markers (in a serving's description/unit) of an NLEA label / edible-portion
+# serving — USDA's reference amount, the most trustworthy single serving to scale
+# a bare count by.
+_PREFERRED_SERVING_WORDS = frozenset({"nlea", "edible"})
+
+# Markers of a whole-package/container serving, which is often oversized (a whole
+# box or bag holding several portions) and a poor default for a bare count. These
+# are skipped in favor of an edible serving when one exists.
+_OVERSIZED_SERVING_WORDS = frozenset({
+    "package", "pkg", "container", "box", "bag", "carton",
+    "jar", "tub", "pouch", "bottle", "can", "loaf",
+})
 
 _SERVING_CONFIDENCE = 0.9
 _WHOLE_ITEM_CONFIDENCE = 0.8
@@ -91,6 +105,33 @@ def _matches_whole_item(food: Food, unit: str) -> bool:
     return target in tokens
 
 
+def _serving_words(serving: ServingSize) -> set[str]:
+    """The singularized word tokens of a serving's description and unit."""
+    text = f"{serving.description or ''} {serving.unit or ''}".replace(",", " ")
+    return {_singular(token) for token in text.split()}
+
+
+def representative_serving(servings: list[ServingSize]) -> ServingSize | None:
+    """Pick the serving that best represents one edible portion.
+
+    USDA foods may list servings in any order, sometimes leading with an oversized
+    whole-package serving (a whole box or bag) ahead of the edible NLEA reference
+    amount. Used to scale a bare count or a fallback, that package wildly overstates
+    a portion. So prefer, in order: an NLEA/edible-portion serving, then any serving
+    that is not a whole-package one, then — fail-soft — the first listed serving so a
+    food whose only serving is a package still resolves.
+    """
+    if not servings:
+        return None
+    for serving in servings:
+        if _serving_words(serving) & _PREFERRED_SERVING_WORDS:
+            return serving
+    for serving in servings:
+        if not (_serving_words(serving) & _OVERSIZED_SERVING_WORDS):
+            return serving
+    return servings[0]
+
+
 def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> PortionEstimate:
     """Estimate the gram weight of *quantity* *unit* of *food*.
 
@@ -118,10 +159,11 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
                 confidence=_SERVING_CONFIDENCE,
             )
 
-    # 3. A whole-item count — use the food's primary serving size.
+    # 3. A whole-item count — use the food's representative (edible, not oversized)
+    #    serving rather than blindly the first one listed.
     if food.serving_sizes and _matches_whole_item(food, normalized):
-        primary = food.serving_sizes[0]
-        if primary.amount:
+        primary = representative_serving(food.serving_sizes)
+        if primary and primary.amount:
             per_item = primary.gram_weight / primary.amount
             return PortionEstimate(
                 grams=quantity * per_item,
