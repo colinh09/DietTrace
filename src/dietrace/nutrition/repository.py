@@ -33,6 +33,8 @@ class FoodRepository:
 
     def get(self, fdc_id: int) -> Food | None:
         """Return the :class:`Food` for *fdc_id*, or None if it is absent."""
+        if not Path(self._db_path).exists():
+            return None
         conn = sqlite3.connect(self._db_path)
         conn.row_factory = sqlite3.Row
         try:
@@ -68,6 +70,8 @@ class FoodRepository:
         """
         query = name.strip().lower()
         if not query:
+            return []
+        if not Path(self._db_path).exists():
             return []
         words = query.split()
 

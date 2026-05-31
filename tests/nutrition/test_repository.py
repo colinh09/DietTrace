@@ -78,3 +78,17 @@ def test_get_unknown_fdc_id_returns_none(food_db) -> None:
     repo = FoodRepository(food_db)
 
     assert repo.get(999999) is None
+
+
+def test_get_fails_soft_when_db_missing(tmp_path) -> None:
+    """A missing DB file degrades to None instead of raising (fail-soft, )."""
+    missing = FoodRepository(tmp_path / "does_not_exist.sqlite")
+
+    assert missing.get(1001) is None
+
+
+def test_search_fails_soft_when_db_missing(tmp_path) -> None:
+    """A missing DB file degrades to no candidates instead of raising (fail-soft)."""
+    missing = FoodRepository(tmp_path / "does_not_exist.sqlite")
+
+    assert missing.search("egg") == []
