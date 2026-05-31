@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
+from dietrace.web.goals import load_goals
 from dietrace.web.store import MealLogStore
 
 SERVICE_NAME = "dietrace-web"
@@ -59,6 +60,25 @@ def _aggregate(meals: list[dict[str, Any]]) -> list[dict[str, Any]]:
             entry["name"] = nutrient.get("name", "")
             entry["unit"] = nutrient.get("unit", "")
     return [{"code": code, **vals} for code, vals in agg.items()]
+
+
+def _goals_progress(
+    totals: list[dict[str, Any]],
+    goals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Per-macro target, consumed, and remaining-vs-target.
+
+    For each daily goal, look up the aggregated total for its USDA code (0 when the
+    day has none) and report ``remaining = target − consumed``.
+    """
+    by_code = {n["code"]: float(n.get("amount", 0.0)) for n in totals}
+    progress: list[dict[str, Any]] = []
+    for goal in goals:
+        consumed = by_code.get(goal["code"], 0.0)
+        progress.append(
+            {**goal, "consumed": consumed, "remaining": goal["target"] - consumed}
+        )
+    return progress
 
 
 def _build_trace(
@@ -119,6 +139,7 @@ def create_app(
     meal_logger: MealLogger | None = None,
     store: MealLogStore | None = None,
     tracer_init: Callable[[str], Any] = init_tracer,
+    goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     log_store = store or MealLogStore(os.environ.get("DIETRACE_LOG_DB", "data/log.sqlite"))
@@ -152,12 +173,18 @@ def create_app(
         day = date or datetime.datetime.now(tz=datetime.UTC).date().isoformat()
         return {"date": day, "meals": log_store.list(limit, date=day)}
 
+    @app.get("/goals")
+    def goals() -> dict[str, Any]:
+        return {"goals": goals_loader()}
+
     @app.get("/analysis")
     def analysis() -> dict[str, Any]:
         meals = log_store.list(1000)
+        totals = _aggregate(meals)
         return {
             "meal_count": len(meals),
-            "totals": _aggregate(meals),
+            "totals": totals,
+            "goals": _goals_progress(totals, goals_loader()),
             "traces_buffered": get_buffer().trace_count(),
         }
 

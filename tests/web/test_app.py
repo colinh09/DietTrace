@@ -95,6 +95,37 @@ def test_reasoning_unknown_trace_is_empty(tmp_path) -> None:
     assert response.json()["spans"] == []
 
 
+def test_goals_endpoint_returns_targets(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+
+    response = client.get("/goals")
+
+    assert response.status_code == 200
+    goals = response.json()["goals"]
+    by_code = {g["code"]: g for g in goals}
+    # Calories + the three macros, by USDA number code.
+    assert set(by_code) == {"208", "203", "205", "204"}
+    assert all(g["target"] > 0 for g in goals)
+
+
+def test_analysis_includes_targets_and_remaining(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    # Two stubbed meals → 210 kcal of Energy (code 208) consumed.
+    client.post("/log", json={"text": "1 banana"})
+    client.post("/log", json={"text": "another banana"})
+
+    body = client.get("/analysis").json()
+
+    energy = next(g for g in body["goals"] if g["code"] == "208")
+    assert energy["consumed"] == 210.0
+    # remaining = target − consumed.
+    assert energy["remaining"] == energy["target"] - 210.0
+    # A macro with nothing consumed has remaining == its full target.
+    protein = next(g for g in body["goals"] if g["code"] == "203")
+    assert protein["consumed"] == 0.0
+    assert protein["remaining"] == protein["target"]
+
+
 def _trace_logger(text: str) -> dict:
     """A logger whose per_item carries the matched USDA food + id and grams."""
     return {
