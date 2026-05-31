@@ -48,14 +48,13 @@ async def _mcp_session(api_key: str, base_url: str) -> AsyncIterator[Any]:  # pr
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
+    # The phoenix-mcp server takes the endpoint + key as CLI args (passing them
+    # only via env makes its API fetch fail). base_url must include the Phoenix
+    # Cloud workspace slug (e.g. .../s/<workspace>).
     server_params = StdioServerParameters(
         command="npx",
-        args=["-y", "@arizeai/phoenix-mcp"],
-        env={
-            **os.environ,
-            "PHOENIX_API_KEY": api_key,
-            "PHOENIX_BASE_URL": base_url,
-        },
+        args=["-y", "@arizeai/phoenix-mcp", "--baseUrl", base_url, "--apiKey", api_key],
+        env={**os.environ},
     )
 
     async with (
@@ -120,6 +119,25 @@ class PhoenixMCPClient:
             experiments = parsed["experiments"]
 
         return experiments[:limit]
+
+    async def get_experiment_results(self, experiment_id: str) -> list[dict[str, Any]]:
+        """Return per-example results for an experiment via ``get-experiment-by-id``.
+
+        Each result carries the example ``input``, ``reference_output`` (ground
+        truth), and ``output`` (the run's logged meal) — enough for the supervisor
+        to re-score the run with the numeric evaluators and read its own accuracy
+        trend from Phoenix at runtime.
+        """
+        async with self._session() as session:
+            result = await session.call_tool(
+                "get-experiment-by-id", arguments={"experiment_id": experiment_id}
+            )
+        parsed = _parse_tool_result(result)
+        if isinstance(parsed, dict):
+            return parsed.get("experimentResult", [])
+        if isinstance(parsed, list):
+            return parsed
+        return []
 
     async def get_spans(self, trace_id: str) -> list[dict[str, Any]]:
         """Return spans for a given trace_id by calling ``get-spans``."""

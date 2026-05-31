@@ -30,8 +30,26 @@ def _get_or_create_dataset(client, cases):
         return uploader.upload(client, cases)
 
 
+def _degrade(result: dict) -> dict:
+    """Halve every logged amount — a deliberate accuracy regression for the
+    supervisor-loop demo (run with --degrade)."""
+    for nutrient in result.get("totals", []):
+        nutrient["amount"] = float(nutrient.get("amount", 0.0)) * 0.5
+    return result
+
+
 def main() -> None:
+    import argparse
+
     from phoenix.client import Client
+
+    parser = argparse.ArgumentParser(description="Run the nutrition accuracy experiment.")
+    parser.add_argument(
+        "--degrade",
+        action="store_true",
+        help="Halve macros to simulate a regression (supervisor-loop demo).",
+    )
+    args = parser.parse_args()
 
     client = Client(
         base_url=os.environ["PHOENIX_BASE_URL"],
@@ -45,12 +63,12 @@ def main() -> None:
     repository = FoodRepository(os.environ.get("DIETRACE_FOOD_DB", "data/food.sqlite"))
 
     def run_agent(text: str) -> dict:
-        return log_meal(text, repository).model_dump()
+        result = log_meal(text, repository).model_dump()
+        return _degrade(result) if args.degrade else result
 
-    print("Running experiment (live Gemini parse per case)...")
-    ran = runner.run(
-        client, dataset, run_agent, experiment_name=EXPERIMENT_NAME
-    )
+    name = EXPERIMENT_NAME + ("-degraded" if args.degrade else "")
+    print(f"Running experiment '{name}' (live Gemini parse per case)...")
+    ran = runner.run(client, dataset, run_agent, experiment_name=name)
 
     # Phoenix prints its own per-evaluator summary; surface the experiment URL too.
     for attr in ("url", "experiment_url"):

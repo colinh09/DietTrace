@@ -46,3 +46,20 @@ async def test_list_datasets_unwraps_payload() -> None:
     datasets = await client.list_datasets()
 
     assert datasets[0]["name"] == "dietrace-nutrition-v1"
+
+
+async def test_get_experiment_results_unwraps_experiment_result() -> None:
+    payload = {
+        "metadata": {"id": "exp14"},
+        "experimentResult": [
+            {"example_id": "e1", "input": {"text": "egg"}, "reference_output": {}, "output": {}},
+        ],
+    }
+    session = _FakeSession(payload)
+    client = PhoenixMCPClient(_session=session)
+
+    results = await client.get_experiment_results("exp14")
+
+    assert results[0]["example_id"] == "e1"
+    assert session.calls[0][0] == "get-experiment-by-id"
+    assert session.calls[0][1] == {"experiment_id": "exp14"}
