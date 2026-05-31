@@ -92,7 +92,8 @@ def macro_pct_error(
     averages them, and returns the mean normalized to a [0,1] accuracy score
     (``1 - min(mean, 1)``). The per-macro and mean raw errors travel in
     ``metadata`` so the supervisor reads true magnitudes; the label passes when
-    the mean stays within the default ±15% band.
+    the mean stays within the case's ±band (default ±15%, overridable per case
+    via ``metadata["tolerance"]`` like the other evaluators — ).
     """
     by_code = _output_by_code(output)
     exp = _expected_macros(expected)
@@ -102,7 +103,7 @@ def macro_pct_error(
     }
     mean_error = sum(per_macro.values()) / len(per_macro)
     score = 1.0 - min(mean_error, 1.0)
-    label = "pass" if mean_error <= _DEFAULT_TOLERANCE else "fail"
+    label = "pass" if mean_error <= _tolerance(metadata) else "fail"
 
     detail = ", ".join(f"{key} {err:.1%}" for key, err in per_macro.items())
     explanation = f"mean |%error| {mean_error:.1%} ({detail})"

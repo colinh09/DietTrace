@@ -103,6 +103,22 @@ def test_macro_pct_error_zero_expected_macro() -> None:
     assert macro_pct_error(off_target, expected).metadata["per_macro"]["carb_g"] == 1.0
 
 
+def test_macro_pct_error_honors_per_case_tolerance() -> None:
+    """The pass/fail label respects a per-case ±band, not just the ±15% default.
+
+    : the tolerance is "configurable per case". The same mean error must
+    fail a tighter band and pass a looser one, matching the other evaluators.
+    """
+    # Mean |%error| is 8.75% (see test_macro_pct_error_known_values).
+    output = _totals(calories=440.0, protein_g=18.0, fat_g=34.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    assert macro_pct_error(output, expected, {"tolerance": 0.05}).label == "fail"
+    assert macro_pct_error(output, expected, {"tolerance": 0.20}).label == "pass"
+    # Default (no metadata) still passes at ±15%.
+    assert macro_pct_error(output, expected).label == "pass"
+
+
 def test_eval_result_to_phoenix_carries_metadata() -> None:
     """EvalResult serializes the score/label/explanation plus raw metadata."""
     result = EvalResult(
