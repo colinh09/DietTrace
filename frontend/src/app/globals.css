@@ -1,26 +1,108 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
+/* The design ships a single calm light theme; there is intentionally no .dark
+   token block. The dark variant is declared only so the stock shadcn components'
+   inert `dark:` utilities resolve. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Sage design tokens. The named design tokens (--bg, --accent, --line, --amber,
+ * font stacks, --radius) are mapped onto shadcn's semantic tokens just below.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* palette */
+  --bg: #FAFAF8;
+  --ink: #1B1A16;
+  --muted-ink: #79766C;
+  --faint: #A8A498;
+  --line: #ECEAE2;
+  --line-strong: #E0DDD2;
+  --surface: #FFFFFF;
+  --accent: #5E7A5C;
+  --accent-ink: #46603F;
+  --accent-soft: rgba(94, 122, 92, 0.10);
+  --accent-softer: rgba(94, 122, 92, 0.055);
+  --amber: #B07F34;
+  --amber-ink: #8A6021;
+  --amber-soft: rgba(176, 127, 52, 0.13);
+
+  /* typography */
+  --ui-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", "Palatino", Georgia, serif;
+
+  /* density */
+  --radius: 14px;
+  --meal-py: 16px;
+  --step-py: 14px;
+
+  /* shadcn semantic tokens → sage palette */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--accent-soft);
+  --secondary-foreground: var(--accent-ink);
+  --muted: var(--line);
+  --muted-foreground: var(--muted-ink);
+  --accent-bg: var(--accent-softer);
+  --accent-foreground: var(--accent-ink);
+  --destructive: #B0473A;
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--accent);
+}
+
+[data-density="compact"] {
+  --meal-py: 11px;
+  --step-py: 10px;
+  --radius: 12px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-bg);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--ui-font);
+  --font-serif: var(--serif);
+  --font-mono: var(--mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--ui-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "tnum" 1;
 }
