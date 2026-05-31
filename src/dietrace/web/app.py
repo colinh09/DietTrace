@@ -17,7 +17,7 @@ from collections.abc import Callable, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -35,7 +35,9 @@ from dietrace.web.feedback import (
     to_example,
 )
 from dietrace.web.goals import load_goals
+from dietrace.web.identity import current_user
 from dietrace.web.store import MealLogStore
+from dietrace.web.stores import build_stores
 
 SERVICE_NAME = "dietrace-web"
 
@@ -200,10 +202,12 @@ def create_app(
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
-    log_store = store or MealLogStore(os.environ.get("DIETRACE_LOG_DB", "data/log.sqlite"))
-    corrections = feedback_store or FeedbackStore(
-        os.environ.get("DIETRACE_FEEDBACK_DB", "data/feedback.sqlite")
-    )
+    if store is not None and feedback_store is not None:
+        log_store, corrections = store, feedback_store
+    else:
+        default_meals, default_feedback = build_stores()
+        log_store = store or default_meals
+        corrections = feedback_store or default_feedback
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
@@ -231,15 +235,17 @@ def create_app(
         return {"status": "ok"}
 
     @app.post("/log")
-    def log_meal(req: LogRequest) -> dict[str, Any]:
+    def log_meal(req: LogRequest, user: str = Depends(current_user)) -> dict[str, Any]:
         result = logger_fn(req.text)
         totals = result.get("totals", [])
         per_item = result.get("per_item", [])
-        entry_id = log_store.add(req.text, totals, date=req.date)
+        entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
         return {"id": entry_id, **result, "trace": _build_trace(per_item, totals)}
 
     @app.post("/log/stream")
-    def log_meal_stream(req: LogRequest) -> StreamingResponse:
+    def log_meal_stream(
+        req: LogRequest, user: str = Depends(current_user)
+    ) -> StreamingResponse:
         """Stream the agent's work as Server-Sent Events: one ``step`` event per
         pipeline step, then a ``result`` event (which also persists the meal)."""
 
@@ -249,7 +255,7 @@ def create_app(
             for event in streamer_fn(req.text):
                 if event.get("type") == "result":
                     event["id"] = log_store.add(
-                        req.text, event.get("totals", []), date=req.date
+                        req.text, event.get("totals", []), date=req.date, user_id=user
                     )
                 elif pace:
                     time.sleep(pace)  # let fast steps arrive one at a time
@@ -258,13 +264,15 @@ def create_app(
         return StreamingResponse(events(), media_type="text/event-stream")
 
     @app.delete("/meals/{meal_id}")
-    def delete_meal(meal_id: int) -> dict[str, Any]:
-        return {"id": meal_id, "deleted": log_store.delete(meal_id)}
+    def delete_meal(meal_id: int, user: str = Depends(current_user)) -> dict[str, Any]:
+        return {"id": meal_id, "deleted": log_store.delete(meal_id, user_id=user)}
 
     @app.get("/history")
-    def history(date: str | None = None, limit: int = 50) -> dict[str, Any]:
+    def history(
+        date: str | None = None, limit: int = 50, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
         day = date or datetime.datetime.now(tz=datetime.UTC).date().isoformat()
-        return {"date": day, "meals": log_store.list(limit, date=day)}
+        return {"date": day, "meals": log_store.list(limit, date=day, user_id=user)}
 
     @app.get("/goals")
     def goals() -> dict[str, Any]:
@@ -276,7 +284,9 @@ def create_app(
         return accuracy_report()
 
     @app.post("/feedback")
-    def feedback(correction: Correction) -> dict[str, Any]:
+    def feedback(
+        correction: Correction, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
         """Record a user portion correction and push it to Phoenix as ground truth.
 
         The correction becomes a new example in the live eval dataset, so the next
@@ -284,30 +294,32 @@ def create_app(
         UI. Recording is local-first; the Phoenix push is best-effort.
         """
         expected = corrected_expected(correction)
-        corrections.add(correction, expected)
+        corrections.add(correction, expected, user_id=user)
         added_to_arize = feedback_pusher(*to_example(correction))
         return {
             "ok": True,
             "added_to_arize": added_to_arize,
-            "total_corrections": corrections.count(),
+            "total_corrections": corrections.count(user_id=user),
             "dataset": FEEDBACK_DATASET,
             "phoenix_url": phoenix_dashboard_url(),
         }
 
     @app.get("/feedback")
-    def feedback_summary() -> dict[str, Any]:
+    def feedback_summary(user: str = Depends(current_user)) -> dict[str, Any]:
         return {
-            "total_corrections": corrections.count(),
+            "total_corrections": corrections.count(user_id=user),
             "dataset": FEEDBACK_DATASET,
             "phoenix_url": phoenix_dashboard_url(),
         }
 
     @app.get("/analysis")
-    def analysis(date: str | None = None) -> dict[str, Any]:
+    def analysis(
+        date: str | None = None, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
         # Aggregate only the requested day (default today) so the macro band is
         # the day's intake and stays in sync with date navigation.
         day = date or datetime.datetime.now(tz=datetime.UTC).date().isoformat()
-        meals = log_store.list(1000, date=day)
+        meals = log_store.list(1000, date=day, user_id=user)
         totals = _aggregate(meals)
         return {
             "date": day,

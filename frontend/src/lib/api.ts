@@ -94,10 +94,34 @@ export interface AnalysisResponse {
   traces_buffered: number;
 }
 
+// A stable anonymous id per browser — there's no login, so this is how the
+// backend scopes a person's meals + corrections (the per-user memory layer).
+// Minted once and kept in localStorage; the same id rides every request.
+export function userId(): string {
+  if (typeof window === "undefined") return "anon";
+  let id = window.localStorage.getItem("diettrace_uid");
+  if (!id) {
+    id =
+      window.crypto?.randomUUID?.() ??
+      `u-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem("diettrace_uid", id);
+  }
+  return id;
+}
+
+// Headers every request carries: JSON + the caller's anonymous user id.
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    "X-DietTrace-User": userId(),
+    ...(extra as Record<string, string>),
+  };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: authHeaders(init?.headers),
   });
   if (!response.ok) {
     throw new Error(`DietTrace API ${path} failed: ${response.status}`);
@@ -195,7 +219,12 @@ export async function getAccuracy(): Promise<AccuracyReport> {
 // works, or the final `result` (which also persists the meal and carries its id).
 export interface StreamEvent {
   type: "step" | "result";
-  step?: "parse_meal" | "search_nutrition" | "estimate_portion" | "log_entry";
+  step?:
+    | "parse_meal"
+    | "search_nutrition"
+    | "web_search"
+    | "estimate_portion"
+    | "log_entry";
   status?: "running" | "done";
   summary?: string;
   food?: string;
@@ -218,7 +247,7 @@ export async function logMealStream(
 ): Promise<void> {
   const response = await fetch(`${API_BASE}/log/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify({ text, date }),
   });
   if (!response.ok || !response.body) {

@@ -222,6 +222,45 @@ def test_log_response_carries_ordered_trace(tmp_path) -> None:
     assert trace[-1]["totals"] == _STUB_TOTALS
 
 
+def test_meals_are_scoped_per_user(tmp_path) -> None:
+    # Each user only sees their own meals — the per-user memory layer.
+    client, _ = _client(tmp_path)
+    client.post("/log", json={"text": "alice meal"}, headers={"X-DietTrace-User": "alice"})
+    client.post("/log", json={"text": "bob meal"}, headers={"X-DietTrace-User": "bob"})
+
+    alice = client.get("/history", headers={"X-DietTrace-User": "alice"}).json()["meals"]
+    bob = client.get("/history", headers={"X-DietTrace-User": "bob"}).json()["meals"]
+
+    assert [m["text"] for m in alice] == ["alice meal"]
+    assert [m["text"] for m in bob] == ["bob meal"]
+
+
+def test_one_user_cannot_delete_anothers_meal(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    meal_id = client.post(
+        "/log", json={"text": "alice meal"}, headers={"X-DietTrace-User": "alice"}
+    ).json()["id"]
+
+    # Bob tries to delete Alice's meal — refused; it still belongs to Alice.
+    denied = client.delete(f"/meals/{meal_id}", headers={"X-DietTrace-User": "bob"}).json()
+    assert denied["deleted"] is False
+    alice = client.get("/history", headers={"X-DietTrace-User": "alice"}).json()["meals"]
+    assert len(alice) == 1
+
+
+def test_correction_counts_are_per_user(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    body = {"food": "x", "original_grams": 100.0, "corrected_grams": 50.0, "nutrients": []}
+    client.post("/feedback", json=body, headers={"X-DietTrace-User": "alice"})
+    client.post("/feedback", json=body, headers={"X-DietTrace-User": "alice"})
+    client.post("/feedback", json=body, headers={"X-DietTrace-User": "bob"})
+
+    alice = client.get("/feedback", headers={"X-DietTrace-User": "alice"}).json()
+    bob = client.get("/feedback", headers={"X-DietTrace-User": "bob"}).json()
+    assert alice["total_corrections"] == 2
+    assert bob["total_corrections"] == 1
+
+
 def test_feedback_records_and_pushes_a_correction_to_arize(tmp_path) -> None:
     pushed: list[tuple] = []
 

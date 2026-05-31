@@ -24,6 +24,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from dietrace.web.identity import DEMO_USER
+
 # User corrections accumulate in their OWN Phoenix dataset rather than the curated
 # eval set (`dietrace-nutrition-v1`): they're macro-only ground truth, so keeping
 # them separate preserves the full-micro eval cases while still giving the
@@ -133,6 +135,7 @@ def phoenix_push(inp: dict[str, Any], out: dict[str, Any], meta: dict[str, Any])
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS corrections (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         TEXT NOT NULL DEFAULT 'demo',
     created_at      TEXT NOT NULL,
     food            TEXT NOT NULL,
     original_grams  REAL NOT NULL,
@@ -143,7 +146,7 @@ CREATE TABLE IF NOT EXISTS corrections (
 
 
 class FeedbackStore:
-    """Append-and-count store for user corrections at *db_path*."""
+    """Append-and-count store for user corrections at *db_path*, scoped by user."""
 
     def __init__(self, db_path: str | Path) -> None:
         self._db_path = str(db_path)
@@ -152,21 +155,30 @@ class FeedbackStore:
             parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(_SCHEMA)
+            cols = {row["name"] for row in conn.execute("PRAGMA table_info(corrections)")}
+            if "user_id" not in cols:  # migrate an older DB
+                conn.execute(
+                    "ALTER TABLE corrections ADD COLUMN user_id TEXT NOT NULL "
+                    f"DEFAULT '{DEMO_USER}'"
+                )
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
-    def add(self, correction: Correction, expected: dict[str, Any]) -> int:
-        """Persist a correction; return its new row id."""
+    def add(
+        self, correction: Correction, expected: dict[str, Any], user_id: str = DEMO_USER
+    ) -> int:
+        """Persist a correction for *user_id*; return its new row id."""
         when = datetime.datetime.now(tz=datetime.UTC).isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
                 "INSERT INTO corrections "
-                "(created_at, food, original_grams, corrected_grams, expected_json) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "(user_id, created_at, food, original_grams, corrected_grams, expected_json) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
+                    user_id,
                     when,
                     correction.food,
                     correction.original_grams,
@@ -176,8 +188,10 @@ class FeedbackStore:
             )
             return int(cursor.lastrowid or 0)
 
-    def count(self) -> int:
-        """How many corrections have been contributed."""
+    def count(self, user_id: str = DEMO_USER) -> int:
+        """How many corrections *user_id* has contributed."""
         with self._connect() as conn:
-            row = conn.execute("SELECT COUNT(*) AS n FROM corrections").fetchone()
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM corrections WHERE user_id = ?", (user_id,)
+            ).fetchone()
             return int(row["n"]) if row else 0
