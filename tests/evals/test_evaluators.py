@@ -10,11 +10,15 @@ or network is touched.
 """
 
 from dietrace.evals.evaluators import (
+    PHOENIX_EVALUATORS,
     EvalResult,
     calorie_accuracy,
+    fiber_accuracy,
     macro_pct_error,
     micro_panel_accuracy,
     portion_error,
+    sodium_accuracy,
+    total_sugars_accuracy,
     within_tolerance,
 )
 from dietrace.evals.schema import ExpectedNutrition
@@ -219,3 +223,99 @@ def test_micro_panel_scores_full_tier() -> None:
 
     assert result.label == "pass"
     assert result.score > 0.9
+
+
+# --- fiber/sodium/sugar single-nutrient evaluators (10.2) ---------------------
+
+
+def test_fiber_accuracy_known_value() -> None:
+    """Fiber (291) 10% over → score 0.9, raw error in metadata, within the band."""
+    output = {"totals": [{"code": "291", "name": "Fiber", "amount": 11.0, "unit": "g"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {"291": 10.0}}
+
+    result = fiber_accuracy(output, expected)
+
+    assert result.metadata["fiber_pct_error"] == 0.10  # |11-10|/10
+    assert result.metadata["code"] == "291"
+    assert result.score == 0.9
+    assert result.label == "pass"
+
+
+def test_sodium_accuracy_known_value_and_unit() -> None:
+    """Sodium (307) 10% over → 0.9; the explanation carries the mg unit."""
+    output = {"totals": [{"code": "307", "name": "Sodium", "amount": 660.0, "unit": "mg"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {"307": 600.0}}
+
+    result = sodium_accuracy(output, expected)
+
+    assert result.metadata["sodium_pct_error"] == 0.10  # |660-600|/600
+    assert result.score == 0.9
+    assert result.label == "pass"
+    assert "mg" in result.explanation
+
+
+def test_sodium_accuracy_fails_outside_band() -> None:
+    """A 50% sodium overestimate fails the default ±15% band."""
+    output = {"totals": [{"code": "307", "name": "Sodium", "amount": 900.0, "unit": "mg"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {"307": 600.0}}
+
+    assert sodium_accuracy(output, expected).label == "fail"
+
+
+def test_total_sugars_accuracy_known_value() -> None:
+    """Total sugars (269) exact match → score 1.0, zero error."""
+    output = {"totals": [{"code": "269", "name": "Sugars", "amount": 24.0, "unit": "g"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {"269": 24.0}}
+
+    result = total_sugars_accuracy(output, expected)
+
+    assert result.metadata["total_sugars_pct_error"] == 0.0
+    assert result.score == 1.0
+    assert result.label == "pass"
+
+
+def test_fiber_accuracy_na_without_ground_truth() -> None:
+    """No fiber in the expected micro panel → n/a, not a spurious score."""
+    output = {"totals": [{"code": "291", "name": "Fiber", "amount": 5.0, "unit": "g"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {"307": 600.0}}
+
+    assert fiber_accuracy(output, expected).label == "n/a"
+
+
+def test_sodium_accuracy_missing_total_is_full_error() -> None:
+    """Ground truth present but the agent logged no sodium → full error, fails."""
+    output = {"totals": [{"code": "208", "name": "Energy", "amount": 200.0, "unit": "kcal"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {"307": 600.0}}
+
+    result = sodium_accuracy(output, expected)
+
+    assert result.metadata["sodium_pct_error"] == 1.0  # 0 vs 600
+    assert result.score == 0.0
+    assert result.label == "fail"
+
+
+def test_sodium_accuracy_scored_on_label_tier() -> None:
+    """Unlike the full micro panel, sodium is scored on branded label cases too."""
+    output = {"totals": [{"code": "307", "name": "Sodium", "amount": 600.0, "unit": "mg"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {"307": 600.0}}
+
+    result = sodium_accuracy(output, expected, {"nutrient_tier": "label"})
+
+    assert result.label == "pass"
+    assert result.score == 1.0
+
+
+def test_fiber_accuracy_accepts_expected_nutrition_model() -> None:
+    """``expected`` may be an ExpectedNutrition model carrying the micro panel."""
+    output = {"totals": [{"code": "291", "name": "Fiber", "amount": 9.0, "unit": "g"}]}
+    expected = ExpectedNutrition(
+        calories=1, protein_g=1, fat_g=1, carb_g=1, micros={"291": 9.0}
+    )
+
+    assert fiber_accuracy(output, expected).score == 1.0
+
+
+def test_new_evaluators_registered_in_phoenix_list() -> None:
+    """The three new evaluators are wired into PHOENIX_EVALUATORS by name (10.2)."""
+    names = {fn.__name__ for fn in PHOENIX_EVALUATORS}
+    assert {"fiber_accuracy", "sodium_accuracy", "total_sugars_accuracy"} <= names

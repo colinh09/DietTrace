@@ -252,6 +252,62 @@ def micro_panel_accuracy(
     )
 
 
+def _micro_accuracy_evaluator(
+    name: str, code: str, unit: str
+) -> Callable[..., EvalResult]:
+    """Build a single-nutrient evaluator scoring one micro code.
+
+    Fiber (291), sodium (307), and total sugars (269) each appear on nutrition
+    labels, so — unlike the full ``micro_panel_accuracy`` — they are scored on
+    both tiers, gating only on whether the case carries ground truth for the
+    nutrient (``expected.micros[code]``). Scoring mirrors ``calorie_accuracy``:
+    ``1 - min(|%error|, 1)`` for the Phoenix chart, the raw error in
+    ``metadata``, and a pass/fail label against the case's ±band; absence of
+    ground truth returns a non-penalizing ``n/a``.
+    """
+
+    def evaluator(
+        output: Any,
+        expected: Any,
+        metadata: dict[str, Any] | None = None,
+    ) -> EvalResult:
+        target = (_expected_value(expected, "micros") or {}).get(code)
+        if target is None:
+            return _not_applicable(f"no ground-truth {name} for this case")
+        actual = _output_by_code(output).get(code, 0.0)
+        target = float(target)
+        err = _pct_error(actual, target)
+        tol = _tolerance(metadata)
+        return EvalResult(
+            score=1.0 - min(err, 1.0),
+            label="pass" if err <= tol else "fail",
+            explanation=(
+                f"{name} |%error| {err:.1%} ({actual:.0f} vs {target:.0f} {unit})"
+            ),
+            metadata={
+                f"{name}_pct_error": err,
+                "code": code,
+                "actual": actual,
+                "expected": target,
+            },
+        )
+
+    evaluator.__name__ = f"{name}_accuracy"
+    evaluator.__qualname__ = f"{name}_accuracy"
+    evaluator.__doc__ = (
+        f"{name.replace('_', ' ').title()} (USDA code {code}) closeness as a "
+        f"normalized [0,1] score; n/a without ground truth."
+    )
+    return evaluator
+
+
+# Label-friendly single-nutrient evaluators: fiber (291),
+# sodium (307), and total sugars (269), each scored against its micro-panel code.
+fiber_accuracy = _micro_accuracy_evaluator("fiber", "291", "g")
+sodium_accuracy = _micro_accuracy_evaluator("sodium", "307", "mg")
+total_sugars_accuracy = _micro_accuracy_evaluator("total_sugars", "269", "g")
+
+
 # ---------------------------------------------------------------------------
 # Phoenix experiment adapters
 # ---------------------------------------------------------------------------
@@ -265,6 +321,9 @@ _NUMERIC_EVALUATORS: list[Callable[..., EvalResult]] = [
     within_tolerance,
     portion_error,
     micro_panel_accuracy,
+    fiber_accuracy,
+    sodium_accuracy,
+    total_sugars_accuracy,
 ]
 
 
