@@ -10,8 +10,9 @@ Energy (USDA code 208) is special-cased. When a food carries Atwater
 (``protein_g · f_p + fat_g · f_f + carb_g · f_c``) rather than scaling the
 stored 208, because the macro-derived figure is what USDA itself reports for
 those foods; a per-macro factor that is absent falls back to the standard
-Atwater value. Without conversion factors the stored per-100 g energy is scaled
-like any other nutrient.
+Atwater value. When a food has conversion factors but no macros to derive energy
+from, the stored 208 is kept (not zeroed). Without conversion factors the stored
+per-100 g energy is scaled like any other nutrient.
 """
 
 from __future__ import annotations
@@ -69,17 +70,26 @@ class LoggedMeal(BaseModel):
         return None
 
 
-def _atwater_kcal(scaled: dict[str, Nutrient], factors: ConversionFactors) -> float:
-    """Energy from the scaled macros and *factors*, defaulting missing factors."""
+def _atwater_kcal(
+    scaled: dict[str, Nutrient], factors: ConversionFactors
+) -> float | None:
+    """Energy from the scaled macros and *factors*, or None if no macro is present.
+
+    A missing per-macro factor falls back to the standard Atwater value. When the
+    panel carries no macros at all there is nothing to derive energy from, so this
+    returns None and the caller keeps the food's stored 208 rather than zeroing it.
+    """
     own = {_PROTEIN: factors.protein, _FAT: factors.fat, _CARB: factors.carbohydrate}
     kcal = 0.0
+    found = False
     for code, std in _STD_ATWATER.items():
         macro = scaled.get(code)
         if macro is None:
             continue
+        found = True
         factor = own[code] if own[code] is not None else std
         kcal += macro.amount * factor
-    return kcal
+    return kcal if found else None
 
 
 def _scaled_panel(food: Food, grams: float) -> list[Nutrient]:
@@ -90,13 +100,15 @@ def _scaled_panel(food: Food, grams: float) -> list[Nutrient]:
         for n in food.nutrients
     }
     if food.conversion_factors is not None:
-        existing = scaled.get(_ENERGY)
-        scaled[_ENERGY] = Nutrient(
-            code=_ENERGY,
-            name=existing.name if existing else "Energy",
-            amount=_atwater_kcal(scaled, food.conversion_factors),
-            unit=existing.unit if existing else "kcal",
-        )
+        atwater = _atwater_kcal(scaled, food.conversion_factors)
+        if atwater is not None:
+            existing = scaled.get(_ENERGY)
+            scaled[_ENERGY] = Nutrient(
+                code=_ENERGY,
+                name=existing.name if existing else "Energy",
+                amount=atwater,
+                unit=existing.unit if existing else "kcal",
+            )
     return list(scaled.values())
 
 
