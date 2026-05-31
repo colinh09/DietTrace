@@ -14,6 +14,17 @@ def test_dockerfile_serves_the_app_on_8080() -> None:
     assert "8080" in dockerfile
 
 
+def test_frontend_dockerfile_builds_and_serves_on_port_env() -> None:
+    dockerfile = _read("frontend/Dockerfile")
+    # Node base image to build the Next app.
+    assert "node:" in dockerfile
+    # Build then start the Next app (the npm build + start scripts).
+    assert "npm run build" in dockerfile
+    assert '"start"' in dockerfile or "npm run start" in dockerfile
+    # Cloud Run injects PORT; the container must honour it.
+    assert "PORT" in dockerfile
+
+
 def test_ci_runs_ruff_and_pytest_on_prs() -> None:
     ci = _read(".github/workflows/ci.yml")
     assert "pull_request" in ci
