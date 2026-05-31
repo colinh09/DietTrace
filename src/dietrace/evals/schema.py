@@ -20,7 +20,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 # The two scoring tiers; micro evaluators return n/a for "label".
 NutrientTier = Literal["full", "label"]
@@ -71,7 +71,7 @@ class CaseMetadata(BaseModel):
 
     nutrient_tier: NutrientTier
     fdc_id: int | None = None
-    tolerance: float = _DEFAULT_TOLERANCE
+    tolerance: float = Field(default=_DEFAULT_TOLERANCE, ge=0.0, allow_inf_nan=False)
     source: str | None = None
     notes: str | None = None
 

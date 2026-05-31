@@ -14,7 +14,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from dietrace.evals.schema import EvalCase, load_case
+from dietrace.evals.schema import CaseMetadata, EvalCase, load_case
 
 _FULL_CASE = {
     "input": {"text": "two eggs and half an avocado"},
@@ -117,3 +117,16 @@ def test_unknown_fields_are_rejected() -> None:
 
     with pytest.raises(ValidationError):
         EvalCase.model_validate(bad)
+
+
+def test_case_metadata_rejects_non_finite_or_negative_tolerance():
+    """A NaN/inf/negative ±band would silently flip every evaluator's pass/fail
+    verdict (``err <= tolerance`` is False against NaN), so the schema must
+    reject it loudly rather than corrupt scoring."""
+    for bad in (-0.1, float("nan"), float("inf")):
+        with pytest.raises(ValidationError):
+            CaseMetadata(nutrient_tier="full", tolerance=bad)
+
+    # 0.0 (require exact match) and positive bands remain valid.
+    assert CaseMetadata(nutrient_tier="full", tolerance=0.0).tolerance == 0.0
+    assert CaseMetadata(nutrient_tier="full", tolerance=0.2).tolerance == 0.2
