@@ -151,6 +151,10 @@ export interface AccuracyReport {
   loop: { step: string; label: string }[];
   dataset: { cases: number; source: string };
   phoenix_url: string;
+  // "live" when read from Phoenix experiments, "measured" on fallback.
+  source: "live" | "measured";
+  // Number of Phoenix experiments behind the numbers (null on fallback).
+  experiments: number | null;
 }
 
 // Read the accuracy / Arize-observability report.

@@ -16,6 +16,8 @@ const report: AccuracyReport = {
   ],
   dataset: { cases: 16, source: "USDA FoodData Central (CC0)" },
   phoenix_url: "https://app.phoenix.arize.com/s/demo",
+  source: "live",
+  experiments: 3,
 };
 
 describe("AccuracyPage", () => {

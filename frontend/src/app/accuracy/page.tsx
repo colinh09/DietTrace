@@ -67,7 +67,13 @@ export default function AccuracyPage() {
             </section>
 
             <section className="acc-block">
-              <div className="acc-block-head mono">measured improvement</div>
+              <div className="acc-block-head mono">
+                {report.source === "live"
+                  ? `live from arize phoenix · ${report.experiments} experiment${
+                      report.experiments === 1 ? "" : "s"
+                    }`
+                  : "measured improvement"}
+              </div>
               <div className="acc-bars">
                 {report.metrics.map((m) => (
                   <div className="acc-bar-row" key={m.key}>
