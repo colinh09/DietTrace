@@ -129,14 +129,13 @@ export default function AccuracyPage() {
                 Scored on {report.dataset.cases} cases from{" "}
                 {report.dataset.source}.
               </span>
-              <a
-                href={report.phoenix_url}
-                target="_blank"
-                rel="noreferrer"
-                className="acc-link"
-              >
-                View on Arize Phoenix →
-              </a>
+              <span className="acc-link">
+                {report.source === "live"
+                  ? `Live from Arize Phoenix · ${report.experiments} experiment${
+                      report.experiments === 1 ? "" : "s"
+                    }`
+                  : "Measured on Arize Phoenix"}
+              </span>
             </section>
           </>
         )}

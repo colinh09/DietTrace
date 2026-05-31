@@ -186,21 +186,31 @@ export function MealTrace({
         ))}
 
         {status === "saved" && result ? (
-          <div className="correct-bar saved">
-            <Check size={12} color="var(--accent)" />
-            <span className="correct-hint">
-              Learned — log this meal again and it&apos;ll come back right. Added to
-              Arize as ground truth ({result.corrections} correction
-              {result.corrections === 1 ? "" : "s"} so far).
-            </span>
-            <a
-              href={result.phoenix_url}
-              target="_blank"
-              rel="noreferrer"
-              className="correct-link mono"
-            >
-              view in Phoenix →
-            </a>
+          <div className="correct-saved">
+            <div className="correct-bar saved">
+              <Check size={12} color="var(--accent)" />
+              <span className="correct-hint">
+                Learned — log this meal again and it&apos;ll come back right.
+              </span>
+            </div>
+            <div className="arize-card">
+              <span className="arize-card-head mono">
+                added to your arize eval set · ground truth ({result.corrections} case
+                {result.corrections === 1 ? "" : "s"})
+              </span>
+              <div className="arize-card-body">
+                <span className="arize-truth">{mealText}</span>
+                <span className="arize-macros mono tnum">
+                  {Math.round(macrosOf(result.totals).kcal)} kcal · P{" "}
+                  {Math.round(macrosOf(result.totals).protein)} · C{" "}
+                  {Math.round(macrosOf(result.totals).carb)} · F{" "}
+                  {Math.round(macrosOf(result.totals).fat)}
+                </span>
+              </div>
+              <span className="arize-card-foot">
+                The next re-test scores the agent against this.
+              </span>
+            </div>
           </div>
         ) : editing ? (
           <div className="correct-bar">

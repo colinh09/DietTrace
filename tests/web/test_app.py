@@ -376,6 +376,44 @@ def test_retune_reports_before_after_accuracy_on_the_users_corrections(tmp_path)
     assert res["improved"] is True
 
 
+def test_retune_stream_emits_a_case_then_a_summary(tmp_path) -> None:
+    def learning_logger(text, examples=()):
+        cal = 750.0 if examples else 1440.0
+        return {
+            "totals": [{"code": "208", "name": "Energy", "amount": cal, "unit": "kcal"}],
+            "per_item": [],
+        }
+
+    client, _ = _client(tmp_path, logger=learning_logger)
+    client.post(
+        "/correct",
+        json={
+            "meal_text": "chipotle bowl",
+            "items": [
+                {
+                    "description": "bowl",
+                    "original_grams": 100.0,
+                    "corrected_grams": 100.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 750.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+        headers={"X-DietTrace-User": "alice"},
+    )
+
+    res = client.post("/retune/stream", headers={"X-DietTrace-User": "alice"})
+    events = [
+        json.loads(line[6:])
+        for line in res.text.split("\n\n")
+        if line.startswith("data: ")
+    ]
+    assert events[0]["type"] == "case" and events[0]["text"] == "chipotle bowl"
+    assert events[0]["after"] > events[0]["before"]
+    assert events[-1]["type"] == "summary" and events[-1]["improved"] is True
+
+
 def test_retune_with_no_corrections_is_a_noop(tmp_path) -> None:
     client, _ = _client(tmp_path)
     res = client.post("/retune", headers={"X-DietTrace-User": "nobody"}).json()

@@ -21,7 +21,7 @@ const report: AccuracyReport = {
 };
 
 describe("AccuracyPage", () => {
-  it("renders the headline accuracy, the loop, and the Phoenix link", async () => {
+  it("renders the headline accuracy, the loop, and the live Arize source", async () => {
     vi.mocked(getAccuracy).mockResolvedValue(report);
 
     render(<AccuracyPage />);
@@ -33,7 +33,12 @@ describe("AccuracyPage", () => {
     );
     expect(screen.getByText("60%")).toBeInTheDocument(); // calorie accuracy headline
     expect(screen.getByText(/the self-supervision loop/i)).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: /View on Arize Phoenix/i });
-    expect(link).toHaveAttribute("href", report.phoenix_url);
+    // The data is shown in-UI and labeled as live from Arize (no external link).
+    expect(
+      screen.getByText("Live from Arize Phoenix · 3 experiments"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /View on Arize Phoenix/i }),
+    ).not.toBeInTheDocument();
   });
 });

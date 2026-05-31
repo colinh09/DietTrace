@@ -194,23 +194,22 @@ def _meal_example(
     return {"text": meal_text}, out, {"source": "user_meal_correction", "items": len(items)}
 
 
+def _case_score(case: dict[str, Any], estimate: Callable[[str], dict]) -> float:
+    """Calorie accuracy of one *estimate* against a case (1.0 exact, 0.0 far off)."""
+    expected = case["calories"]
+    est = calories_of(estimate(case["text"]).get("totals", []))
+    if expected <= 0:
+        return 1.0 if est == 0 else 0.0
+    return round(max(0.0, 1.0 - abs(est - expected) / expected), 3)
+
+
 def _calorie_accuracy(
     cases: list[dict[str, Any]], estimate: Callable[[str], dict]
 ) -> float:
-    """Mean calorie accuracy of *estimate* over *cases* (1.0 = exact, 0.0 = far off).
-
-    Each case scores ``max(0, 1 - |est - expected| / expected)`` against the user's
-    corrected calories — a simple, honest before/after number for the re-test.
-    """
-    scores: list[float] = []
-    for case in cases:
-        expected = case["calories"]
-        est = calories_of(estimate(case["text"]).get("totals", []))
-        if expected <= 0:
-            scores.append(1.0 if est == 0 else 0.0)
-        else:
-            scores.append(max(0.0, 1.0 - abs(est - expected) / expected))
-    return round(sum(scores) / len(scores), 3) if scores else 0.0
+    """Mean calorie accuracy of *estimate* over *cases* — a before/after number."""
+    if not cases:
+        return 0.0
+    return round(sum(_case_score(c, estimate) for c in cases) / len(cases), 3)
 
 
 def _build_trace(
@@ -478,6 +477,42 @@ def create_app(
             "after": after,
             "improved": after >= before,
         }
+
+    @app.post("/retune/stream")
+    def retune_stream(user: str = Depends(current_user)) -> StreamingResponse:
+        """Re-test as a live stream: one event per corrected meal as it's scored,
+        then a summary — so the eval is visible happening, not just a final number."""
+        cases = learning.eval_cases(user)
+        examples = learning.examples(user)
+
+        def events() -> Iterator[str]:
+            befores: list[float] = []
+            afters: list[float] = []
+            for case in cases:
+                base = _case_score(case, lambda t: logger_fn(t, examples=[]))
+                tuned = _case_score(case, lambda t: logger_fn(t, examples=examples))
+                befores.append(base)
+                afters.append(tuned)
+                event = {
+                    "type": "case",
+                    "text": case["text"],
+                    "expected_calories": round(case["calories"]),
+                    "before": base,
+                    "after": tuned,
+                }
+                yield f"data: {json.dumps(event)}\n\n"
+            before = round(sum(befores) / len(befores), 3) if befores else None
+            after = round(sum(afters) / len(afters), 3) if afters else None
+            summary = {
+                "type": "summary",
+                "cases": len(cases),
+                "before": before,
+                "after": after,
+                "improved": bool(after is not None and before is not None and after >= before),
+            }
+            yield f"data: {json.dumps(summary)}\n\n"
+
+        return StreamingResponse(events(), media_type="text/event-stream")
 
     @app.get("/analysis")
     def analysis(

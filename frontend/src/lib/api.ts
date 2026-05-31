@@ -195,6 +195,57 @@ export async function retune(): Promise<RetuneResult> {
   return request<RetuneResult>("/retune", { method: "POST" });
 }
 
+// One corrected meal as it's scored during a streamed re-test.
+export interface RetuneCase {
+  type: "case";
+  text: string;
+  expected_calories: number;
+  before: number;
+  after: number;
+}
+
+// The final roll-up of a streamed re-test.
+export interface RetuneSummary {
+  type: "summary";
+  cases: number;
+  before: number | null;
+  after: number | null;
+  improved: boolean;
+}
+
+export type RetuneEvent = RetuneCase | RetuneSummary;
+
+// Stream the re-test: `onEvent` fires per corrected meal as it's scored, then
+// once with the summary — so the eval is visible happening in the UI.
+export async function retuneStream(
+  onEvent: (event: RetuneEvent) => void,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/retune/stream`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`DietTrace /retune/stream failed: ${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep = buffer.indexOf("\n\n");
+    while (sep >= 0) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      if (frame.startsWith("data: ")) {
+        onEvent(JSON.parse(frame.slice(6)) as RetuneEvent);
+      }
+      sep = buffer.indexOf("\n\n");
+    }
+  }
+}
+
 // Read one day's logged meals. Omit `date` for today (the backend default).
 export async function getHistory(date?: string): Promise<HistoryResponse> {
   const query = date ? `?date=${encodeURIComponent(date)}` : "";

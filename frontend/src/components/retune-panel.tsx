@@ -1,19 +1,20 @@
 "use client";
 
-// The user-triggered "re-tune & re-test" control. Once you've taught the
-// agent a few corrections, this offers to re-run it on your own corrected meals —
-// base agent vs. agent-with-your-memory — and shows the before/after accuracy. The
-// user pulls the trigger (a judge wants to watch it happen), so the cost + the
-// ~live wait only happen on demand.
+// The user-triggered "re-tune & re-test" control, made visible. Once
+// you've taught the agent corrections, this re-runs it on your own corrected
+// meals — base agent vs. agent-with-your-memory — and **streams each case as it's
+// scored**, so judges watch the Arize-style eval happen, not just a final number.
+// The user pulls the trigger (the cost + ~live wait only happen on demand).
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
-import { retune, type RetuneResult } from "@/lib/api";
+import { Check, Sparkles } from "lucide-react";
+import { retuneStream, type RetuneCase, type RetuneSummary } from "@/lib/api";
 
 const pct = (v: number | null) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 
 export function RetunePanel({ corrections }: { corrections: number }) {
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<RetuneResult | null>(null);
+  const [cases, setCases] = useState<RetuneCase[]>([]);
+  const [summary, setSummary] = useState<RetuneSummary | null>(null);
   const [error, setError] = useState(false);
 
   if (corrections < 1) return null;
@@ -21,8 +22,13 @@ export function RetunePanel({ corrections }: { corrections: number }) {
   async function run() {
     setBusy(true);
     setError(false);
+    setCases([]);
+    setSummary(null);
     try {
-      setResult(await retune());
+      await retuneStream((event) => {
+        if (event.type === "case") setCases((cur) => [...cur, event]);
+        else setSummary(event);
+      });
     } catch {
       setError(true);
     } finally {
@@ -46,38 +52,58 @@ export function RetunePanel({ corrections }: { corrections: number }) {
         </button>
       </div>
 
-      {busy && (
-        <div className="retune-note mono">
-          running your agent on your corrected meals, with and without what it
-          learned…
+      {(busy || cases.length > 0) && (
+        <div className="retune-eval">
+          <div className="retune-eval-head mono">
+            arize eval · scoring your corrected meals against the agent
+            {busy ? " …" : ""}
+          </div>
+          <ul className="retune-cases">
+            {cases.map((c, i) => (
+              <li className="retune-case" key={i}>
+                <span className="retune-case-check">
+                  <Check size={11} color="var(--accent)" />
+                </span>
+                <span className="retune-case-text">{c.text}</span>
+                <span className="retune-case-truth mono tnum">
+                  {c.expected_calories} kcal
+                </span>
+                <span className="retune-case-scores mono tnum">
+                  {pct(c.before)} <span className="retune-arrow">→</span>{" "}
+                  <b className={c.after >= c.before ? "up" : ""}>{pct(c.after)}</b>
+                </span>
+              </li>
+            ))}
+            {busy && (
+              <li className="retune-case pending mono">
+                running the agent on the next meal…
+              </li>
+            )}
+          </ul>
         </div>
       )}
 
-      {result && !busy && (
-        result.cases === 0 ? (
-          <div className="retune-note mono">No corrected meals to test yet.</div>
-        ) : (
-          <div className="retune-result">
-            <div className="retune-scores">
-              <span className="retune-score">
-                <span className="retune-score-label mono">base agent</span>
-                <span className="retune-score-val tnum">{pct(result.before)}</span>
-              </span>
-              <span className="retune-arrow">→</span>
-              <span className="retune-score up">
-                <span className="retune-score-label mono">with your corrections</span>
-                <span className="retune-score-val tnum">{pct(result.after)}</span>
-              </span>
-            </div>
-            <div className="retune-caption">
-              Calorie accuracy across your {result.cases} corrected meal
-              {result.cases === 1 ? "" : "s"}.{" "}
-              {result.improved
-                ? "Your corrections made it more accurate."
-                : "No change this round."}
-            </div>
+      {summary && !busy && summary.cases > 0 && (
+        <div className="retune-result">
+          <div className="retune-scores">
+            <span className="retune-score">
+              <span className="retune-score-label mono">base agent</span>
+              <span className="retune-score-val tnum">{pct(summary.before)}</span>
+            </span>
+            <span className="retune-arrow big">→</span>
+            <span className="retune-score up">
+              <span className="retune-score-label mono">with your corrections</span>
+              <span className="retune-score-val tnum">{pct(summary.after)}</span>
+            </span>
           </div>
-        )
+          <div className="retune-caption">
+            Mean calorie accuracy across your {summary.cases} corrected meal
+            {summary.cases === 1 ? "" : "s"}.{" "}
+            {summary.improved
+              ? "Your corrections made it more accurate."
+              : "No change this round."}
+          </div>
+        </div>
       )}
 
       {error && !busy && (

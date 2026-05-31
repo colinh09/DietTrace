@@ -266,8 +266,31 @@ body {
 .retune-score-label { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
 .retune-score-val { font-size: 22px; font-weight: 700; color: var(--muted-ink); }
 .retune-score.up .retune-score-val { color: var(--accent-ink); }
-.retune-arrow { font-size: 18px; color: var(--faint); }
+.retune-arrow { font-size: 13px; color: var(--faint); }
+.retune-arrow.big { font-size: 18px; }
 .retune-caption { margin-top: 9px; font-size: 12px; color: var(--muted-ink); }
+
+/* live eval readout — each corrected meal scored, streamed in */
+.retune-eval { margin-top: 12px; }
+.retune-eval-head { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
+.retune-cases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.retune-case { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--ink); }
+.retune-case-check { display: inline-flex; flex-shrink: 0; }
+.retune-case-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.retune-case-truth { font-size: 11px; color: var(--muted-ink); flex-shrink: 0; }
+.retune-case-scores { font-size: 12px; color: var(--muted-ink); flex-shrink: 0; }
+.retune-case-scores b { color: var(--muted-ink); }
+.retune-case-scores b.up { color: var(--accent-ink); }
+.retune-case.pending { color: var(--faint); padding-left: 20px; }
+
+/* the ground-truth example a correction contributes to Arize, shown in-UI */
+.correct-saved { display: flex; flex-direction: column; gap: 8px; }
+.arize-card { border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; background: var(--bg); }
+.arize-card-head { display: block; font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 6px; }
+.arize-card-body { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.arize-truth { font-size: 13px; color: var(--ink); }
+.arize-macros { font-size: 12px; color: var(--accent-ink); }
+.arize-card-foot { display: block; margin-top: 6px; font-size: 11px; color: var(--faint); }
 
 /* responsive — tighten the page to ~full-width and stack the band on narrow
    screens. */
