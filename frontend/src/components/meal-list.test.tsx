@@ -113,7 +113,11 @@ describe("MealList", () => {
     fireEvent.click(within(row).getByRole("button", { name: /expand/i }));
     expect(within(row).getByText(/the agent's work/i)).toBeInTheDocument();
     expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
-    expect(within(row).getByLabelText(/grams of grilled chicken/i)).toBeInTheDocument();
+    // The portion shows read-only; correcting it is one click away.
+    expect(within(row).getByText("140 g")).toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: /something's off/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows a calm note when an expanded row has no trace detail", () => {

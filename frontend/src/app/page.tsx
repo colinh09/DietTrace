@@ -11,11 +11,13 @@ import { DayMacros } from "@/components/day-macros";
 import { LogInput } from "@/components/log-input";
 import { LiveMeal, type LiveEntry } from "@/components/live-meal";
 import { MealList, type MealDetail } from "@/components/meal-list";
+import { RetunePanel } from "@/components/retune-panel";
 import {
   deleteMeal,
   getAnalysis,
   getGoals,
   getHistory,
+  getMemory,
   logMealStream,
   type GoalProgress,
   type Meal,
@@ -31,6 +33,18 @@ export default function Home() {
   const [details, setDetails] = useState<Record<number, MealDetail>>({});
   // The in-progress meal while its /log/stream is running, or null when idle.
   const [live, setLive] = useState<LiveEntry | null>(null);
+  // How many corrections this user has taught — drives the re-tune panel.
+  const [corrections, setCorrections] = useState(0);
+
+  const loadMemory = useCallback(() => {
+    getMemory()
+      .then((res) => setCorrections(res.corrections))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadMemory();
+  }, [loadMemory]);
 
   // Load the daily targets first so the band isn't empty; fail-soft.
   useEffect(() => {
@@ -131,7 +145,9 @@ export default function Home() {
           heading={heading}
           detailsById={details}
           onEdit={handleDelete}
+          onCorrected={loadMemory}
         />
+        <RetunePanel corrections={corrections} />
       </main>
     </div>
   );

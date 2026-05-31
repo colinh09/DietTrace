@@ -32,9 +32,29 @@ from dietrace.llm.config import GEMINI_MODEL
 _PROMPT_PATH = Path(__file__).parent / "parse_prompt.md"
 
 
-def _prompt(text: str) -> str:
-    """Render the parse prompt for *text* (a ``{text}`` placeholder substitution)."""
-    return _PROMPT_PATH.read_text(encoding="utf-8").replace("{text}", text)
+def _prompt(text: str, examples: list[dict[str, Any]] | None = None) -> str:
+    """Render the parse prompt for *text*, prepending the user's few-shot examples.
+
+    *examples* are this user's past corrections (``{text, foods:[{food, grams}]}``);
+    showing the model how they like meals broken down steers similar parses — e.g.
+    teaching it not to count a composite dish AND its components.
+    """
+    template = _PROMPT_PATH.read_text(encoding="utf-8")
+    return _few_shot_block(examples) + template.replace("{text}", text)
+
+
+def _few_shot_block(examples: list[dict[str, Any]] | None) -> str:
+    """Render the user's corrections as a worked-examples preamble (empty if none)."""
+    if not examples:
+        return ""
+    lines = [
+        "This user has corrected past meals. Match how they break meals into foods "
+        "(same items, no double-counting a dish and its components):",
+    ]
+    for example in examples:
+        foods = ", ".join(f.get("food", "") for f in example.get("foods", []))
+        lines.append(f'- "{example.get("text", "")}" → [{foods}]')
+    return "\n".join(lines) + "\n\n"
 
 
 class ParsedItem(BaseModel):
@@ -113,7 +133,9 @@ def _coerce_items(raw: list[Any]) -> list[ParsedItem]:
     return items
 
 
-def parse_meal(text: str, client: Any | None = None) -> MealParse:
+def parse_meal(
+    text: str, client: Any | None = None, examples: list[dict[str, Any]] | None = None
+) -> MealParse:
     """Parse free-text *text* into structured meal items via Gemini.
 
     *client* is a ``google.genai`` client (a mock in tests); when omitted a
@@ -129,7 +151,7 @@ def parse_meal(text: str, client: Any | None = None) -> MealParse:
 
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=_prompt(text),
+        contents=_prompt(text, examples),
         config=_structured_config(),
     )
 

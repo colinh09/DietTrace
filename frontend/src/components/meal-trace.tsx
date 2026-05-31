@@ -1,33 +1,32 @@
 "use client";
 
-// The agent's-work trace behind a meal's expand.
-//
-// Two calm parts, matching  (`.mealtrace` / trace.jsx):
-//   1. the agent's ordered steps — parse_meal → search_nutrition →
-//      estimate_portion → log_entry — as one quiet line per step, read straight
-//      from the `/log` trace; and
-//   2. the per-item table, whose grams are editable and rescale the row's
-//      kcal/P/C/F live (the portion is the one number a person actually corrects).
+// The agent's-work trace + the meal-correction editor behind a meal's expand
+//. Two calm parts:
+//   1. the agent's ordered steps — parse → search/web → portion → log (or a
+//      single `recall` step when the meal was served from the user's memory) —
+//      one quiet line each, read straight from the `/log` trace; and
+//   2. the per-item table. "Something's off?" opens an editor: drop a wrongly
+//      added item (the double-count case), nudge a portion, and Save — which
+//      teaches the agent (it recalls this meal next time, learns similar ones)
+//      and pushes the corrected meal to Arize as ground truth.
 import { useState } from "react";
-import { Check, Globe, Sparkle } from "lucide-react";
+import { Check, Globe, History, Sparkle, X } from "lucide-react";
 import {
-  submitCorrection,
+  correctMeal,
   type CorrectionResult,
   type LoggedItem,
   type TraceStep,
 } from "@/lib/api";
 import { macrosOf } from "@/lib/meal";
 
-// The web-search fallback gets its own glyph — it's the moment the agent leaves
-// the USDA DB for a grounded web lookup, so it should read distinctly.
+// Each step's rail glyph: a globe for the web fallback, a history mark for a
+// recall from memory, the ✦ sparkle otherwise.
 export function StepGlyph({ step }: { step?: string }) {
-  if (step === "web_search") {
-    return <Globe size={11} color="var(--accent)" />;
-  }
+  if (step === "web_search") return <Globe size={11} color="var(--accent)" />;
+  if (step === "recall") return <History size={11} color="var(--accent)" />;
   return <Sparkle size={11} fill="var(--accent)" color="var(--accent)" />;
 }
 
-// One trace step as a calm rail line: the step name, then its summary.
 function StepLine({ step, isLast }: { step: TraceStep; isLast: boolean }) {
   return (
     <li className="tstep">
@@ -49,106 +48,115 @@ function StepLine({ step, isLast }: { step: TraceStep; isLast: boolean }) {
 
 const fmt = new Intl.NumberFormat("en-US");
 
-// One editable item row. Grams seed from the logged portion; editing them
-// rescales the nutrient panel proportionally (the panel is already scaled to the
-// logged grams, so the factor is newGrams / loggedGrams).
-function ItemRow({ item }: { item: LoggedItem }) {
-  const [grams, setGrams] = useState(item.grams);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle",
-  );
-  const [result, setResult] = useState<CorrectionResult | null>(null);
+// An editable item: its logged values plus the in-editor grams and a removed flag.
+interface EditItem extends LoggedItem {
+  grams_edit: number;
+  removed: boolean;
+}
+
+function ItemRow({
+  item,
+  editing,
+  onGrams,
+  onToggle,
+}: {
+  item: EditItem;
+  editing: boolean;
+  onGrams: (g: number) => void;
+  onToggle: () => void;
+}) {
   const base = macrosOf(item.nutrients);
-  const factor = item.grams > 0 ? grams / item.grams : 0;
-  const name = item.description;
-  const cell = (value: number) => fmt.format(Math.round(value * factor));
-
-  // The portion is the one number a person actually corrects. Once it's been
-  // nudged off the logged value, offer to teach it — the correction becomes a
-  // ground-truth example in the Arize eval set (the self-supervision loop).
-  const changed = grams > 0 && grams !== item.grams && status !== "saved";
-
-  async function save() {
-    setStatus("saving");
-    try {
-      setResult(await submitCorrection(item, grams));
-      setStatus("saved");
-    } catch {
-      setStatus("error");
-    }
-  }
+  const factor = item.grams > 0 ? item.grams_edit / item.grams : 0;
+  const cell = (v: number) => (item.removed ? "—" : fmt.format(Math.round(v * factor)));
 
   return (
-    <>
-      <div className="item-grid">
-        <div className="item-name">
-          <span className="item-name-txt">{name}</span>
-        </div>
-        <div className="num">
+    <div className={"item-grid" + (item.removed ? " removed" : "")}>
+      <div className="item-name">
+        {editing && (
+          <button
+            type="button"
+            className="item-remove"
+            aria-label={item.removed ? `restore ${item.description}` : `remove ${item.description}`}
+            onClick={onToggle}
+          >
+            <X size={13} />
+          </button>
+        )}
+        <span className="item-name-txt">{item.description}</span>
+      </div>
+      <div className="num">
+        {editing && !item.removed ? (
           <span className="grams-edit">
             <input
               className="mono tnum"
               type="number"
               min={0}
               max={2000}
-              value={grams}
-              aria-label={`grams of ${name}`}
-              onChange={(e) => setGrams(Number(e.target.value))}
+              value={item.grams_edit}
+              aria-label={`grams of ${item.description}`}
+              onChange={(e) => onGrams(Number(e.target.value))}
             />
             <span>g</span>
           </span>
-        </div>
-        <div className="num mono tnum">{cell(base.kcal)}</div>
-        <div className="num mono tnum dim">{cell(base.protein)}</div>
-        <div className="num mono tnum dim">{cell(base.carb)}</div>
-        <div className="num mono tnum dim">{cell(base.fat)}</div>
+        ) : (
+          <span className="mono tnum dim">{item.removed ? "—" : `${Math.round(item.grams_edit)} g`}</span>
+        )}
       </div>
-
-      {changed && (
-        <div className="correct-bar">
-          <span className="correct-hint">Looks off? Teach DietTrace the right portion.</span>
-          <button
-            type="button"
-            className="correct-btn mono"
-            onClick={save}
-            disabled={status === "saving"}
-          >
-            {status === "saving" ? "saving…" : `correct → ${grams} g`}
-          </button>
-          {status === "error" && (
-            <span className="correct-err">couldn&apos;t save — try again</span>
-          )}
-        </div>
-      )}
-
-      {status === "saved" && result && (
-        <div className="correct-bar saved">
-          <Check size={12} color="var(--accent)" />
-          <span className="correct-hint">
-            Added to the Arize eval set as ground truth — the next eval run will
-            score against it.
-          </span>
-          <a
-            href={result.phoenix_url}
-            target="_blank"
-            rel="noreferrer"
-            className="correct-link mono"
-          >
-            view in Phoenix →
-          </a>
-        </div>
-      )}
-    </>
+      <div className="num mono tnum">{cell(base.kcal)}</div>
+      <div className="num mono tnum dim">{cell(base.protein)}</div>
+      <div className="num mono tnum dim">{cell(base.carb)}</div>
+      <div className="num mono tnum dim">{cell(base.fat)}</div>
+    </div>
   );
 }
 
 export function MealTrace({
   trace,
   perItem,
+  mealText,
+  onCorrected,
 }: {
   trace: TraceStep[];
   perItem: LoggedItem[];
+  mealText?: string;
+  onCorrected?: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [items, setItems] = useState<EditItem[]>(() =>
+    perItem.map((it) => ({ ...it, grams_edit: it.grams, removed: false })),
+  );
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [result, setResult] = useState<CorrectionResult | null>(null);
+
+  const setGrams = (i: number, g: number) =>
+    setItems((cur) => cur.map((it, j) => (j === i ? { ...it, grams_edit: g } : it)));
+  const toggle = (i: number) =>
+    setItems((cur) => cur.map((it, j) => (j === i ? { ...it, removed: !it.removed } : it)));
+
+  async function save() {
+    if (!mealText) return;
+    setStatus("saving");
+    const kept = items
+      .filter((it) => !it.removed)
+      .map((it) => ({
+        description: it.description,
+        fdc_id: it.fdc_id,
+        original_grams: it.grams,
+        corrected_grams: it.grams_edit,
+        nutrients: it.nutrients,
+      }));
+    try {
+      setResult(await correctMeal(mealText, kept));
+      setStatus("saved");
+      setEditing(false);
+      onCorrected?.();
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  const canEdit = Boolean(mealText) && status !== "saved";
+
   return (
     <div className="mealtrace">
       <div className="mealtrace-head mono">the agent&apos;s work</div>
@@ -157,6 +165,7 @@ export function MealTrace({
           <StepLine key={i} step={step} isLast={i === trace.length - 1} />
         ))}
       </ol>
+
       <div className="exp-pad">
         <div className="item-grid item-head">
           <div>Item</div>
@@ -166,10 +175,71 @@ export function MealTrace({
           <div className="num">C</div>
           <div className="num">F</div>
         </div>
-        {perItem.map((item, i) => (
-          // A meal can carry the same food twice, so pair the id with position.
-          <ItemRow key={`${item.fdc_id}-${i}`} item={item} />
+        {items.map((item, i) => (
+          <ItemRow
+            key={`${item.fdc_id}-${i}`}
+            item={item}
+            editing={editing}
+            onGrams={(g) => setGrams(i, g)}
+            onToggle={() => toggle(i)}
+          />
         ))}
+
+        {status === "saved" && result ? (
+          <div className="correct-bar saved">
+            <Check size={12} color="var(--accent)" />
+            <span className="correct-hint">
+              Learned — log this meal again and it&apos;ll come back right. Added to
+              Arize as ground truth ({result.corrections} correction
+              {result.corrections === 1 ? "" : "s"} so far).
+            </span>
+            <a
+              href={result.phoenix_url}
+              target="_blank"
+              rel="noreferrer"
+              className="correct-link mono"
+            >
+              view in Phoenix →
+            </a>
+          </div>
+        ) : editing ? (
+          <div className="correct-bar">
+            <span className="correct-hint">
+              Remove anything wrong (e.g. a double-counted dish) or fix a portion,
+              then teach it.
+            </span>
+            <button
+              type="button"
+              className="correct-btn mono"
+              onClick={save}
+              disabled={status === "saving"}
+            >
+              {status === "saving" ? "teaching…" : "save correction"}
+            </button>
+            <button
+              type="button"
+              className="correct-cancel mono"
+              onClick={() => setEditing(false)}
+            >
+              cancel
+            </button>
+            {status === "error" && (
+              <span className="correct-err">couldn&apos;t save — try again</span>
+            )}
+          </div>
+        ) : (
+          canEdit && (
+            <div className="correct-bar">
+              <button
+                type="button"
+                className="correct-btn mono"
+                onClick={() => setEditing(true)}
+              >
+                something&apos;s off?
+              </button>
+            </div>
+          )
+        )}
       </div>
     </div>
   );

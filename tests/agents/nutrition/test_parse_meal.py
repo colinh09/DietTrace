@@ -98,6 +98,21 @@ def test_captures_a_named_brand_separately_from_the_food() -> None:
     assert item.brand == "Five Guys"
 
 
+def test_few_shot_examples_are_prepended_to_the_prompt() -> None:
+    """A user's corrections ride in the prompt so similar meals parse their way."""
+    client = _client(_items_json([{"food": "chicken"}]))
+
+    parse_meal(
+        "chipotle bowl",
+        client=client,
+        examples=[{"text": "chipotle bowl", "foods": [{"food": "chicken", "grams": 113}]}],
+    )
+
+    sent = client.models.generate_content.call_args.kwargs["contents"]
+    assert "corrected past meals" in sent
+    assert "chipotle bowl" in sent and "chicken" in sent
+
+
 def test_malformed_output_fails_soft() -> None:
     """Non-JSON model output yields an empty parse, never an exception."""
     result = parse_meal("???", client=_client("Sorry, I can't do that."))

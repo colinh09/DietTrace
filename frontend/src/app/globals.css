@@ -242,6 +242,32 @@ body {
 .correct-link { font-size: 11px; color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
 .correct-link:hover { border-bottom-color: var(--accent-ink); }
 .correct-err { font-size: 11px; color: #9a5a4a; }
+.correct-cancel { font-size: 11px; color: var(--muted-ink); background: none; border: none; cursor: pointer; padding: 3px 6px; }
+.correct-cancel:hover { color: var(--ink); }
+
+/* correction editor: per-row remove + a struck-through removed row */
+.item-remove { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: none; border-radius: 5px; background: var(--accent-soft); color: var(--accent-ink); cursor: pointer; flex-shrink: 0; transition: background .14s ease; }
+.item-remove:hover { background: #e7d6d0; color: #9a5a4a; }
+.item-grid.removed .item-name-txt { text-decoration: line-through; color: var(--faint); }
+.item-grid.removed .num { color: var(--faint); }
+
+/* re-tune & re-test panel — the user-triggered "watch it improve" control */
+.retune { margin: 18px 0 6px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--accent-softer); }
+.retune-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.retune-lead { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink); }
+.retune-lead b { color: var(--accent-ink); font-weight: 600; }
+.retune-btn { font-size: 12px; color: var(--accent-foreground); background: var(--accent); border: none; border-radius: 7px; padding: 6px 13px; cursor: pointer; transition: background .14s ease; }
+.retune-btn:hover:not(:disabled) { background: var(--accent-ink); }
+.retune-btn:disabled { opacity: 0.6; cursor: default; }
+.retune-note { margin-top: 10px; font-size: 11.5px; color: var(--muted-ink); }
+.retune-result { margin-top: 14px; }
+.retune-scores { display: flex; align-items: center; gap: 16px; }
+.retune-score { display: flex; flex-direction: column; gap: 2px; }
+.retune-score-label { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+.retune-score-val { font-size: 22px; font-weight: 700; color: var(--muted-ink); }
+.retune-score.up .retune-score-val { color: var(--accent-ink); }
+.retune-arrow { font-size: 18px; color: var(--faint); }
+.retune-caption { margin-top: 9px; font-size: 12px; color: var(--muted-ink); }
 
 /* responsive — tighten the page to ~full-width and stack the band on narrow
    screens. */

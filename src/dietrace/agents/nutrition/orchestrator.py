@@ -97,15 +97,17 @@ def log_meal(
     *,
     client: Any | None = None,
     web_lookup: WebLookup = _default_web_lookup,
+    examples: list[dict[str, Any]] | None = None,
 ) -> LoggedMeal:
     """Log *text* into scaled nutrient totals via parse → search → portion → calc.
 
-    One Gemini call parses the meal (mockable via *client*); each item then resolves
-    against the food DB, falling back to a grounded web lookup for a branded item the
-    DB can't honor. Items that resolve to nothing are skipped rather than raising, so
-    a partially-understood meal still logs what it can.
+    One Gemini call parses the meal (mockable via *client*, steered by the user's
+    few-shot *examples* when given); each item then resolves against the food DB,
+    falling back to a grounded web lookup for a branded item the DB can't honor.
+    Items that resolve to nothing are skipped rather than raising, so a
+    partially-understood meal still logs what it can.
     """
-    parsed = parse_meal(text, client=client)
+    parsed = parse_meal(text, client=client, examples=examples)
 
     meal_items: list[MealItem] = []
     for item in parsed.items:
@@ -123,6 +125,7 @@ def stream_meal(
     *,
     client: Any | None = None,
     web_lookup: WebLookup = _default_web_lookup,
+    examples: list[dict[str, Any]] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Run the meal pipeline as a live event stream — one event per step.
 
@@ -141,7 +144,7 @@ def stream_meal(
         return event
 
     yield step(step="parse_meal", status="running", summary="reading your meal…")
-    parsed = parse_meal(text, client=client)
+    parsed = parse_meal(text, client=client, examples=examples)
     foods = [item.food for item in parsed.items]
     plural = "" if len(foods) == 1 else "s"
     yield step(

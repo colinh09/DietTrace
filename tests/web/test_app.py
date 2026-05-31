@@ -11,12 +11,13 @@ from fastapi.testclient import TestClient
 
 from dietrace.web.app import create_app
 from dietrace.web.feedback import FeedbackStore
+from dietrace.web.memory import SqliteMemory
 from dietrace.web.store import MealLogStore
 
 _STUB_TOTALS = [{"code": "208", "name": "Energy", "amount": 105.0, "unit": "kcal"}]
 
 
-def _stub_logger(text: str) -> dict:
+def _stub_logger(text: str, examples=()) -> dict:
     return {"totals": _STUB_TOTALS, "per_item": [{"description": text, "grams": 118.0}]}
 
 
@@ -26,6 +27,7 @@ def _client(tmp_path, logger=_stub_logger, pusher=lambda *a: False):
         meal_logger=logger,
         store=store,
         feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        memory=SqliteMemory(tmp_path / "memory.sqlite"),
         feedback_pusher=pusher,
         tracer_init=lambda name: None,
     )
@@ -170,7 +172,7 @@ def test_cors_origins_come_from_env(tmp_path, monkeypatch) -> None:
     )
 
 
-def _trace_logger(text: str) -> dict:
+def _trace_logger(text: str, examples=()) -> dict:
     """A logger whose per_item carries the matched USDA food + id and grams."""
     return {
         "totals": _STUB_TOTALS,
@@ -261,6 +263,125 @@ def test_correction_counts_are_per_user(tmp_path) -> None:
     assert bob["total_corrections"] == 1
 
 
+def test_correction_rescales_items_and_reports_totals(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    body = client.post(
+        "/correct",
+        json={
+            "meal_text": "a snack",
+            "items": [
+                {
+                    "description": "almonds",
+                    "original_grams": 100.0,
+                    "corrected_grams": 50.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 200.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+    ).json()
+
+    assert body["ok"] and body["corrections"] == 1
+    assert body["per_item"][0]["grams"] == 50.0
+    # 200 kcal at 100 g → 100 kcal at 50 g.
+    assert {t["code"]: t["amount"] for t in body["totals"]}["208"] == 100.0
+
+
+def test_corrected_meal_is_recalled_on_the_next_identical_log(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    client.post(
+        "/correct",
+        json={
+            "meal_text": "chipotle bowl",
+            "items": [
+                {
+                    "description": "Chipotle Chicken",
+                    "original_grams": 113.0,
+                    "corrected_grams": 113.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 180.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+        headers={"X-DietTrace-User": "alice"},
+    )
+
+    # Re-logging the same meal (any spacing/case) is served from memory, not the agent.
+    body = client.post(
+        "/log", json={"text": "Chipotle Bowl"}, headers={"X-DietTrace-User": "alice"}
+    ).json()
+    assert body["recalled"] is True
+    assert [i["description"] for i in body["per_item"]] == ["Chipotle Chicken"]
+    assert body["trace"][0]["step"] == "recall"
+
+
+def test_recall_is_scoped_to_the_correcting_user(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    client.post(
+        "/correct",
+        json={
+            "meal_text": "chipotle bowl",
+            "items": [
+                {
+                    "description": "Chicken",
+                    "original_grams": 100.0,
+                    "corrected_grams": 100.0,
+                    "nutrients": [],
+                }
+            ],
+        },
+        headers={"X-DietTrace-User": "alice"},
+    )
+
+    # Bob logging the same words gets the agent (the stub), not Alice's memory.
+    bob = client.post(
+        "/log", json={"text": "chipotle bowl"}, headers={"X-DietTrace-User": "bob"}
+    ).json()
+    assert bob.get("recalled") is not True
+
+
+def test_retune_reports_before_after_accuracy_on_the_users_corrections(tmp_path) -> None:
+    # A logger that overshoots without the user's examples, nails it with them.
+    def learning_logger(text, examples=()):
+        cal = 750.0 if examples else 1440.0
+        return {
+            "totals": [{"code": "208", "name": "Energy", "amount": cal, "unit": "kcal"}],
+            "per_item": [],
+        }
+
+    client, _ = _client(tmp_path, logger=learning_logger)
+    client.post(
+        "/correct",
+        json={
+            "meal_text": "chipotle bowl",
+            "items": [
+                {
+                    "description": "bowl",
+                    "original_grams": 100.0,
+                    "corrected_grams": 100.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 750.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+        headers={"X-DietTrace-User": "alice"},
+    )
+
+    res = client.post("/retune", headers={"X-DietTrace-User": "alice"}).json()
+    assert res["cases"] == 1
+    assert res["after"] > res["before"]
+    assert res["improved"] is True
+
+
+def test_retune_with_no_corrections_is_a_noop(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    res = client.post("/retune", headers={"X-DietTrace-User": "nobody"}).json()
+    assert res["cases"] == 0 and res["before"] is None
+
+
 def test_feedback_records_and_pushes_a_correction_to_arize(tmp_path) -> None:
     pushed: list[tuple] = []
 
@@ -304,7 +425,7 @@ def test_feedback_is_recorded_even_when_the_arize_push_fails(tmp_path) -> None:
     assert client.get("/feedback").json()["total_corrections"] == 1
 
 
-def _web_trace_logger(text: str) -> dict:
+def _web_trace_logger(text: str, examples=()) -> dict:
     """A logger whose item came from the grounded web fallback (fdc_id 0)."""
     return {
         "totals": _STUB_TOTALS,
@@ -366,7 +487,7 @@ def test_log_accepts_client_date(tmp_path) -> None:
 _ENERGY = [{"code": "208", "name": "Energy", "amount": 143.0, "unit": "kcal"}]
 
 
-def _fake_streamer(text):
+def _fake_streamer(text, examples=()):
     yield {"type": "step", "step": "parse_meal", "status": "done", "summary": "1 food"}
     yield {"type": "step", "step": "log_entry", "status": "done", "totals": _ENERGY}
     yield {"type": "result", "per_item": [], "totals": _ENERGY, "trace": []}
@@ -376,7 +497,11 @@ def test_log_stream_emits_events_and_persists(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("DIETRACE_STREAM_PACE", "0")
     store = MealLogStore(tmp_path / "log.sqlite")
     app = create_app(
-        meal_streamer=_fake_streamer, store=store, tracer_init=lambda name: None
+        meal_streamer=_fake_streamer,
+        store=store,
+        feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        memory=SqliteMemory(tmp_path / "memory.sqlite"),
+        tracer_init=lambda name: None,
     )
     client = TestClient(app)
 

@@ -44,6 +44,7 @@ export interface LoggedItem {
 // Every step carries `step` + `summary`; the rest depends on the step kind.
 export interface TraceStep {
   step:
+    | "recall"
     | "parse_meal"
     | "search_nutrition"
     | "web_search"
@@ -143,28 +144,55 @@ export async function deleteMeal(id: number): Promise<void> {
   await request(`/meals/${id}`, { method: "DELETE" });
 }
 
-// The result of contributing a portion correction to the Arize eval set.
+// One kept item of a corrected meal sent to POST /correct (removed items are
+// simply omitted). The backend rescales the panel from original to corrected grams.
+export interface CorrectionItemInput {
+  description: string;
+  fdc_id: number;
+  original_grams: number;
+  corrected_grams: number;
+  nutrients: Nutrient[];
+}
+
+// The result of correcting a meal — it's now remembered (cache + few-shot) and
+// pushed to Arize as ground truth.
 export interface CorrectionResult {
   ok: boolean;
   added_to_arize: boolean;
-  total_corrections: number;
-  dataset: string;
+  corrections: number;
+  per_item: LoggedItem[];
+  totals: Nutrient[];
   phoenix_url: string;
 }
 
-// Correct a logged item's portion → push it to Phoenix as a new ground-truth
-// example (the self-supervision loop, driven from the UI). The item's logged
-// `nutrients` panel lets the backend rescale the expected macros to the new grams.
-export async function submitCorrection(item: LoggedItem, correctedGrams: number) {
-  return request<CorrectionResult>("/feedback", {
+// Save a corrected meal: remove wrong items / fix portions → the agent remembers
+// it (recalls the same meal, learns from similar ones) and Arize gets the truth.
+export async function correctMeal(
+  mealText: string,
+  items: CorrectionItemInput[],
+): Promise<CorrectionResult> {
+  return request<CorrectionResult>("/correct", {
     method: "POST",
-    body: JSON.stringify({
-      food: item.description,
-      original_grams: item.grams,
-      corrected_grams: correctedGrams,
-      nutrients: item.nutrients,
-    }),
+    body: JSON.stringify({ meal_text: mealText, items }),
   });
+}
+
+// How many corrections this user has taught the agent.
+export async function getMemory(): Promise<{ corrections: number }> {
+  return request<{ corrections: number }>("/memory");
+}
+
+// The before/after of re-testing the agent on the user's own corrected meals.
+export interface RetuneResult {
+  cases: number;
+  before: number | null;
+  after: number | null;
+  improved: boolean;
+}
+
+// Re-tune & re-test: run the agent on your corrected meals, base vs with-memory.
+export async function retune(): Promise<RetuneResult> {
+  return request<RetuneResult>("/retune", { method: "POST" });
 }
 
 // Read one day's logged meals. Omit `date` for today (the backend default).
@@ -220,6 +248,7 @@ export async function getAccuracy(): Promise<AccuracyReport> {
 export interface StreamEvent {
   type: "step" | "result";
   step?:
+    | "recall"
     | "parse_meal"
     | "search_nutrition"
     | "web_search"

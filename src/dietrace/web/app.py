@@ -36,6 +36,7 @@ from dietrace.web.feedback import (
 )
 from dietrace.web.goals import load_goals
 from dietrace.web.identity import current_user
+from dietrace.web.memory import build_memory, calories_of, sum_totals
 from dietrace.web.store import MealLogStore
 from dietrace.web.stores import build_stores
 
@@ -49,8 +50,8 @@ DEFAULT_CORS_ORIGINS = "http://localhost:3000"
 # arriving one at a time (the parse step is naturally slow; these are instant).
 _STREAM_PACE = float(os.environ.get("DIETRACE_STREAM_PACE", "0.18"))
 
-MealLogger = Callable[[str], dict]
-MealStreamer = Callable[[str], Iterator[dict]]
+MealLogger = Callable[..., dict]
+MealStreamer = Callable[..., Iterator[dict]]
 
 
 def _cors_origins() -> list[str]:
@@ -71,27 +72,54 @@ class LogRequest(BaseModel):
     date: str | None = None
 
 
-def default_meal_logger(text: str) -> dict:  # pragma: no cover — live Gemini call
+class CorrectionItem(BaseModel):
+    """One kept item of a corrected meal: the user adjusted its portion (or left it).
+
+    ``nutrients`` is the item's panel as logged (scaled to ``original_grams``); the
+    server rescales it to ``corrected_grams``. Items the user removed (e.g. a
+    double-counted dish) simply aren't sent.
+    """
+
+    description: str
+    fdc_id: int = 0
+    original_grams: float
+    corrected_grams: float
+    nutrients: list[dict[str, Any]] = []
+
+
+class MealCorrection(BaseModel):
+    """A user's corrected version of a logged meal — the new ground truth for it."""
+
+    meal_text: str
+    items: list[CorrectionItem]
+
+
+def default_meal_logger(
+    text: str, examples: list[dict] | None = None
+) -> dict:  # pragma: no cover — live Gemini call
     """Production ``/log`` path: one Gemini parse, then the deterministic pipeline.
 
-    Gemini parses the meal into items; ``log_meal`` then runs search → portion →
-    calculation deterministically against the food DB, returning the
+    Gemini parses the meal into items (steered by the user's few-shot *examples*
+    when given); ``log_meal`` then runs search → portion → calculation
+    deterministically against the food DB, returning the
     ``{per_item, totals}`` the web layer and evaluators read.
     """
     from dietrace.agents.nutrition.orchestrator import log_meal
     from dietrace.nutrition.repository import FoodRepository
 
     repository = FoodRepository(os.environ.get("DIETRACE_FOOD_DB", "data/food.sqlite"))
-    return log_meal(text, repository).model_dump()
+    return log_meal(text, repository, examples=examples).model_dump()
 
 
-def default_meal_streamer(text: str) -> Iterator[dict]:  # pragma: no cover — live Gemini
+def default_meal_streamer(
+    text: str, examples: list[dict] | None = None
+) -> Iterator[dict]:  # pragma: no cover — live Gemini
     """Production ``/log/stream`` path: the live agent pipeline as an event stream."""
     from dietrace.agents.nutrition.orchestrator import stream_meal
     from dietrace.nutrition.repository import FoodRepository
 
     repository = FoodRepository(os.environ.get("DIETRACE_FOOD_DB", "data/food.sqlite"))
-    yield from stream_meal(text, repository)
+    yield from stream_meal(text, repository, examples=examples)
 
 
 def _aggregate(meals: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -125,6 +153,64 @@ def _goals_progress(
             {**goal, "consumed": consumed, "remaining": goal["target"] - consumed}
         )
     return progress
+
+
+def _recall_step() -> dict[str, Any]:
+    """The trace step shown when a meal is served from the user's corrections."""
+    return {
+        "step": "recall",
+        "status": "done",
+        "summary": "recalled from your past correction — no guessing needed",
+    }
+
+
+def _rescale_item(item: CorrectionItem) -> dict[str, Any]:
+    """A corrected item: its panel rescaled from the logged to the corrected grams."""
+    factor = item.corrected_grams / item.original_grams if item.original_grams else 0.0
+    nutrients = [
+        {**n, "amount": round(float(n.get("amount", 0.0)) * factor, 2)}
+        for n in item.nutrients
+    ]
+    return {
+        "fdc_id": item.fdc_id,
+        "description": item.description,
+        "grams": item.corrected_grams,
+        "nutrients": nutrients,
+    }
+
+
+def _meal_example(
+    meal_text: str, items: list[dict[str, Any]], totals: list[dict[str, Any]]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Render a corrected meal as a Phoenix (input, output, metadata) example."""
+    by_code = {t["code"]: t["amount"] for t in totals}
+    out = {
+        "grams": round(sum(i["grams"] for i in items), 1),
+        "calories": round(by_code.get("208", 0.0), 1),
+        "protein_g": round(by_code.get("203", 0.0), 1),
+        "fat_g": round(by_code.get("204", 0.0), 1),
+        "carb_g": round(by_code.get("205", 0.0), 1),
+    }
+    return {"text": meal_text}, out, {"source": "user_meal_correction", "items": len(items)}
+
+
+def _calorie_accuracy(
+    cases: list[dict[str, Any]], estimate: Callable[[str], dict]
+) -> float:
+    """Mean calorie accuracy of *estimate* over *cases* (1.0 = exact, 0.0 = far off).
+
+    Each case scores ``max(0, 1 - |est - expected| / expected)`` against the user's
+    corrected calories — a simple, honest before/after number for the re-test.
+    """
+    scores: list[float] = []
+    for case in cases:
+        expected = case["calories"]
+        est = calories_of(estimate(case["text"]).get("totals", []))
+        if expected <= 0:
+            scores.append(1.0 if est == 0 else 0.0)
+        else:
+            scores.append(max(0.0, 1.0 - abs(est - expected) / expected))
+    return round(sum(scores) / len(scores), 3) if scores else 0.0
 
 
 def _build_trace(
@@ -197,6 +283,7 @@ def create_app(
     meal_streamer: MealStreamer | None = None,
     store: MealLogStore | None = None,
     feedback_store: FeedbackStore | None = None,
+    memory: Any | None = None,
     feedback_pusher: FeedbackPusher = phoenix_push,
     tracer_init: Callable[[str], Any] = init_tracer,
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
@@ -208,6 +295,7 @@ def create_app(
         default_meals, default_feedback = build_stores()
         log_store = store or default_meals
         corrections = feedback_store or default_feedback
+    learning = memory or build_memory()
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
@@ -236,7 +324,18 @@ def create_app(
 
     @app.post("/log")
     def log_meal(req: LogRequest, user: str = Depends(current_user)) -> dict[str, Any]:
-        result = logger_fn(req.text)
+        recalled = learning.recall(user, req.text)
+        if recalled is not None:
+            per_item, totals = recalled["per_item"], recalled["totals"]
+            entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
+            return {
+                "id": entry_id,
+                "per_item": per_item,
+                "totals": totals,
+                "recalled": True,
+                "trace": [_recall_step()] + _build_trace(per_item, totals),
+            }
+        result = logger_fn(req.text, examples=learning.examples(user))
         totals = result.get("totals", [])
         per_item = result.get("per_item", [])
         entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
@@ -250,9 +349,25 @@ def create_app(
         pipeline step, then a ``result`` event (which also persists the meal)."""
 
         pace = float(os.environ.get("DIETRACE_STREAM_PACE", str(_STREAM_PACE)))
+        recalled = learning.recall(user, req.text)
+
+        def cached_events() -> Iterator[str]:
+            # A meal the user already corrected — recall it instead of re-running.
+            per_item, totals = recalled["per_item"], recalled["totals"]
+            yield f"data: {json.dumps(_recall_step())}\n\n"
+            entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
+            result = {
+                "type": "result",
+                "id": entry_id,
+                "per_item": per_item,
+                "totals": totals,
+                "recalled": True,
+                "trace": [_recall_step()],
+            }
+            yield f"data: {json.dumps(result)}\n\n"
 
         def events() -> Iterator[str]:
-            for event in streamer_fn(req.text):
+            for event in streamer_fn(req.text, examples=learning.examples(user)):
                 if event.get("type") == "result":
                     event["id"] = log_store.add(
                         req.text, event.get("totals", []), date=req.date, user_id=user
@@ -261,7 +376,8 @@ def create_app(
                     time.sleep(pace)  # let fast steps arrive one at a time
                 yield f"data: {json.dumps(event)}\n\n"
 
-        return StreamingResponse(events(), media_type="text/event-stream")
+        stream = cached_events() if recalled is not None else events()
+        return StreamingResponse(stream, media_type="text/event-stream")
 
     @app.delete("/meals/{meal_id}")
     def delete_meal(meal_id: int, user: str = Depends(current_user)) -> dict[str, Any]:
@@ -310,6 +426,57 @@ def create_app(
             "total_corrections": corrections.count(user_id=user),
             "dataset": FEEDBACK_DATASET,
             "phoenix_url": phoenix_dashboard_url(),
+        }
+
+    @app.post("/correct")
+    def correct(
+        correction: MealCorrection, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """Save a user's corrected meal → their memory (cache + few-shot) + Arize.
+
+        Each kept item is rescaled to its corrected portion; removed items (e.g. a
+        double-counted dish) are simply dropped. The corrected meal is remembered
+        so the same meal is recalled next time and similar meals parse better, and
+        it's pushed to Phoenix as ground truth.
+        """
+        corrected_items = [_rescale_item(item) for item in correction.items]
+        totals = sum_totals(corrected_items)
+        learning.remember(user, correction.meal_text, corrected_items, totals)
+        inp, out, meta = _meal_example(correction.meal_text, corrected_items, totals)
+        added_to_arize = feedback_pusher(inp, out, meta)
+        return {
+            "ok": True,
+            "added_to_arize": added_to_arize,
+            "corrections": learning.count(user),
+            "per_item": corrected_items,
+            "totals": totals,
+            "phoenix_url": phoenix_dashboard_url(),
+        }
+
+    @app.get("/memory")
+    def memory_summary(user: str = Depends(current_user)) -> dict[str, Any]:
+        return {"corrections": learning.count(user)}
+
+    @app.post("/retune")
+    def retune(user: str = Depends(current_user)) -> dict[str, Any]:
+        """Re-test the agent on the user's corrected meals, before vs after learning.
+
+        Runs the agent over each meal the user corrected — once as the base agent,
+        once with their corrections as few-shot — and scores both against their
+        corrected calories. The user triggers this when they want to watch their
+        agent improve. Live + costs Gemini calls, so it's on-demand only.
+        """
+        cases = learning.eval_cases(user)
+        if not cases:
+            return {"cases": 0, "before": None, "after": None, "improved": False}
+        examples = learning.examples(user)
+        before = _calorie_accuracy(cases, lambda t: logger_fn(t, examples=[]))
+        after = _calorie_accuracy(cases, lambda t: logger_fn(t, examples=examples))
+        return {
+            "cases": len(cases),
+            "before": before,
+            "after": after,
+            "improved": after >= before,
         }
 
     @app.get("/analysis")

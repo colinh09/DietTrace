@@ -28,10 +28,12 @@ function MealRow({
   meal,
   detail,
   onEdit,
+  onCorrected,
 }: {
   meal: Meal;
   detail?: MealDetail;
   onEdit?: (meal: Meal) => void;
+  onCorrected?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const macros = macrosOf(meal.totals);
@@ -87,7 +89,12 @@ function MealRow({
         <div className="meal-exp-inner">
           {open &&
             (detail ? (
-              <MealTrace trace={detail.trace} perItem={detail.perItem} />
+              <MealTrace
+                trace={detail.trace}
+                perItem={detail.perItem}
+                mealText={meal.text}
+                onCorrected={onCorrected}
+              />
             ) : (
               <div className="meal-exp-empty">
                 No agent trace for this meal — log it again to see the agent&apos;s work.
@@ -104,11 +111,13 @@ export function MealList({
   heading = "Logged",
   detailsById,
   onEdit,
+  onCorrected,
 }: {
   meals: Meal[];
   heading?: string;
   detailsById?: Record<number, MealDetail>;
   onEdit?: (meal: Meal) => void;
+  onCorrected?: () => void;
 }) {
   return (
     <section className="meals">
@@ -130,6 +139,7 @@ export function MealList({
               meal={meal}
               detail={detailsById?.[meal.id]}
               onEdit={onEdit}
+              onCorrected={onCorrected}
             />
           ))}
         </ul>
