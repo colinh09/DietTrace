@@ -12,6 +12,9 @@ from dietrace.nutrition.models import SearchCandidate
 from dietrace.nutrition.repository import FoodRepository
 from tests.nutrition.fixtures_food_db import (
     AVOCADO_FDC_ID,
+    CHICKEN_BREAST_COOKED_FDC_ID,
+    CHICKEN_BREAST_RAW_FDC_ID,
+    CHICKEN_DELI_FDC_ID,
     EGG_FDC_ID,
     TOAST_FDC_ID,
 )
@@ -88,6 +91,28 @@ def test_search_prefers_canonical_on_ties(food_db) -> None:
 
     assert [c.fdc_id for c in candidates] == [EGG_FDC_ID, TOAST_FDC_ID]
     assert all(c.score == candidates[0].score for c in candidates)
+
+
+def test_search_chicken_breast_prefers_plain_cut_over_deli(food_db) -> None:
+    """"chicken breast" resolves to a plain cut, never the deli roll.
+
+    The raw cut, the plainly-cooked cut, and the processed deli slice all carry
+    the words "chicken" and "breast", so each is an equal all-words text match.
+    The canonical ranking must then prefer the raw cut first, the cooked cut
+    next, and bury the deli product last — a deli roll should never outrank a
+    plainly-cooked breast just because it has fewer cooking words.
+    """
+    repo = FoodRepository(food_db)
+
+    candidates = repo.search("chicken breast")
+
+    assert [c.fdc_id for c in candidates] == [
+        CHICKEN_BREAST_RAW_FDC_ID,
+        CHICKEN_BREAST_COOKED_FDC_ID,
+        CHICKEN_DELI_FDC_ID,
+    ]
+    assert all(c.score == candidates[0].score for c in candidates)
+    assert candidates[-1].fdc_id == CHICKEN_DELI_FDC_ID
 
 
 def test_search_no_match_returns_empty(food_db) -> None:

@@ -20,8 +20,21 @@ import sqlite3
 EGG_FDC_ID = 748967
 AVOCADO_FDC_ID = 171705
 TOAST_FDC_ID = 172686
+# A "chicken breast" query has to choose among a raw cut, a plainly-cooked cut,
+# and a processed deli roll: all three carry the words "chicken" and
+# "breast", so the canonical ranking — not text relevance — must break the tie.
+CHICKEN_BREAST_RAW_FDC_ID = 171477
+CHICKEN_BREAST_COOKED_FDC_ID = 171534
+CHICKEN_DELI_FDC_ID = 172865
 
-FIXTURE_FDC_IDS = (EGG_FDC_ID, AVOCADO_FDC_ID, TOAST_FDC_ID)
+FIXTURE_FDC_IDS = (
+    EGG_FDC_ID,
+    AVOCADO_FDC_ID,
+    TOAST_FDC_ID,
+    CHICKEN_BREAST_RAW_FDC_ID,
+    CHICKEN_BREAST_COOKED_FDC_ID,
+    CHICKEN_DELI_FDC_ID,
+)
 
 _SCHEMA = """
 CREATE TABLE foods (
@@ -79,6 +92,17 @@ _FOODS = [
     (EGG_FDC_ID, "Egg, whole, raw, fresh", "sr_legacy_food"),
     (AVOCADO_FDC_ID, "Avocados, raw, all commercial varieties", "sr_legacy_food"),
     (TOAST_FDC_ID, "Bread, whole-wheat, commercially prepared", "sr_legacy_food"),
+    (
+        CHICKEN_BREAST_RAW_FDC_ID,
+        "Chicken, broilers or fryers, breast, meat only, raw",
+        "sr_legacy_food",
+    ),
+    (
+        CHICKEN_BREAST_COOKED_FDC_ID,
+        "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+        "sr_legacy_food",
+    ),
+    (CHICKEN_DELI_FDC_ID, "Chicken breast, deli, sliced", "branded_food"),
 ]
 
 # fdc_id -> {nutrient code: amount per 100 g}, USDA-grounded.
@@ -86,6 +110,9 @@ _FOOD_NUTRIENTS = {
     EGG_FDC_ID: {"208": 143.0, "203": 12.6, "204": 9.51, "205": 0.72},
     AVOCADO_FDC_ID: {"208": 160.0, "203": 2.0, "204": 14.66, "205": 8.53},
     TOAST_FDC_ID: {"208": 254.0, "203": 12.3, "204": 3.55, "205": 43.1},
+    CHICKEN_BREAST_RAW_FDC_ID: {"208": 120.0, "203": 22.5, "204": 2.62, "205": 0.0},
+    CHICKEN_BREAST_COOKED_FDC_ID: {"208": 165.0, "203": 31.0, "204": 3.57, "205": 0.0},
+    CHICKEN_DELI_FDC_ID: {"208": 92.0, "203": 17.0, "204": 1.5, "205": 2.0},
 }
 
 # fdc_id -> list of (amount, unit, gram_weight, description, sequence_number)

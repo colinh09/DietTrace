@@ -185,10 +185,19 @@ _PROCESSED_TERMS = frozenset({
     "cooked", "boiled", "roasted", "fried", "baked", "grilled", "steamed",
     "braised", "dried", "dehydrated", "frozen", "canned", "dry", "honey",
     "salted", "unsalted", "sweetened", "sweet", "flavor", "flavored", "powder",
-    "juice", "milk", "sliced", "deli", "formulated", "reduced", "nonfat",
+    "juice", "milk", "sliced", "formulated", "reduced", "nonfat",
     "lowfat", "drained", "prepared", "commercially", "mesquite", "smoked",
     "seasoned", "rotisserie", "creamed", "candied", "pickled", "instant",
     "concentrate", "puree", "pureed", "powdered",
+})
+
+# Terms marking a deli / luncheon-meat product (a processed roll or slice). These
+# are penalized harder than a plain cooking method so "chicken breast" resolves
+# to a raw or plainly-cooked cut rather than a deli roll: a
+# deli item must not outrank a cooked cut merely for having fewer cooking words.
+_DELI_TERMS = frozenset({
+    "deli", "luncheon", "lunchmeat", "roll", "loaf", "spread", "patty",
+    "nugget", "prepackaged",
 })
 
 
@@ -228,7 +237,11 @@ def _text_score(query: str, fields: list[str]) -> tuple[int, str]:
 
 
 def _canonical_score(description: str) -> float:
-    """Higher for a more canonical (raw/whole, simple, short) food description."""
+    """Higher for a more canonical (raw/whole, simple, short) food description.
+
+    Cooking-method and processing words each cost a little; deli / luncheon-meat
+    markers cost more, so a plainly-cooked cut still outranks a deli product.
+    """
     toks = _tokens(description)
     score = 0.0
     if "raw" in toks:
@@ -236,5 +249,6 @@ def _canonical_score(description: str) -> float:
     if "whole" in toks:
         score += 0.5
     score -= float(len(_PROCESSED_TERMS & toks))
+    score -= 2.0 * len(_DELI_TERMS & toks)
     score -= 0.02 * len(description)
     return score
