@@ -131,3 +131,55 @@ export async function getAnalysis(date?: string): Promise<AnalysisResponse> {
 export async function getGoals(): Promise<GoalsResponse> {
   return request<GoalsResponse>("/goals");
 }
+
+// A single Server-Sent Event from `POST /log/stream`: a `step` as the agent
+// works, or the final `result` (which also persists the meal and carries its id).
+export interface StreamEvent {
+  type: "step" | "result";
+  step?: "parse_meal" | "search_nutrition" | "estimate_portion" | "log_entry";
+  status?: "running" | "done";
+  summary?: string;
+  food?: string;
+  matched?: string;
+  fdc_id?: number;
+  grams?: number;
+  foods?: string[];
+  totals?: Nutrient[];
+  per_item?: LoggedItem[];
+  trace?: TraceStep[];
+  id?: number;
+}
+
+// Stream a meal log: `onEvent` fires for each step as the agent works, then once
+// more with the final `result`. Resolves when the stream ends.
+export async function logMealStream(
+  text: string,
+  date: string | undefined,
+  onEvent: (event: StreamEvent) => void,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/log/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, date }),
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`DietTrace /log/stream failed: ${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep = buffer.indexOf("\n\n");
+    while (sep >= 0) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      if (frame.startsWith("data: ")) {
+        onEvent(JSON.parse(frame.slice(6)) as StreamEvent);
+      }
+      sep = buffer.indexOf("\n\n");
+    }
+  }
+}

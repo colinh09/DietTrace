@@ -109,3 +109,19 @@ def test_fallback_grams_defaults_to_100g_without_servings() -> None:
     food = Food(fdc_id=99, description="Mystery powder", data_type="branded_food")
 
     assert _fallback_grams(food, 2.0) == pytest.approx(200.0)
+
+
+def test_stream_meal_emits_steps_then_result(tmp_path) -> None:
+    from dietrace.agents.nutrition.orchestrator import stream_meal
+
+    client = _parse_client([{"food": "egg", "quantity": 2, "unit": "large"}])
+    events = list(stream_meal("two eggs", _repo(tmp_path), client=client))
+
+    assert events[0]["type"] == "step" and events[0]["step"] == "parse_meal"
+    assert events[-1]["type"] == "result"
+    steps = [e["step"] for e in events if e["type"] == "step"]
+    assert {"parse_meal", "search_nutrition", "estimate_portion", "log_entry"} <= set(steps)
+    result = events[-1]
+    assert result["totals"] and result["per_item"]
+    # The result's trace is exactly the step events that streamed.
+    assert result["trace"] == [e for e in events if e["type"] == "step"]

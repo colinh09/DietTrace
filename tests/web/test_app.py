@@ -5,6 +5,7 @@ persistence entirely offline.
 """
 
 import datetime
+import json
 
 from fastapi.testclient import TestClient
 
@@ -245,3 +246,33 @@ def test_log_accepts_client_date(tmp_path) -> None:
     client, store = _client(tmp_path)
     client.post("/log", json={"text": "1 banana", "date": "2026-05-31"})
     assert store.list()[0]["date"] == "2026-05-31"
+
+
+_ENERGY = [{"code": "208", "name": "Energy", "amount": 143.0, "unit": "kcal"}]
+
+
+def _fake_streamer(text):
+    yield {"type": "step", "step": "parse_meal", "status": "done", "summary": "1 food"}
+    yield {"type": "step", "step": "log_entry", "status": "done", "totals": _ENERGY}
+    yield {"type": "result", "per_item": [], "totals": _ENERGY, "trace": []}
+
+
+def test_log_stream_emits_events_and_persists(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DIETRACE_STREAM_PACE", "0")
+    store = MealLogStore(tmp_path / "log.sqlite")
+    app = create_app(
+        meal_streamer=_fake_streamer, store=store, tracer_init=lambda name: None
+    )
+    client = TestClient(app)
+
+    response = client.post("/log/stream", json={"text": "one egg"})
+
+    assert response.status_code == 200
+    events = [
+        json.loads(line[6:])
+        for line in response.text.split("\n\n")
+        if line.startswith("data: ")
+    ]
+    assert [e["type"] for e in events] == ["step", "step", "result"]
+    assert isinstance(events[-1]["id"], int)
+    assert len(store.list()) == 1

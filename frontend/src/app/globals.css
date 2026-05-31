@@ -245,3 +245,9 @@ body {
   .dm-macros { grid-template-columns: 1fr; gap: 12px; }
   .meal-side { gap: 9px; }
 }
+
+/* Live (streaming) meal entry — the working state while the agent runs. */
+.conf-chip.working { background: var(--accent-soft); color: var(--accent-ink); }
+.conf-chip.working .conf-dot { background: var(--accent); animation: dt-pulse 1.1s ease-in-out infinite; }
+.meal.live { background: var(--accent-softer); border-radius: var(--radius); }
+@keyframes dt-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }

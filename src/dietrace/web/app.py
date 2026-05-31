@@ -9,14 +9,17 @@ runs one Gemini parse then the deterministic pipeline. Tracing is best-effort (�
 from __future__ import annotations
 
 import datetime
+import json
 import os
+import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from dietrace.observability.phoenix import init_tracer
@@ -30,7 +33,12 @@ SERVICE_NAME = "dietrace-web"
 # so deploys can add their real domain.
 DEFAULT_CORS_ORIGINS = "http://localhost:3000"
 
+# A small beat between the fast deterministic stream steps so the UI can show them
+# arriving one at a time (the parse step is naturally slow; these are instant).
+_STREAM_PACE = float(os.environ.get("DIETRACE_STREAM_PACE", "0.18"))
+
 MealLogger = Callable[[str], dict]
+MealStreamer = Callable[[str], Iterator[dict]]
 
 
 def _cors_origins() -> list[str]:
@@ -63,6 +71,15 @@ def default_meal_logger(text: str) -> dict:  # pragma: no cover — live Gemini 
 
     repository = FoodRepository(os.environ.get("DIETRACE_FOOD_DB", "data/food.sqlite"))
     return log_meal(text, repository).model_dump()
+
+
+def default_meal_streamer(text: str) -> Iterator[dict]:  # pragma: no cover — live Gemini
+    """Production ``/log/stream`` path: the live agent pipeline as an event stream."""
+    from dietrace.agents.nutrition.orchestrator import stream_meal
+    from dietrace.nutrition.repository import FoodRepository
+
+    repository = FoodRepository(os.environ.get("DIETRACE_FOOD_DB", "data/food.sqlite"))
+    yield from stream_meal(text, repository)
 
 
 def _aggregate(meals: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -154,6 +171,7 @@ def _build_trace(
 def create_app(
     *,
     meal_logger: MealLogger | None = None,
+    meal_streamer: MealStreamer | None = None,
     store: MealLogStore | None = None,
     tracer_init: Callable[[str], Any] = init_tracer,
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
@@ -161,6 +179,7 @@ def create_app(
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     log_store = store or MealLogStore(os.environ.get("DIETRACE_LOG_DB", "data/log.sqlite"))
     logger_fn = meal_logger or default_meal_logger
+    streamer_fn = meal_streamer or default_meal_streamer
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -192,6 +211,25 @@ def create_app(
         per_item = result.get("per_item", [])
         entry_id = log_store.add(req.text, totals, date=req.date)
         return {"id": entry_id, **result, "trace": _build_trace(per_item, totals)}
+
+    @app.post("/log/stream")
+    def log_meal_stream(req: LogRequest) -> StreamingResponse:
+        """Stream the agent's work as Server-Sent Events: one ``step`` event per
+        pipeline step, then a ``result`` event (which also persists the meal)."""
+
+        pace = float(os.environ.get("DIETRACE_STREAM_PACE", str(_STREAM_PACE)))
+
+        def events() -> Iterator[str]:
+            for event in streamer_fn(req.text):
+                if event.get("type") == "result":
+                    event["id"] = log_store.add(
+                        req.text, event.get("totals", []), date=req.date
+                    )
+                elif pace:
+                    time.sleep(pace)  # let fast steps arrive one at a time
+                yield f"data: {json.dumps(event)}\n\n"
+
+        return StreamingResponse(events(), media_type="text/event-stream")
 
     @app.delete("/meals/{meal_id}")
     def delete_meal(meal_id: int) -> dict[str, Any]:
