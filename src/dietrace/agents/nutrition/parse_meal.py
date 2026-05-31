@@ -19,29 +19,21 @@ lazily so importing this module never requires GCP credentials.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
 from dietrace.llm.config import GEMINI_MODEL
 
-_PROMPT = """\
-Extract the foods from this meal description into a JSON object.
+# The meal-parsing prompt lives in a tracked file so the supervisor can propose
+# fixes to it (it is the generative step that drives parse accuracy).
+_PROMPT_PATH = Path(__file__).parent / "parse_prompt.md"
 
-Return ONLY JSON of the form:
-{{"items": [{{"food": "<food name>", "quantity": <number>, "unit": "<unit>"}}]}}
 
-Rules:
-- One entry per distinct food.
-- "food" is the bare food name (singular, no quantity words).
-- "quantity" is a number ("half" -> 0.5, "a"/"an"/none -> 1).
-- "unit" is the household measure ("slice", "cup", "each", ...); use "each" \
-for whole countable items and "" when there is no natural unit.
-- Do not invent foods that are not mentioned.
-
-Meal description:
-{text}
-"""
+def _prompt(text: str) -> str:
+    """Render the parse prompt for *text* (a ``{text}`` placeholder substitution)."""
+    return _PROMPT_PATH.read_text(encoding="utf-8").replace("{text}", text)
 
 
 class ParsedItem(BaseModel):
@@ -119,7 +111,7 @@ def parse_meal(text: str, client: Any | None = None) -> MealParse:
 
     response = client.models.generate_content(
         model=GEMINI_MODEL,
-        contents=_PROMPT.format(text=text),
+        contents=_prompt(text),
         config=_structured_config(),
     )
 

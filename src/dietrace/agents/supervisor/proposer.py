@@ -12,13 +12,14 @@ import textwrap
 import warnings
 from pathlib import Path
 
-_INSTRUCTION_REL = "src/dietrace/agents/nutrition/instruction.md"
+_INSTRUCTION_REL = "src/dietrace/agents/nutrition/parse_prompt.md"
 _MAX_INSTRUCTION_CHARS = 8000
 
 
 def _instruction_path() -> Path:
-    """Return the absolute path to the nutrition agent instruction doc."""
-    return Path(__file__).parent.parent / "nutrition" / "instruction.md"
+    """Return the absolute path to the meal-parsing prompt — the generative step
+    that drives parse accuracy, so it is the artifact worth fixing on a regression."""
+    return Path(__file__).parent.parent / "nutrition" / "parse_prompt.md"
 
 
 def _build_prompt(
@@ -31,8 +32,9 @@ def _build_prompt(
 ) -> str:
     return textwrap.dedent(f"""
         You are a prompt-engineering assistant reviewing a failing eval case for the
-        DietTrace nutrition logging agent. The agent estimates calories and macros
-        from a natural-language meal; this case regressed on accuracy.
+        DietTrace nutrition agent. The agent parses a natural-language meal into
+        food items, then deterministically looks up and totals their macros; the
+        prompt below drives that parse step, and this case regressed on accuracy.
 
         ## Failing case
 
@@ -42,7 +44,7 @@ def _build_prompt(
         Agent output : {agent_output}
         Trace summary: {trace_summary}
 
-        ## Current instruction document
+        ## Current meal-parsing prompt
 
         ```
         {instruction_text}
@@ -50,7 +52,7 @@ def _build_prompt(
 
         ## Your task
 
-        Propose a minimal change to the instruction document that would fix this
+        Propose a minimal change to the meal-parsing prompt that would fix this
         regression without breaking other behavior. Output ONLY a unified diff
         (--- / +++ / @@ header lines, then context and change lines). Do NOT output
         any explanation, prose, or markdown fencing — raw diff text only. The diff
