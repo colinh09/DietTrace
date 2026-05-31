@@ -114,6 +114,33 @@ def test_skips_malformed_items_keeps_valid_ones() -> None:
     assert [i.food for i in result.items] == ["rice", "egg"]
 
 
+def test_drops_non_positive_and_non_finite_quantities() -> None:
+    """A non-finite (NaN/inf) or non-positive quantity is dropped fail-soft.
+
+    Pydantic coerces these to valid floats, so without an explicit guard they
+    would slip past the "non-numeric quantity → skip" contract and poison the
+    deterministic math downstream — a NaN quantity silently propagates NaN into
+    the meal totals, a negative one *subtracts* grams. A real portion is a
+    positive, finite quantity, so every other shape is dropped like any other
+    malformed item; the valid item alongside them survives.
+    """
+    client = _client(
+        _items_json(
+            [
+                {"food": "nan-food", "quantity": float("nan"), "unit": "g"},
+                {"food": "inf-food", "quantity": float("inf"), "unit": "g"},
+                {"food": "neg-food", "quantity": -2, "unit": "each"},
+                {"food": "zero-food", "quantity": 0, "unit": "each"},
+                {"food": "egg", "quantity": 2, "unit": "each"},
+            ]
+        )
+    )
+
+    result = parse_meal("a poisoned meal", client=client)
+
+    assert [i.food for i in result.items] == ["egg"]
+
+
 def test_calls_client_with_model_and_text() -> None:
     """The free text is sent to the model named by config."""
     from dietrace.llm.config import GEMINI_MODEL

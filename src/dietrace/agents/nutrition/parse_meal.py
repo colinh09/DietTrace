@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from dietrace.llm.config import GEMINI_MODEL
 
@@ -40,11 +40,16 @@ class ParsedItem(BaseModel):
     """One food parsed from free text: its name, quantity, and household unit.
 
     ``quantity`` defaults to 1 and ``unit`` to "" so a bare food name (the model
-    omitting either) still yields a usable item for the deterministic tools.
+    omitting either) still yields a usable item for the deterministic tools. A
+    real portion is a positive, finite number, so a non-positive or non-finite
+    ``quantity`` (NaN/inf — which pydantic would otherwise coerce to a valid
+    float) is rejected, dropping the item fail-soft rather than letting it poison
+    the deterministic math downstream (a NaN propagates into the meal totals, a
+    negative grams *subtracts*).
     """
 
     food: str
-    quantity: float = 1.0
+    quantity: float = Field(default=1.0, gt=0.0, allow_inf_nan=False)
     unit: str = ""
 
 
