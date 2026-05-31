@@ -59,6 +59,18 @@ def test_logs_full_meal_with_scaled_totals(tmp_path) -> None:
     assert meal.total("203") is not None  # protein totalled
 
 
+def test_unmatched_unit_falls_back_to_serving(tmp_path) -> None:
+    # Gemini emits a unit no serving matches ("blob"); the item must still log
+    # (via the food's primary serving) rather than being dropped.
+    client = _parse_client([{"food": "egg", "quantity": 2, "unit": "blob"}])
+
+    meal = log_meal("two eggs", _repo(tmp_path), client=client)
+
+    assert len(meal.per_item) == 1
+    # Egg primary serving is 50 g; 2 × 50 = 100 g via fallback.
+    assert meal.per_item[0].grams == 100.0
+
+
 def test_unresolvable_item_is_skipped(tmp_path) -> None:
     client = _parse_client(
         [

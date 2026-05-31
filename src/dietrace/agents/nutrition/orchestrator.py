@@ -16,6 +16,7 @@ from dietrace.agents.nutrition.estimate_portion import estimate_portion
 from dietrace.agents.nutrition.log_entry import LoggedMeal, MealItem, log_entry
 from dietrace.agents.nutrition.parse_meal import parse_meal
 from dietrace.agents.nutrition.search_nutrition import search_nutrition
+from dietrace.nutrition.models import Food
 from dietrace.nutrition.repository import FoodRepository
 
 
@@ -40,8 +41,22 @@ def log_meal(
         if food is None:
             continue
         estimate = estimate_portion(food, item.quantity, item.unit)
-        if estimate.grams is None:
-            continue
-        meal_items.append(MealItem(food=food, grams=estimate.grams))
+        grams = estimate.grams
+        if grams is None:
+            grams = _fallback_grams(food, item.quantity)
+        meal_items.append(MealItem(food=food, grams=grams))
 
     return log_entry(meal_items)
+
+
+def _fallback_grams(food: Food, quantity: float) -> float:
+    """Grams when no unit resolves: scale the food's primary serving, else 100 g.
+
+    Better to log an approximate portion (and let the evals score it) than to drop
+    the item entirely when Gemini emits a unit no serving matches (e.g. "large").
+    """
+    if food.serving_sizes:
+        primary = food.serving_sizes[0]
+        per_unit = primary.gram_weight / primary.amount if primary.amount else primary.gram_weight
+        return quantity * per_unit
+    return quantity * 100.0

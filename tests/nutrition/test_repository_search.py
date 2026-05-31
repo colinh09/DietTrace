@@ -50,29 +50,43 @@ def test_search_is_case_insensitive(food_db) -> None:
     assert [c.fdc_id for c in repo.search("AVOCADO")] == [AVOCADO_FDC_ID]
 
 
-def test_search_ranks_exact_above_prefix_above_substring(food_db) -> None:
-    """Match quality is scored exact > prefix > substring."""
+def test_search_ranks_exact_above_allwords_above_prefix(food_db) -> None:
+    """Match quality: exact (4) > all-words (3) > prefix (2)."""
     repo = FoodRepository(food_db)
 
     exact = repo.search("egg")  # alias "egg" equals the query
-    prefix = repo.search("avo")  # "Avocados"/"avocado" start with the query
-    substring = repo.search("wheat")  # "whole-wheat" only contains the query
+    all_words = repo.search("wheat")  # "wheat" is a whole word of "whole-wheat"
+    prefix = repo.search("avo")  # "Avocados"/"avocado" start with, but isn't, "avo"
 
-    assert exact[0].score > prefix[0].score > substring[0].score
+    assert exact[0].score == 4
+    assert all_words[0].score == 3
+    assert prefix[0].score == 2
+    assert exact[0].score > all_words[0].score > prefix[0].score
 
 
-def test_search_orders_candidates_by_rank(food_db) -> None:
-    """Multiple matches come back best-first, ties broken deterministically.
+def test_search_finds_multi_word_query_regardless_of_order(food_db) -> None:
+    """Every query word need only appear in the description (any order)."""
+    repo = FoodRepository(food_db)
 
-    "whole" prefixes an alias of both the toast ("whole wheat bread") and the
-    egg ("whole egg"); the equal-score tie breaks by fdc_id so the order is
-    stable across runs.
+    # "wheat bread" matches "Bread, whole-wheat, ..." though the words are split.
+    candidates = repo.search("wheat bread")
+
+    assert [c.fdc_id for c in candidates] == [TOAST_FDC_ID]
+    assert candidates[0].score == 3  # all query words present
+
+
+def test_search_prefers_canonical_on_ties(food_db) -> None:
+    """On an equal text score, the raw/simpler food ranks first.
+
+    "whole" is an all-words match for both the egg ("Egg, whole, raw, fresh")
+    and the toast ("Bread, whole-wheat, commercially prepared"); the egg wins
+    the tie because it is "raw" and carries no processed terms.
     """
     repo = FoodRepository(food_db)
 
     candidates = repo.search("whole")
 
-    assert [c.fdc_id for c in candidates] == [TOAST_FDC_ID, EGG_FDC_ID]
+    assert [c.fdc_id for c in candidates] == [EGG_FDC_ID, TOAST_FDC_ID]
     assert all(c.score == candidates[0].score for c in candidates)
 
 

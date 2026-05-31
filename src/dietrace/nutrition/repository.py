@@ -12,6 +12,7 @@ turns free text into a reproducible ``fdc_id`` for ``get`` to hydrate.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -56,34 +57,39 @@ class FoodRepository:
     def search(self, name: str) -> list[SearchCandidate]:
         """Return candidates matching *name* by description or alias, best first.
 
-        Alias-aware: a query hits a food through its description (name)
-        or any ``food_aliases`` row. Each hit is scored by match quality —
-        exact (3) > prefix (2) > substring (1), case-insensitive — and the list
-        is ordered by descending score, breaking ties by ``fdc_id`` so results
-        are deterministic. A blank query matches nothing.
+        Word-aware and canonical-preferring: a food matches when every
+        query word appears in its description, or an alias matches the query.
+        Each hit is scored by match quality — exact (4) > all-words (3) >
+        prefix (2) > substring (1) — and ties break toward the most canonical
+        food (raw/whole, fewer processed terms, shorter name) then by ``fdc_id``.
+        So "broccoli" resolves to "Broccoli, raw" over a cooked variant and
+        "greek yogurt" finds "Yogurt, Greek" despite the word order. A blank query
+        matches nothing.
         """
         query = name.strip().lower()
         if not query:
             return []
+        words = query.split()
 
         conn = sqlite3.connect(self._db_path)
         conn.row_factory = sqlite3.Row
         try:
-            like = f"%{query}%"
+            # Candidates: every query word present in the description, OR an alias
+            # containing the whole query (aliases are word-tokenized at build).
+            where_words = " AND ".join("LOWER(f.description) LIKE ?" for _ in words)
             rows = conn.execute(
-                """
+                f"""
                 SELECT f.fdc_id, f.description, f.data_type
                 FROM foods f
-                WHERE LOWER(f.description) LIKE ?
+                WHERE ({where_words})
                    OR f.fdc_id IN (
-                       SELECT fdc_id FROM food_aliases
-                       WHERE LOWER(alias_name) LIKE ?
+                       SELECT fdc_id FROM food_aliases WHERE LOWER(alias_name) LIKE ?
                    )
                 """,
-                (like, like),
+                (*(f"%{w}%" for w in words), f"%{query}%"),
             ).fetchall()
 
-            candidates = []
+            ranked: list[tuple[int, float, SearchCandidate]] = []
             for row in rows:
                 aliases = [
                     r["alias_name"]
@@ -92,48 +98,27 @@ class FoodRepository:
                         (row["fdc_id"],),
                     ).fetchall()
                 ]
-                score, matched_on = self._best_match(
-                    query, [row["description"], *aliases]
-                )
-                candidates.append(
-                    SearchCandidate(
-                        fdc_id=row["fdc_id"],
-                        description=row["description"],
-                        data_type=row["data_type"],
-                        score=score,
-                        matched_on=matched_on,
+                score, matched_on = _text_score(query, [row["description"], *aliases])
+                if score == 0:
+                    continue
+                ranked.append(
+                    (
+                        score,
+                        _canonical_score(row["description"]),
+                        SearchCandidate(
+                            fdc_id=row["fdc_id"],
+                            description=row["description"],
+                            data_type=row["data_type"],
+                            score=score,
+                            matched_on=matched_on,
+                        ),
                     )
                 )
 
-            candidates.sort(key=lambda c: (-c.score, c.fdc_id))
-            return candidates
+            ranked.sort(key=lambda r: (-r[0], -r[1], r[2].fdc_id))
+            return [candidate for _, _, candidate in ranked]
         finally:
             conn.close()
-
-    @staticmethod
-    def _best_match(query: str, fields: list[str]) -> tuple[int, str]:
-        """Score *query* against *fields*; return the best (score, matched text).
-
-        Exact match scores 3, a prefix 2, any other substring 1, no match 0.
-        The first field reaching the best score wins the tie, keeping the
-        matched text stable.
-        """
-        best_score = 0
-        best_field = ""
-        for field in fields:
-            lowered = field.lower()
-            if lowered == query:
-                score = 3
-            elif lowered.startswith(query):
-                score = 2
-            elif query in lowered:
-                score = 1
-            else:
-                score = 0
-            if score > best_score:
-                best_score = score
-                best_field = field
-        return best_score, best_field
 
     @staticmethod
     def _nutrients(conn: sqlite3.Connection, fdc_id: int) -> list[Nutrient]:
@@ -192,3 +177,64 @@ class FoodRepository:
             fat=row["fat_factor"],
             carbohydrate=row["carbohydrate_factor"],
         )
+
+
+# Terms marking a processed / non-canonical food form; their presence lowers a
+# candidate's rank so a plain "raw"/"whole" food wins over prepared variants.
+_PROCESSED_TERMS = frozenset({
+    "cooked", "boiled", "roasted", "fried", "baked", "grilled", "steamed",
+    "braised", "dried", "dehydrated", "frozen", "canned", "dry", "honey",
+    "salted", "unsalted", "sweetened", "sweet", "flavor", "flavored", "powder",
+    "juice", "milk", "sliced", "deli", "formulated", "reduced", "nonfat",
+    "lowfat", "drained", "prepared", "commercially", "mesquite", "smoked",
+    "seasoned", "rotisserie", "creamed", "candied", "pickled", "instant",
+    "concentrate", "puree", "pureed", "powdered",
+})
+
+
+def _singular(word: str) -> str:
+    """Drop a trailing plural 's' so "banana" matches "Bananas" (light stemming)."""
+    return word[:-1] if len(word) > 3 and word.endswith("s") else word
+
+
+def _tokens(text: str) -> set[str]:
+    """The lower-case alphanumeric word tokens of *text*, singularized."""
+    return {_singular(t) for t in re.findall(r"[a-z0-9]+", text.lower())}
+
+
+def _text_score(query: str, fields: list[str]) -> tuple[int, str]:
+    """Best relevance score of *query* across *fields* (and the field that won).
+
+    exact (4) > all query words present as whole words (3) > prefix (2) >
+    loose substring (1) > no match (0). Word matching is singular/plural-aware.
+    """
+    qtokens = _tokens(query)
+    best, best_field = 0, ""
+    for field in fields:
+        lowered = field.lower()
+        if lowered == query:
+            score = 4
+        elif qtokens and qtokens <= _tokens(field):
+            score = 3
+        elif lowered.startswith(query):
+            score = 2
+        elif query in lowered:
+            score = 1
+        else:
+            score = 0
+        if score > best:
+            best, best_field = score, field
+    return best, best_field
+
+
+def _canonical_score(description: str) -> float:
+    """Higher for a more canonical (raw/whole, simple, short) food description."""
+    toks = _tokens(description)
+    score = 0.0
+    if "raw" in toks:
+        score += 3.0
+    if "whole" in toks:
+        score += 0.5
+    score -= float(len(_PROCESSED_TERMS & toks))
+    score -= 0.02 * len(description)
+    return score
