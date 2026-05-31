@@ -82,13 +82,19 @@ def _llm_judge(example_id: str, scores: list[float]) -> Trend:  # pragma: no cov
 def _collect_scores_by_case(
     summaries: list[ExperimentSummary],
 ) -> dict[str, list[float]]:
-    """Build a map of example_id -> [scores oldest-first], skipping unscored runs."""
+    """Build a map of example_id -> [scores oldest-first], skipping unscored runs.
+
+    Non-applicable ``n/a`` results (a micro evaluator on a label-tier food, portion
+    with no ground-truth grams) carry a placeholder score of 1.0; they are excluded
+    by label — not score — so they cannot mask a real accuracy trend, mirroring the
+    reader's aggregates.
+    """
     scores_by_case: dict[str, list[float]] = defaultdict(list)
     seen_per_experiment: dict[int, set[str]] = defaultdict(set)
 
     for exp_idx, summary in enumerate(summaries):
         for result in summary.case_results:
-            if result.score is None:
+            if result.score is None or result.label == "n/a":
                 continue
             if result.example_id in seen_per_experiment[exp_idx]:
                 continue
