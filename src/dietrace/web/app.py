@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
+from dietrace.web.accuracy import accuracy_report
 from dietrace.web.goals import load_goals
 from dietrace.web.store import MealLogStore
 
@@ -243,6 +244,11 @@ def create_app(
     @app.get("/goals")
     def goals() -> dict[str, Any]:
         return {"goals": goals_loader()}
+
+    @app.get("/accuracy")
+    def accuracy_panel() -> dict[str, Any]:
+        """The Arize accuracy story + measured numbers for the web /accuracy page."""
+        return accuracy_report()
 
     @app.get("/analysis")
     def analysis(date: str | None = None) -> dict[str, Any]:

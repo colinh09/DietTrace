@@ -4,6 +4,7 @@
 // right — ‹ prev · date · next › plus a calendar affordance that drops a
 // month-grid popover. Layout follows .
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Sparkle } from "lucide-react";
 import { formatHeaderDate, isSameDay } from "@/lib/date";
 
@@ -104,6 +105,9 @@ export function Header({ date, onShift, onPickDate }: HeaderProps) {
       <div className="brand">
         <Sparkle size={15} fill="var(--accent)" color="var(--accent)" />
         <span className="brand-name">DietTrace</span>
+        <Link href="/accuracy" className="hdr-link mono">
+          accuracy
+        </Link>
       </div>
       <div className="datenav" ref={navRef}>
         <button

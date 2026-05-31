@@ -132,6 +132,32 @@ export async function getGoals(): Promise<GoalsResponse> {
   return request<GoalsResponse>("/goals");
 }
 
+// One scored accuracy dimension, baseline vs current (0–1, higher is better).
+export interface AccuracyMetric {
+  key: string;
+  label: string;
+  baseline: number;
+  current: number;
+}
+
+// `GET /accuracy` — the Arize accuracy story + measured improvement.
+export interface AccuracyReport {
+  headline: {
+    calorie_accuracy: number;
+    macro_accuracy: number;
+    within_tolerance: number;
+  };
+  metrics: AccuracyMetric[];
+  loop: { step: string; label: string }[];
+  dataset: { cases: number; source: string };
+  phoenix_url: string;
+}
+
+// Read the accuracy / Arize-observability report.
+export async function getAccuracy(): Promise<AccuracyReport> {
+  return request<AccuracyReport>("/accuracy");
+}
+
 // A single Server-Sent Event from `POST /log/stream`: a `step` as the agent
 // works, or the final `result` (which also persists the meal and carries its id).
 export interface StreamEvent {

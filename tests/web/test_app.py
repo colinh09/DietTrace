@@ -276,3 +276,10 @@ def test_log_stream_emits_events_and_persists(tmp_path, monkeypatch) -> None:
     assert [e["type"] for e in events] == ["step", "step", "result"]
     assert isinstance(events[-1]["id"], int)
     assert len(store.list()) == 1
+
+
+def test_accuracy_endpoint_returns_the_report(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    body = client.get("/accuracy").json()
+    assert "metrics" in body and len(body["loop"]) == 4
+    assert body["phoenix_url"]
