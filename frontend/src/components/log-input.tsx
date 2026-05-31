@@ -14,8 +14,11 @@ type Status = "empty" | "processing" | "result";
 
 export function LogInput({
   onLogged,
+  date,
 }: {
   onLogged: (text: string, result: LogResponse) => void;
+  // The viewed calendar day (YYYY-MM-DD) the meal is filed under.
+  date?: string;
 }) {
   const [text, setText] = useState("");
   const [status, setStatus] = useState<Status>("empty");
@@ -25,7 +28,7 @@ export function LogInput({
     if (!meal || status === "processing") return;
     setStatus("processing");
     try {
-      const result = await logMeal(meal);
+      const result = await logMeal(meal, date);
       onLogged(meal, result);
       setText("");
       setStatus("result");

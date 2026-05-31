@@ -19,10 +19,11 @@ lazily so importing this module never requires GCP credentials.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ValidationError
 
 from dietrace.llm.config import GEMINI_MODEL
 
@@ -40,16 +41,15 @@ class ParsedItem(BaseModel):
     """One food parsed from free text: its name, quantity, and household unit.
 
     ``quantity`` defaults to 1 and ``unit`` to "" so a bare food name (the model
-    omitting either) still yields a usable item for the deterministic tools. A
-    real portion is a positive, finite number, so a non-positive or non-finite
-    ``quantity`` (NaN/inf — which pydantic would otherwise coerce to a valid
-    float) is rejected, dropping the item fail-soft rather than letting it poison
-    the deterministic math downstream (a NaN propagates into the meal totals, a
-    negative grams *subtracts*).
+    omitting either) still yields a usable item for the deterministic tools. The
+    model stays a clean schema (no validation constraints) because it is also sent
+    to Gemini as the structured-output ``response_schema``, which rejects JSON
+    Schema keywords like ``exclusiveMinimum``; the positive/finite-quantity guard
+    lives in :func:`_coerce_items` instead.
     """
 
     food: str
-    quantity: float = Field(default=1.0, gt=0.0, allow_inf_nan=False)
+    quantity: float = 1.0
     unit: str = ""
 
 
@@ -88,15 +88,24 @@ def _raw_items(payload: Any) -> list[Any]:
 
 
 def _coerce_items(raw: list[Any]) -> list[ParsedItem]:
-    """Validate each raw entry into a :class:`ParsedItem`, dropping bad ones."""
+    """Validate each raw entry into a :class:`ParsedItem`, dropping bad ones.
+
+    A real portion is positive and finite, so a non-positive or NaN/inf quantity
+    drops the item fail-soft rather than poisoning the deterministic math (a NaN
+    propagates into totals; a negative quantity subtracts). The guard is here
+    rather than on the model so the model stays a clean Gemini response schema.
+    """
     items: list[ParsedItem] = []
     for entry in raw:
         if not isinstance(entry, dict):
             continue
         try:
-            items.append(ParsedItem.model_validate(entry))
+            item = ParsedItem.model_validate(entry)
         except ValidationError:
             continue  # missing food, non-numeric quantity, … — skip fail-soft
+        if not math.isfinite(item.quantity) or item.quantity <= 0:
+            continue  # non-positive / non-finite portion — skip fail-soft
+        items.append(item)
     return items
 
 

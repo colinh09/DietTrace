@@ -66,10 +66,10 @@ function MealRow({
           <button
             type="button"
             className="meal-edit"
-            aria-label="edit meal"
+            aria-label="remove meal"
             onClick={() => onEdit?.(meal)}
           >
-            edit
+            remove
           </button>
           <button
             type="button"

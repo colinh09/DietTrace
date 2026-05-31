@@ -69,10 +69,10 @@ describe("MealList", () => {
     expect(within(loose).getByText(/Medium/)).toBeInTheDocument();
   });
 
-  it("offers an edit affordance and an expand chevron per row", () => {
+  it("offers a remove affordance and an expand chevron per row", () => {
     render(<MealList meals={meals} />);
     const row = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
-    expect(within(row).getByRole("button", { name: /edit/i })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: /remove/i })).toBeInTheDocument();
     // The row head is itself the expand toggle, collapsed by default.
     const head = within(row).getByRole("button", { name: /expand/i });
     expect(head).toHaveAttribute("aria-expanded", "false");

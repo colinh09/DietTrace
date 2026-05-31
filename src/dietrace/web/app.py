@@ -40,9 +40,15 @@ def _cors_origins() -> list[str]:
 
 
 class LogRequest(BaseModel):
-    """A meal to log, in natural language."""
+    """A meal to log, in natural language.
+
+    ``date`` is the client's local calendar day (YYYY-MM-DD); when given it is the
+    day the meal is filed under, so the day boundary follows the user's timezone
+    rather than the server's UTC day.
+    """
 
     text: str
+    date: str | None = None
 
 
 def default_meal_logger(text: str) -> dict:  # pragma: no cover — live Gemini call
@@ -184,8 +190,12 @@ def create_app(
         result = logger_fn(req.text)
         totals = result.get("totals", [])
         per_item = result.get("per_item", [])
-        entry_id = log_store.add(req.text, totals)
+        entry_id = log_store.add(req.text, totals, date=req.date)
         return {"id": entry_id, **result, "trace": _build_trace(per_item, totals)}
+
+    @app.delete("/meals/{meal_id}")
+    def delete_meal(meal_id: int) -> dict[str, Any]:
+        return {"id": meal_id, "deleted": log_store.delete(meal_id)}
 
     @app.get("/history")
     def history(date: str | None = None, limit: int = 50) -> dict[str, Any]:
@@ -197,10 +207,14 @@ def create_app(
         return {"goals": goals_loader()}
 
     @app.get("/analysis")
-    def analysis() -> dict[str, Any]:
-        meals = log_store.list(1000)
+    def analysis(date: str | None = None) -> dict[str, Any]:
+        # Aggregate only the requested day (default today) so the macro band is
+        # the day's intake and stays in sync with date navigation.
+        day = date or datetime.datetime.now(tz=datetime.UTC).date().isoformat()
+        meals = log_store.list(1000, date=day)
         totals = _aggregate(meals)
         return {
+            "date": day,
             "meal_count": len(meals),
             "totals": totals,
             "goals": _goals_progress(totals, goals_loader()),

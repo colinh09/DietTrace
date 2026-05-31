@@ -64,3 +64,18 @@ def test_list_without_date_returns_all(tmp_path) -> None:
     store.add("d2", [], created_at=datetime.datetime(2026, 5, 29, tzinfo=datetime.UTC))
 
     assert len(store.list()) == 2
+
+
+def test_add_with_explicit_date_files_under_that_day(tmp_path) -> None:
+    store = MealLogStore(tmp_path / "log.sqlite")
+    store.add("late snack", [], date="2026-05-31")
+    assert len(store.list(date="2026-05-31")) == 1
+    assert store.list(date="2026-06-01") == []
+
+
+def test_delete_removes_a_meal(tmp_path) -> None:
+    store = MealLogStore(tmp_path / "log.sqlite")
+    meal_id = store.add("1 banana", [])
+    assert store.delete(meal_id) is True
+    assert store.list() == []
+    assert store.delete(meal_id) is False  # already gone

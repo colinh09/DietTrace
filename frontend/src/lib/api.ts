@@ -101,11 +101,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 // Log a meal in natural language; returns its totals, per-item panel, and trace.
-export async function logMeal(text: string): Promise<LogResponse> {
+// `date` (YYYY-MM-DD, the viewed day) files the meal under the client's local day.
+export async function logMeal(text: string, date?: string): Promise<LogResponse> {
   return request<LogResponse>("/log", {
     method: "POST",
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, date }),
   });
+}
+
+// Delete a logged meal by id.
+export async function deleteMeal(id: number): Promise<void> {
+  await request(`/meals/${id}`, { method: "DELETE" });
 }
 
 // Read one day's logged meals. Omit `date` for today (the backend default).
@@ -114,9 +120,11 @@ export async function getHistory(date?: string): Promise<HistoryResponse> {
   return request<HistoryResponse>(`/history${query}`);
 }
 
-// Read the aggregate analysis: totals consumed and per-goal remaining.
-export async function getAnalysis(): Promise<AnalysisResponse> {
-  return request<AnalysisResponse>("/analysis");
+// Read the day's aggregate analysis (totals consumed + per-goal remaining) for
+// `date` (default today on the backend), so it tracks date navigation.
+export async function getAnalysis(date?: string): Promise<AnalysisResponse> {
+  const query = date ? `?date=${encodeURIComponent(date)}` : "";
+  return request<AnalysisResponse>(`/analysis${query}`);
 }
 
 // Read the daily macro/calorie goals.

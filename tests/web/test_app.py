@@ -212,3 +212,36 @@ def test_log_response_carries_ordered_trace(tmp_path) -> None:
     # The final step carries the summed totals.
     assert trace[-1]["step"] == "log_entry"
     assert trace[-1]["totals"] == _STUB_TOTALS
+
+
+def test_delete_meal_removes_it(tmp_path) -> None:
+    client, store = _client(tmp_path)
+    client.post("/log", json={"text": "1 banana"})
+    meal_id = store.list()[0]["id"]
+
+    response = client.delete(f"/meals/{meal_id}")
+
+    assert response.status_code == 200
+    assert response.json()["deleted"] is True
+    assert store.list() == []
+
+
+def test_analysis_is_date_scoped(tmp_path) -> None:
+    client, store = _client(tmp_path)
+    store.add("today", [{"code": "208", "name": "Energy", "amount": 100.0, "unit": "kcal"}],
+              date="2026-05-31")
+    store.add("yesterday", [{"code": "208", "name": "Energy", "amount": 500.0, "unit": "kcal"}],
+              date="2026-05-30")
+
+    body = client.get("/analysis?date=2026-05-31").json()
+
+    assert body["date"] == "2026-05-31"
+    assert body["meal_count"] == 1
+    energy = next(t for t in body["totals"] if t["code"] == "208")
+    assert energy["amount"] == 100.0  # only today's meal, not the 500 from yesterday
+
+
+def test_log_accepts_client_date(tmp_path) -> None:
+    client, store = _client(tmp_path)
+    client.post("/log", json={"text": "1 banana", "date": "2026-05-31"})
+    assert store.list()[0]["date"] == "2026-05-31"

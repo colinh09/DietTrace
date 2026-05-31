@@ -35,7 +35,7 @@ describe("LogInput", () => {
     fireEvent.submit(input.closest("form") as HTMLFormElement);
 
     await waitFor(() => expect(onLogged).toHaveBeenCalledTimes(1));
-    expect(logMeal).toHaveBeenCalledWith("2 eggs");
+    expect(logMeal).toHaveBeenCalledWith("2 eggs", undefined);
     expect(onLogged).toHaveBeenCalledWith("2 eggs", result);
     // The input clears after a successful log, ready for the next meal.
     expect(input.value).toBe("");
@@ -50,7 +50,7 @@ describe("LogInput", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /^log$/i }));
 
-    await waitFor(() => expect(logMeal).toHaveBeenCalledWith("oatmeal"));
+    await waitFor(() => expect(logMeal).toHaveBeenCalledWith("oatmeal", undefined));
     expect(onLogged).toHaveBeenCalledWith("oatmeal", result);
   });
 

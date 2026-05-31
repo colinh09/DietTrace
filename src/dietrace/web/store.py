@@ -45,20 +45,30 @@ class MealLogStore:
         text: str,
         totals: list[dict[str, Any]],
         created_at: datetime.datetime | None = None,
+        date: str | None = None,
     ) -> int:
         """Persist a logged meal and return its new row id.
 
-        ``created_at`` defaults to now (UTC); the entry's calendar ``date`` is
-        derived from it so ``list(date=...)`` can return a single day's meals.
+        ``created_at`` defaults to now (UTC). The calendar ``date`` (the day the
+        meal belongs to, for ``list(date=...)``) defaults to that timestamp's day
+        but can be passed explicitly so the client's local day is recorded rather
+        than the server's UTC day.
         """
         when = created_at or datetime.datetime.now(tz=datetime.UTC)
+        day = date or when.date().isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
                 "INSERT INTO meals (created_at, date, text, totals_json) "
                 "VALUES (?, ?, ?, ?)",
-                (when.isoformat(), when.date().isoformat(), text, json.dumps(totals)),
+                (when.isoformat(), day, text, json.dumps(totals)),
             )
             return int(cursor.lastrowid)
+
+    def delete(self, meal_id: int) -> bool:
+        """Delete the meal with *meal_id*; return True if a row was removed."""
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM meals WHERE id = ?", (meal_id,))
+            return cursor.rowcount > 0
 
     def list(
         self, limit: int = 50, date: str | None = None

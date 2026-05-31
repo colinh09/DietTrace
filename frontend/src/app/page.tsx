@@ -11,6 +11,7 @@ import { DayMacros } from "@/components/day-macros";
 import { LogInput } from "@/components/log-input";
 import { MealList, type MealDetail } from "@/components/meal-list";
 import {
+  deleteMeal,
   getAnalysis,
   getGoals,
   getHistory,
@@ -27,45 +28,52 @@ export default function Home() {
   // expanded row can show the trace + per-item table the backend just produced.
   const [details, setDetails] = useState<Record<number, MealDetail>>({});
 
-  // /goals gives the targets immediately so the band isn't empty; /analysis
-  // then layers the day's consumed/remaining on top. Each is fail-soft — a
-  // missing backend just leaves the band at its targets (or empty). /analysis
-  // is not date-aware yet (it aggregates the current day), so this loads once
-  // on mount rather than re-firing on date navigation.
+  // Load the daily targets first so the band isn't empty; fail-soft.
   useEffect(() => {
-    let cancelled = false;
     getGoals()
-      .then((res) => {
-        if (cancelled) return;
+      .then((res) =>
         setGoals((current) =>
           current.length
             ? current
             : res.goals.map((g) => ({ ...g, consumed: 0, remaining: g.target })),
-        );
-      })
+        ),
+      )
       .catch(() => {});
-    getAnalysis()
-      .then((res) => {
-        if (!cancelled) setGoals(res.goals);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  // The meal list is sourced from /history for the selected day; re-fetches on
-  // date navigation and again after a meal is logged. Fail-soft: a missing
-  // backend just leaves the list empty.
+  // The meal list AND the day-macros band are both sourced for the selected day,
+  // and re-fetch on date navigation and after a meal is logged or removed — so
+  // navigating days updates both the meals and the consumed/remaining totals.
   const loadHistory = useCallback(() => {
     getHistory(toISODate(date))
       .then((res) => setMeals(res.meals))
       .catch(() => {});
   }, [date]);
 
+  const loadAnalysis = useCallback(() => {
+    getAnalysis(toISODate(date))
+      .then((res) => setGoals(res.goals))
+      .catch(() => {});
+  }, [date]);
+
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+    loadAnalysis();
+  }, [loadHistory, loadAnalysis]);
+
+  // Remove a logged meal: drop it optimistically, then reconcile both reads.
+  const handleDelete = useCallback(
+    (meal: Meal) => {
+      setMeals((current) => current.filter((m) => m.id !== meal.id));
+      deleteMeal(meal.id)
+        .then(() => {
+          loadHistory();
+          loadAnalysis();
+        })
+        .catch(() => {});
+    },
+    [loadHistory, loadAnalysis],
+  );
 
   const heading = isSameDay(date, new Date()) ? "Today" : "Logged";
 
@@ -79,15 +87,35 @@ export default function Home() {
         />
         <DayMacros goals={goals} />
         <LogInput
-          onLogged={(_text, result) => {
+          date={toISODate(date)}
+          onLogged={(text, result) => {
+            // Optimistically drop the meal in immediately so it never depends on
+            // the refetch timing; loadHistory() then reconciles with the server.
+            const optimistic: Meal = {
+              id: result.id,
+              created_at: new Date().toISOString(),
+              date: toISODate(date),
+              text,
+              totals: result.totals,
+            };
+            setMeals((current) => [
+              optimistic,
+              ...current.filter((m) => m.id !== result.id),
+            ]);
             setDetails((current) => ({
               ...current,
               [result.id]: { trace: result.trace, perItem: result.per_item },
             }));
             loadHistory();
+            loadAnalysis();
           }}
         />
-        <MealList meals={meals} heading={heading} detailsById={details} />
+        <MealList
+          meals={meals}
+          heading={heading}
+          detailsById={details}
+          onEdit={handleDelete}
+        />
       </main>
     </div>
   );
