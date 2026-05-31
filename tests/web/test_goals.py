@@ -40,3 +40,21 @@ def test_non_numeric_env_override_falls_back_to_default(monkeypatch) -> None:
 
     assert by_code["203"]["target"] == 150.0  # protein default, not the bad value
     assert by_code["208"]["target"] == 1800.0  # a valid sibling override still applies
+
+
+def test_non_finite_env_override_falls_back_to_default(monkeypatch) -> None:
+    # float("nan")/float("inf") parse without raising, so they slip past the
+    # ValueError guard — but a non-finite target poisons /analysis (remaining =
+    # target − consumed becomes NaN/inf) and serializes as invalid JSON
+    # (NaN/Infinity). Degrade to the built-in default like any malformed value.
+    monkeypatch.setenv("DIETRACE_GOAL_PROTEIN", "nan")
+    monkeypatch.setenv("DIETRACE_GOAL_CARB", "inf")
+    monkeypatch.setenv("DIETRACE_GOAL_FAT", "-inf")
+    monkeypatch.setenv("DIETRACE_GOAL_CALORIES", "1800")
+
+    by_code = {g["code"]: g for g in load_goals()}
+
+    assert by_code["203"]["target"] == 150.0  # protein default, not NaN
+    assert by_code["205"]["target"] == 200.0  # carb default, not +inf
+    assert by_code["204"]["target"] == 65.0  # fat default, not -inf
+    assert by_code["208"]["target"] == 1800.0  # a valid sibling override still applies

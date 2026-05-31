@@ -8,6 +8,7 @@ at ``GET /goals``, and drive the remaining-vs-target figures in ``/analysis``.
 
 from __future__ import annotations
 
+import math
 import os
 from typing import Any
 
@@ -25,15 +26,19 @@ def _target(env_var: str, default: float) -> float:
 
     A non-numeric override (e.g. ``DIETRACE_GOAL_PROTEIN=abc``) must not crash
     ``/goals`` or ``/analysis`` — degrade to the built-in default rather than
-    letting ``float()`` raise.
+    letting ``float()`` raise. ``nan``/``inf`` parse
+    without raising but are equally malformed: a non-finite target poisons the
+    ``/analysis`` remaining-vs-target math and serializes as invalid JSON
+    (``NaN``/``Infinity``), so they fall back to the default too.
     """
     raw = os.environ.get(env_var)
     if raw is None:
         return default
     try:
-        return float(raw)
+        value = float(raw)
     except ValueError:
         return default
+    return value if math.isfinite(value) else default
 
 
 def load_goals() -> list[dict[str, Any]]:
