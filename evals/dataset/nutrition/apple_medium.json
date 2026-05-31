@@ -1,0 +1,17 @@
+{
+  "input": { "text": "1 medium apple" },
+  "expected": {
+    "calories": 94.6,
+    "protein_g": 0.47,
+    "fat_g": 0.31,
+    "carb_g": 25.13,
+    "grams": 182.0,
+    "micros": { "306": 195.0, "401": 8.4, "291": 4.4 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 171688,
+    "source": "USDA SR Legacy — Apples, raw, with skin",
+    "notes": "1 medium apple ~182 g."
+  }
+}

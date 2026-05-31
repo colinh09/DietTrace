@@ -1,0 +1,17 @@
+{
+  "input": { "text": "1 medium baked sweet potato" },
+  "expected": {
+    "calories": 102.6,
+    "protein_g": 2.29,
+    "fat_g": 0.17,
+    "carb_g": 23.61,
+    "grams": 114.0,
+    "micros": { "306": 542.0, "401": 22.3, "291": 3.8 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 168483,
+    "source": "USDA SR Legacy — Sweet potato, cooked, baked in skin, flesh, without salt",
+    "notes": "1 medium baked ~114 g flesh."
+  }
+}

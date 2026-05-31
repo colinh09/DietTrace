@@ -1,0 +1,17 @@
+{
+  "input": { "text": "half a cup of dry rolled oats" },
+  "expected": {
+    "calories": 155.6,
+    "protein_g": 6.76,
+    "fat_g": 2.76,
+    "carb_g": 26.51,
+    "grams": 40.0,
+    "micros": { "306": 172.0, "304": 71.0, "291": 4.2 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 169705,
+    "source": "USDA SR Legacy — Oats",
+    "notes": "1/2 cup dry oats ~40 g."
+  }
+}

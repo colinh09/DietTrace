@@ -1,0 +1,17 @@
+{
+  "input": { "text": "2 tablespoons of creamy peanut butter" },
+  "expected": {
+    "calories": 190.0,
+    "protein_g": 7.0,
+    "fat_g": 16.0,
+    "carb_g": 8.0,
+    "grams": 32.0
+  },
+  "metadata": {
+    "nutrient_tier": "label",
+    "fdc_id": 2261812,
+    "tolerance": 0.2,
+    "source": "USDA Branded — label nutrients per 32 g (2 tbsp) serving",
+    "notes": "Branded label data; macros only, no full micro panel."
+  }
+}

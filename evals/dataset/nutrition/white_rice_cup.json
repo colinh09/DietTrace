@@ -1,0 +1,17 @@
+{
+  "input": { "text": "1 cup of cooked white rice" },
+  "expected": {
+    "calories": 205.4,
+    "protein_g": 4.25,
+    "fat_g": 0.44,
+    "carb_g": 44.51,
+    "grams": 158.0,
+    "micros": { "306": 55.0, "304": 19.0, "305": 68.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 168878,
+    "source": "USDA SR Legacy — Rice, white, long-grain, regular, cooked",
+    "notes": "1 cup cooked ~158 g."
+  }
+}

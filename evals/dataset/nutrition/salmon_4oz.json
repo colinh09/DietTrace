@@ -1,0 +1,17 @@
+{
+  "input": { "text": "4 oz of cooked salmon" },
+  "expected": {
+    "calories": 232.8,
+    "protein_g": 24.97,
+    "fat_g": 13.96,
+    "carb_g": 0.0,
+    "grams": 113.0,
+    "micros": { "307": 69.0, "306": 434.0, "305": 285.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 175168,
+    "source": "USDA SR Legacy — Fish, salmon, Atlantic, farmed, cooked, dry heat",
+    "notes": "4 oz cooked ~113 g."
+  }
+}
