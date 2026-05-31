@@ -165,11 +165,40 @@ body {
 .loginput-btn:hover { background: var(--accent-ink); }
 .loginput-btn:disabled { opacity: 0.6; cursor: default; }
 
-/* today's logged meals — a compact placeholder list (the full rows land in 9.6) */
-.meals { list-style: none; margin: 0; padding: 0; }
-.meal { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: var(--meal-py) 0; border-bottom: 1px solid var(--line); }
-.meal-text { color: var(--ink); font-size: 15px; }
-.meal-kcal { color: var(--muted-ink); font-size: 13px; white-space: nowrap; }
+/* today's logged meals — compact rows from /history */
+.meals { margin-top: 30px; }
+.meals-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.meals-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.005em; }
+.meals-count { font-size: 11.5px; color: var(--faint); }
+.meals-empty { color: var(--faint); font-size: 14.5px; padding: 26px 0; border-top: 1px solid var(--line); margin-top: 8px; }
+.meals-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+
+.meal { border-bottom: 1px solid var(--line); }
+.meal-head { display: flex; align-items: center; gap: 12px; padding: var(--meal-py) 2px; }
+.meal-bullet { display: flex; width: 13px; flex-shrink: 0; }
+.meal-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.meal-text { font-family: var(--serif); font-size: 16.5px; font-weight: 500; color: var(--ink); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meal-time { font-size: 11px; color: var(--faint); }
+.meal-side { display: flex; align-items: center; gap: 13px; flex-shrink: 0; }
+.meal-macros { font-size: 12.5px; color: var(--muted-ink); white-space: nowrap; }
+.meal-macros b { color: var(--ink); font-weight: 600; }
+.mm-sep { margin: 0 6px; color: var(--faint); }
+.mm-part { white-space: nowrap; }
+.conf-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 100px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.conf-chip.high { color: var(--accent-ink); background: var(--accent-soft); }
+.conf-chip.high .conf-dot { background: var(--accent); }
+.conf-chip.med { color: var(--amber-ink); background: var(--amber-soft); }
+.conf-chip.med .conf-dot { background: var(--amber); }
+.conf-dot { width: 6px; height: 6px; border-radius: 50%; }
+.meal-edit { font-size: 11.5px; color: var(--faint); cursor: pointer; padding: 3px 8px; border-radius: 7px; background: none; border: none; font-family: inherit; transition: background .14s, color .14s; }
+.meal-edit:hover { color: var(--accent-ink); background: var(--accent-softer); }
+.meal-chev { color: var(--faint); display: flex; background: none; border: none; cursor: pointer; padding: 0; }
+.meal-chev svg { transition: transform .2s ease; }
+.meal-chev[data-open="true"] svg { transform: rotate(180deg); }
+
+.meal-exp { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .27s ease; }
+.meal-exp[data-open="true"] { grid-template-rows: 1fr; }
+.meal-exp-inner { overflow: hidden; min-height: 0; }
 
 /* responsive — stack the band on narrow screens */
 @media (max-width: 640px) {

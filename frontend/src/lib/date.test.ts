@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatHeaderDate, isSameDay, shiftDate, toISODate } from "@/lib/date";
+import { formatHeaderDate, formatTime, isSameDay, shiftDate, toISODate } from "@/lib/date";
 
 describe("date helpers", () => {
   // May 30, 2026 is a Saturday — the day shown in the v2 design.
@@ -24,5 +24,11 @@ describe("date helpers", () => {
   it("compares two dates by calendar day", () => {
     expect(isSameDay(may30, new Date(2026, 4, 30, 23, 59))).toBe(true);
     expect(isSameDay(may30, new Date(2026, 4, 31))).toBe(false);
+  });
+
+  it("formats a meal's timestamp as a short clock time", () => {
+    // A meal logged at a known local wall-clock time renders as "h:mm AM/PM".
+    const logged = new Date(2026, 4, 30, 8, 14).toISOString();
+    expect(formatTime(logged)).toMatch(/^\d{1,2}:\d{2}\s?(AM|PM)$/);
   });
 });

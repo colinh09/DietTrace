@@ -1,36 +1,28 @@
 "use client";
 
-// The DietTrace day view. Through this is the shell + header + the
-// day-macros band + the inline log input: a centered single-column page that
-// owns the selected day, renders the ✦ DietTrace header, shows calories +
-// P/C/F vs targets, and logs meals into today's list. The richer meal rows and
-// agent's-work trace land in –9.7.
-import { useEffect, useState } from "react";
+// The DietTrace day view: a centered single-column page that owns the selected
+// day, renders the ✦ DietTrace header, the day-macros band (calories + P/C/F vs
+// targets), the inline log input, and the day's logged meals as compact rows
+// read from /history. The agent's-work trace behind
+// each row's expand lands in 9.7.
+import { useCallback, useEffect, useState } from "react";
 import { Header } from "@/components/header";
 import { DayMacros } from "@/components/day-macros";
 import { LogInput } from "@/components/log-input";
+import { MealList } from "@/components/meal-list";
 import {
   getAnalysis,
   getGoals,
+  getHistory,
   type GoalProgress,
-  type LogResponse,
+  type Meal,
 } from "@/lib/api";
-import { shiftDate } from "@/lib/date";
-
-// A just-logged meal dropped into today's list. The full meal row (time, macro
-// breakdown, confidence chip, expand) is built in 9.6; for now a row carries
-// the text the user typed plus the response the agent returned.
-interface LoggedMeal {
-  text: string;
-  result: LogResponse;
-}
-
-const ENERGY = "208";
+import { isSameDay, shiftDate, toISODate } from "@/lib/date";
 
 export default function Home() {
   const [date, setDate] = useState(() => new Date());
   const [goals, setGoals] = useState<GoalProgress[]>([]);
-  const [meals, setMeals] = useState<LoggedMeal[]>([]);
+  const [meals, setMeals] = useState<Meal[]>([]);
 
   // /goals gives the targets immediately so the band isn't empty; /analysis
   // then layers the day's consumed/remaining on top. Each is fail-soft — a
@@ -59,6 +51,21 @@ export default function Home() {
     };
   }, []);
 
+  // The meal list is sourced from /history for the selected day; re-fetches on
+  // date navigation and again after a meal is logged. Fail-soft: a missing
+  // backend just leaves the list empty.
+  const loadHistory = useCallback(() => {
+    getHistory(toISODate(date))
+      .then((res) => setMeals(res.meals))
+      .catch(() => {});
+  }, [date]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  const heading = isSameDay(date, new Date()) ? "Today" : "Logged";
+
   return (
     <div className="page">
       <main className="wrap">
@@ -68,24 +75,8 @@ export default function Home() {
           onPickDate={setDate}
         />
         <DayMacros goals={goals} />
-        <LogInput
-          onLogged={(text, result) =>
-            setMeals((current) => [{ text, result }, ...current])
-          }
-        />
-        <ul className="meals">
-          {meals.map((meal, i) => {
-            const kcal = meal.result.totals.find((n) => n.code === ENERGY)?.amount;
-            return (
-              <li className="meal" key={`${meal.result.id}-${i}`}>
-                <span className="meal-text">{meal.text}</span>
-                {kcal != null && (
-                  <span className="meal-kcal mono tnum">{Math.round(kcal)} kcal</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <LogInput onLogged={() => loadHistory()} />
+        <MealList meals={meals} heading={heading} />
       </main>
     </div>
   );

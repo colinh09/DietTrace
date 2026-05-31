@@ -11,6 +11,15 @@ export function formatHeaderDate(date: Date): string {
   });
 }
 
+// "8:14 AM" — a meal's logged time, from its ISO `created_at`, in local time.
+// The store records `created_at` in UTC; the browser renders it wall-clock.
+export function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 // A fresh Date `days` away from `date`; never mutates the input.
 export function shiftDate(date: Date, days: number): Date {
   const next = new Date(date);
