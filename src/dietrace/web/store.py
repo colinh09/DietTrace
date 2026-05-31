@@ -17,6 +17,7 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meals (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at  TEXT NOT NULL,
+    date        TEXT NOT NULL,
     text        TEXT NOT NULL,
     totals_json TEXT NOT NULL
 )
@@ -39,28 +40,48 @@ class MealLogStore:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def add(self, text: str, totals: list[dict[str, Any]]) -> int:
-        """Persist a logged meal and return its new row id."""
-        created_at = datetime.datetime.now(tz=datetime.UTC).isoformat()
+    def add(
+        self,
+        text: str,
+        totals: list[dict[str, Any]],
+        created_at: datetime.datetime | None = None,
+    ) -> int:
+        """Persist a logged meal and return its new row id.
+
+        ``created_at`` defaults to now (UTC); the entry's calendar ``date`` is
+        derived from it so ``list(date=...)`` can return a single day's meals.
+        """
+        when = created_at or datetime.datetime.now(tz=datetime.UTC)
         with self._connect() as conn:
             cursor = conn.execute(
-                "INSERT INTO meals (created_at, text, totals_json) VALUES (?, ?, ?)",
-                (created_at, text, json.dumps(totals)),
+                "INSERT INTO meals (created_at, date, text, totals_json) "
+                "VALUES (?, ?, ?, ?)",
+                (when.isoformat(), when.date().isoformat(), text, json.dumps(totals)),
             )
             return int(cursor.lastrowid)
 
-    def list(self, limit: int = 50) -> list[dict[str, Any]]:
-        """Return the most recently logged meals, newest first."""
+    def list(
+        self, limit: int = 50, date: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Return logged meals newest first, optionally filtered to one ``date``.
+
+        ``date`` is a ``YYYY-MM-DD`` calendar day; when omitted, all days are
+        returned (up to ``limit``).
+        """
+        query = "SELECT id, created_at, date, text, totals_json FROM meals"
+        params: list[Any] = []
+        if date is not None:
+            query += " WHERE date = ?"
+            params.append(date)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT id, created_at, text, totals_json FROM meals "
-                "ORDER BY id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+            rows = conn.execute(query, params).fetchall()
         return [
             {
                 "id": row["id"],
                 "created_at": row["created_at"],
+                "date": row["date"],
                 "text": row["text"],
                 "totals": json.loads(row["totals_json"]),
             }

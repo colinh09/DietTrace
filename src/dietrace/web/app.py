@@ -8,6 +8,7 @@ runs one Gemini parse then the deterministic pipeline. Tracing is best-effort (Â
 
 from __future__ import annotations
 
+import datetime
 import os
 from collections import defaultdict
 from collections.abc import Callable
@@ -147,8 +148,9 @@ def create_app(
         return {"id": entry_id, **result, "trace": _build_trace(per_item, totals)}
 
     @app.get("/history")
-    def history(limit: int = 50) -> dict[str, Any]:
-        return {"meals": log_store.list(limit)}
+    def history(date: str | None = None, limit: int = 50) -> dict[str, Any]:
+        day = date or datetime.datetime.now(tz=datetime.UTC).date().isoformat()
+        return {"date": day, "meals": log_store.list(limit, date=day)}
 
     @app.get("/analysis")
     def analysis() -> dict[str, Any]:

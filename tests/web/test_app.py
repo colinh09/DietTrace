@@ -4,6 +4,8 @@ The meal logger is stubbed and tracing is a no-op, so these exercise the API and
 persistence entirely offline.
 """
 
+import datetime
+
 from fastapi.testclient import TestClient
 
 from dietrace.web.app import create_app
@@ -49,6 +51,26 @@ def test_history_returns_logged_meals(tmp_path) -> None:
 
     assert response.status_code == 200
     assert response.json()["meals"][0]["text"] == "1 banana"
+
+
+def test_history_defaults_to_today_and_filters_by_date(tmp_path) -> None:
+    store = MealLogStore(tmp_path / "log.sqlite")
+    store.add(
+        "old meal", _STUB_TOTALS,
+        created_at=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
+    )
+    store.add("today meal", _STUB_TOTALS)
+    app = create_app(store=store, tracer_init=lambda name: None)
+    client = TestClient(app)
+
+    # Default = today: the old-dated meal is excluded.
+    today_texts = [m["text"] for m in client.get("/history").json()["meals"]]
+    assert "today meal" in today_texts
+    assert "old meal" not in today_texts
+
+    # An explicit date returns only that day's meals.
+    old = client.get("/history", params={"date": "2020-01-01"}).json()["meals"]
+    assert [m["text"] for m in old] == ["old meal"]
 
 
 def test_analysis_aggregates_totals_across_meals(tmp_path) -> None:
