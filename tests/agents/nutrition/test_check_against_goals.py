@@ -112,3 +112,31 @@ def test_totals_without_a_goal_are_ignored() -> None:
 
     assert [s.code for s in check.statuses] == [_ENERGY]
     assert check.status(_SODIUM) is None
+
+
+# USDA code for added/total sugars (269) — a common zero-limit goal.
+_SUGARS = "269"
+
+
+def test_zero_target_goal_with_intake_reads_over_without_nonsense_percent() -> None:
+    """A limit goal of 0 (e.g. added sugar) with any intake reads over, no negative %.
+
+    Percent-of-goal is undefined against a zero target, so the supportive message
+    must not surface a nonsensical figure like "-100% over".
+    """
+    totals = [Nutrient(code=_SUGARS, name="Added sugars", amount=12.0, unit="g")]
+    goals = [NutrientGoal(code=_SUGARS, name="Added sugars", target=0.0, unit="g")]
+
+    status = check_against_goals(totals, goals).status(_SUGARS)
+    assert status.status == "over"
+    assert "%" not in status.message  # no percent against a zero goal
+    assert "-" not in status.message  # never "-100%"
+    assert "12g" in status.message  # the consumed amount is still reported
+
+
+def test_zero_target_goal_met_reads_within() -> None:
+    """A zero limit goal with nothing consumed sits on track, not over."""
+    totals = [Nutrient(code=_SUGARS, name="Added sugars", amount=0.0, unit="g")]
+    goals = [NutrientGoal(code=_SUGARS, name="Added sugars", target=0.0, unit="g")]
+
+    assert check_against_goals(totals, goals).status(_SUGARS).status == "within"

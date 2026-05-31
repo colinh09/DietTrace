@@ -85,6 +85,10 @@ def _message(name: str, label: GoalLabel, pct_off: int, consumed: float, goal: N
     if label == "within":
         return f"{name} is on track with your goal ({figures})."
     if label == "over":
+        # A zero-limit goal (e.g. 0 added sugar) has no meaningful percent-over —
+        # report it without a nonsensical figure rather than "-100% over".
+        if goal.target == 0:
+            return f"{name} is over your zero goal ({figures}) — easy to balance over the day."
         return f"{name} is {pct_off}% over your goal ({figures}) — easy to balance over the day."
     return f"{name} is {pct_off}% under your goal ({figures}) — still room to get there."
 
