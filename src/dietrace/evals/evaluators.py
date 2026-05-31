@@ -116,6 +116,54 @@ def macro_pct_error(
     )
 
 
+def _per_macro_abs_errors(output: Any, expected: Any) -> dict[str, float]:
+    """The absolute error |actual - expected| of each scored macro, native units."""
+    by_code = _output_by_code(output)
+    exp = _expected_macros(expected)
+    return {key: abs(by_code.get(code, 0.0) - exp[key]) for key, code in _MACROS}
+
+
+def macro_mae(
+    output: Any,
+    expected: Any,
+    metadata: dict[str, Any] | None = None,  # accepted for a uniform evaluator API
+) -> EvalResult:
+    """Mean absolute error of the agent's macros vs. expected.
+
+    The companion to ``macro_pct_error``: same macros (calories, protein, fat,
+    carb), but the raw magnitude carried for the supervisor is the absolute error
+    in native units (kcal/g), not a percentage — "off by 12 g protein" reads
+    differently from "off by 30%". The ``mae`` (mean absolute error) and per-macro
+    absolute errors travel in ``metadata``; the [0,1] score normalizes against the
+    expected total (NMAE = Σ|error| / Σ|expected|) so it weights by magnitude
+    rather than equal-weighting percentages, and an all-zero ground truth scores
+    perfect only on an exact zero. The label passes when the NMAE stays within the
+    case's ±band (default ±15%, overridable per case — ).
+    """
+    per_macro_abs = _per_macro_abs_errors(output, expected)
+    exp = _expected_macros(expected)
+
+    mae = sum(per_macro_abs.values()) / len(per_macro_abs)
+    total_expected = sum(abs(v) for v in exp.values())
+    if total_expected == 0.0:
+        nmae = 0.0 if sum(per_macro_abs.values()) == 0.0 else 1.0
+    else:
+        nmae = sum(per_macro_abs.values()) / total_expected
+
+    score = 1.0 - min(nmae, 1.0)
+    label = "pass" if nmae <= _tolerance(metadata) else "fail"
+
+    detail = ", ".join(f"{key} {err:g}" for key, err in per_macro_abs.items())
+    explanation = f"MAE {mae:g} (NMAE {nmae:.1%}; {detail})"
+
+    return EvalResult(
+        score=score,
+        label=label,
+        explanation=explanation,
+        metadata={"per_macro_abs": per_macro_abs, "mae": mae, "nmae": nmae},
+    )
+
+
 def _expected_value(expected: Any, key: str) -> Any:
     """Read *key* from an ExpectedNutrition model or a plain dict."""
     data = expected.model_dump() if hasattr(expected, "model_dump") else expected
@@ -318,6 +366,7 @@ total_sugars_accuracy = _micro_accuracy_evaluator("total_sugars", "269", "g")
 # output, and the example metadata respectively.
 _NUMERIC_EVALUATORS: list[Callable[..., EvalResult]] = [
     macro_pct_error,
+    macro_mae,
     calorie_accuracy,
     within_tolerance,
     portion_error,

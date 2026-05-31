@@ -14,6 +14,7 @@ from dietrace.evals.evaluators import (
     EvalResult,
     calorie_accuracy,
     fiber_accuracy,
+    macro_mae,
     macro_pct_error,
     micro_panel_accuracy,
     portion_error,
@@ -131,6 +132,103 @@ def test_eval_result_to_phoenix_carries_metadata() -> None:
     assert payload["label"] == "pass"
     assert payload["explanation"] == "x"
     assert payload["metadata"] == {"mean_pct_error": 0.5}
+
+
+# --- macro_mae -------------------------------------------------------
+
+
+def test_macro_mae_known_values() -> None:
+    """MAE is the mean absolute error in native units; the score is NMAE-based.
+
+     pairs macro_mae with macro_pct_error: same accuracy signal, but the
+    raw magnitude carried for the supervisor is the absolute error (g/kcal), not
+    a percentage. The [0,1] score normalizes the MAE against the expected total
+    (NMAE = Σ|err| / Σ|expected|), so it weights by magnitude rather than
+    equal-weighting per-macro percentages.
+    """
+    output = _totals(calories=440.0, protein_g=18.0, fat_g=34.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = macro_mae(output, expected)
+
+    per_macro = result.metadata["per_macro_abs"]
+    assert per_macro["calories"] == 40.0  # |440-400|
+    assert per_macro["protein_g"] == 2.0  # |18-20|
+    assert per_macro["fat_g"] == 6.0  # |34-40|
+    assert per_macro["carb_g"] == 0.0  # exact
+    assert result.metadata["mae"] == 12.0  # (40+2+6+0)/4
+    # NMAE = 48 / 470; score = 1 - NMAE.
+    assert abs(result.metadata["nmae"] - 48.0 / 470.0) < 1e-12
+    assert abs(result.score - (1.0 - 48.0 / 470.0)) < 1e-12
+    assert result.label == "pass"  # within the default ±15% band
+
+
+def test_macro_mae_perfect_match() -> None:
+    """An exact match scores 1.0 with zero absolute error across every macro."""
+    output = _totals(calories=400.0, protein_g=20.0, fat_g=40.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = macro_mae(output, expected)
+
+    assert result.score == 1.0
+    assert result.metadata["mae"] == 0.0
+    assert all(err == 0.0 for err in result.metadata["per_macro_abs"].values())
+    assert result.label == "pass"
+
+
+def test_macro_mae_large_error_fails_and_clamps() -> None:
+    """A gross overestimate fails the band; the score clamps at 0.0, not negative."""
+    output = _totals(calories=1200.0, protein_g=80.0, fat_g=120.0, carb_g=40.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = macro_mae(output, expected)
+
+    assert result.metadata["nmae"] > 1.0  # Σ|err| 970 > Σ|exp| 470
+    assert result.score == 0.0
+    assert result.label == "fail"
+
+
+def test_macro_mae_honors_per_case_tolerance() -> None:
+    """The pass/fail label respects a per-case ±band like the other evaluators."""
+    output = _totals(calories=440.0, protein_g=18.0, fat_g=34.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    # NMAE ≈ 10.2%, between the two bands.
+    assert macro_mae(output, expected, {"tolerance": 0.05}).label == "fail"
+    assert macro_mae(output, expected, {"tolerance": 0.20}).label == "pass"
+    assert macro_mae(output, expected).label == "pass"  # default ±15%
+
+
+def test_macro_mae_all_zero_expected() -> None:
+    """All-zero ground truth: exact zero is perfect; any amount is full error."""
+    expected = {"calories": 0.0, "protein_g": 0.0, "fat_g": 0.0, "carb_g": 0.0}
+
+    on_target = _totals(calories=0.0, protein_g=0.0, fat_g=0.0, carb_g=0.0)
+    assert macro_mae(on_target, expected).score == 1.0
+
+    off_target = _totals(calories=5.0, protein_g=0.0, fat_g=0.0, carb_g=0.0)
+    result = macro_mae(off_target, expected)
+    assert result.metadata["nmae"] == 1.0
+    assert result.score == 0.0
+    assert result.label == "fail"
+
+
+def test_macro_mae_accepts_expected_nutrition_model() -> None:
+    """``expected`` may be an ExpectedNutrition model, not just a dict."""
+    output = _totals(calories=420.0, protein_g=20.0, fat_g=40.0, carb_g=10.0)
+    expected = ExpectedNutrition(
+        calories=400.0, protein_g=20.0, fat_g=40.0, carb_g=10.0
+    )
+
+    result = macro_mae(output, expected)
+
+    assert result.metadata["per_macro_abs"]["calories"] == 20.0
+    assert result.metadata["per_macro_abs"]["protein_g"] == 0.0
+
+
+def test_macro_mae_registered_in_phoenix_list() -> None:
+    """macro_mae is wired into PHOENIX_EVALUATORS by name."""
+    assert "macro_mae" in {fn.__name__ for fn in PHOENIX_EVALUATORS}
 
 
 # --- calorie_accuracy (4.3) ---------------------------------------------------
