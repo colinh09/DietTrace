@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from dietrace.observability.phoenix import init_tracer
@@ -25,7 +26,17 @@ from dietrace.web.store import MealLogStore
 
 SERVICE_NAME = "dietrace-web"
 
+# Where the Next frontend is served from; comma-separated origins, env-overridable
+# so deploys can add their real domain.
+DEFAULT_CORS_ORIGINS = "http://localhost:3000"
+
 MealLogger = Callable[[str], dict]
+
+
+def _cors_origins() -> list[str]:
+    """Allowed cross-origin callers, from ``DIETRACE_CORS_ORIGINS`` (default localhost:3000)."""
+    raw = os.environ.get("DIETRACE_CORS_ORIGINS", DEFAULT_CORS_ORIGINS)
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
 class LogRequest(BaseModel):
@@ -155,6 +166,14 @@ def create_app(
         yield
 
     app = FastAPI(title="DietTrace", lifespan=lifespan)
+
+    # Let the Next frontend call the API cross-origin.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins(),
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

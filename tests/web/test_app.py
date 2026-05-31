@@ -126,6 +126,42 @@ def test_analysis_includes_targets_and_remaining(tmp_path) -> None:
     assert protein["remaining"] == protein["target"]
 
 
+def test_cors_preflight_allows_default_localhost_origin(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+
+    response = client.options(
+        "/log",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_cors_origins_come_from_env(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv(
+        "DIETRACE_CORS_ORIGINS",
+        "https://diettrace.app, https://www.diettrace.app",
+    )
+    client, _ = _client(tmp_path)
+
+    response = client.options(
+        "/log",
+        headers={
+            "Origin": "https://www.diettrace.app",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.headers["access-control-allow-origin"] == "https://www.diettrace.app"
+    )
+
+
 def _trace_logger(text: str) -> dict:
     """A logger whose per_item carries the matched USDA food + id and grams."""
     return {
