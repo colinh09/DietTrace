@@ -34,15 +34,30 @@ class ExperimentSummary:
 
     @property
     def pass_rate(self) -> float:
-        """Fraction of cases that passed (0.0 if no results)."""
-        if not self.case_results:
+        """Fraction of *applicable* cases that passed (0.0 if none).
+
+        ``n/a`` results are excluded by label, not score (axon's convention —
+        ), so a non-applicable evaluator (micros on a label-tier food,
+        portion with no ground-truth grams) — which emits a placeholder score of
+        1.0 — does not inflate the rate the supervisor trends on.
+        """
+        scored = [r for r in self.case_results if r.label != "n/a"]
+        if not scored:
             return 0.0
-        return sum(1 for r in self.case_results if r.passed) / len(self.case_results)
+        return sum(1 for r in scored if r.passed) / len(scored)
 
     @property
     def mean_score(self) -> float | None:
-        """Average numeric score across cases, or None if no scores present."""
-        scores = [r.score for r in self.case_results if r.score is not None]
+        """Average numeric score across *applicable* cases, or None if none.
+
+        Like :attr:`pass_rate`, filters ``n/a`` results by label so their
+        non-penalizing 1.0 placeholder does not skew the mean.
+        """
+        scores = [
+            r.score
+            for r in self.case_results
+            if r.label != "n/a" and r.score is not None
+        ]
         if not scores:
             return None
         return sum(scores) / len(scores)
