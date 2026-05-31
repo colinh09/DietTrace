@@ -111,9 +111,12 @@ body {
 .tnum { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 ::selection { background: var(--accent-soft); }
 
-/* layout — centered single-column shell, matching  */
+/* layout — single calm column: centered ~900px on desktop, ~full-width on
+   mobile. The column spans its container and is
+   capped by max-width; on narrow screens the page padding (below) tightens so
+   content runs essentially edge-to-edge. */
 .page { min-height: 100vh; padding: 52px 24px 120px; }
-.wrap { max-width: 760px; margin: 0 auto; }
+.wrap { width: 100%; max-width: 900px; margin: 0 auto; }
 
 /* header — ✦ brand + date navigation */
 .hdr { display: flex; align-items: center; justify-content: space-between; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
@@ -229,8 +232,16 @@ body {
 .grams-edit input:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }
 .grams-edit span { font-size: 11px; color: var(--faint); }
 
-/* responsive — stack the band on narrow screens */
+/* responsive — tighten the page to ~full-width and stack the band on narrow
+   screens. */
 @media (max-width: 640px) {
+  .page { padding: 36px 16px 96px; }
   .daymacros { grid-template-columns: 1fr; gap: 20px; }
   .dm-macros { gap: 14px; }
+}
+
+@media (max-width: 420px) {
+  .page { padding: 28px 14px 80px; }
+  .dm-macros { grid-template-columns: 1fr; gap: 12px; }
+  .meal-side { gap: 9px; }
 }
