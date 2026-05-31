@@ -232,6 +232,17 @@ body {
 .grams-edit input:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }
 .grams-edit span { font-size: 11px; color: var(--faint); }
 
+/* portion-correction bar → feeds the Arize eval set (the self-supervision loop) */
+.correct-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 0 2px; }
+.correct-bar.saved { color: var(--accent-ink); }
+.correct-hint { font-size: 12px; color: var(--muted-ink); }
+.correct-btn { font-size: 11px; color: var(--accent-ink); background: var(--accent-soft); border: none; border-radius: 6px; padding: 3px 9px; cursor: pointer; transition: background .14s ease; }
+.correct-btn:hover:not(:disabled) { background: var(--accent-softer); }
+.correct-btn:disabled { opacity: 0.6; cursor: default; }
+.correct-link { font-size: 11px; color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+.correct-link:hover { border-bottom-color: var(--accent-ink); }
+.correct-err { font-size: 11px; color: #9a5a4a; }
+
 /* responsive — tighten the page to ~full-width and stack the band on narrow
    screens. */
 @media (max-width: 640px) {

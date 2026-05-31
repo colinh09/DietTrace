@@ -43,7 +43,12 @@ export interface LoggedItem {
 // One step of the agent's reconstructed work, surfaced behind a meal's expand.
 // Every step carries `step` + `summary`; the rest depends on the step kind.
 export interface TraceStep {
-  step: "parse_meal" | "search_nutrition" | "estimate_portion" | "log_entry";
+  step:
+    | "parse_meal"
+    | "search_nutrition"
+    | "web_search"
+    | "estimate_portion"
+    | "log_entry";
   summary: string;
   food?: string;
   matched?: string;
@@ -112,6 +117,30 @@ export async function logMeal(text: string, date?: string): Promise<LogResponse>
 // Delete a logged meal by id.
 export async function deleteMeal(id: number): Promise<void> {
   await request(`/meals/${id}`, { method: "DELETE" });
+}
+
+// The result of contributing a portion correction to the Arize eval set.
+export interface CorrectionResult {
+  ok: boolean;
+  added_to_arize: boolean;
+  total_corrections: number;
+  dataset: string;
+  phoenix_url: string;
+}
+
+// Correct a logged item's portion → push it to Phoenix as a new ground-truth
+// example (the self-supervision loop, driven from the UI). The item's logged
+// `nutrients` panel lets the backend rescale the expected macros to the new grams.
+export async function submitCorrection(item: LoggedItem, correctedGrams: number) {
+  return request<CorrectionResult>("/feedback", {
+    method: "POST",
+    body: JSON.stringify({
+      food: item.description,
+      original_grams: item.grams,
+      corrected_grams: correctedGrams,
+      nutrients: item.nutrients,
+    }),
+  });
 }
 
 // Read one day's logged meals. Omit `date` for today (the backend default).

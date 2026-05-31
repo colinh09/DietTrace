@@ -9,8 +9,13 @@
 //   2. the per-item table, whose grams are editable and rescale the row's
 //      kcal/P/C/F live (the portion is the one number a person actually corrects).
 import { useState } from "react";
-import { Globe, Sparkle } from "lucide-react";
-import type { LoggedItem, TraceStep } from "@/lib/api";
+import { Check, Globe, Sparkle } from "lucide-react";
+import {
+  submitCorrection,
+  type CorrectionResult,
+  type LoggedItem,
+  type TraceStep,
+} from "@/lib/api";
 import { macrosOf } from "@/lib/meal";
 
 // The web-search fallback gets its own glyph — it's the moment the agent leaves
@@ -49,35 +54,91 @@ const fmt = new Intl.NumberFormat("en-US");
 // logged grams, so the factor is newGrams / loggedGrams).
 function ItemRow({ item }: { item: LoggedItem }) {
   const [grams, setGrams] = useState(item.grams);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
+  const [result, setResult] = useState<CorrectionResult | null>(null);
   const base = macrosOf(item.nutrients);
   const factor = item.grams > 0 ? grams / item.grams : 0;
   const name = item.description;
   const cell = (value: number) => fmt.format(Math.round(value * factor));
 
+  // The portion is the one number a person actually corrects. Once it's been
+  // nudged off the logged value, offer to teach it — the correction becomes a
+  // ground-truth example in the Arize eval set (the self-supervision loop).
+  const changed = grams > 0 && grams !== item.grams && status !== "saved";
+
+  async function save() {
+    setStatus("saving");
+    try {
+      setResult(await submitCorrection(item, grams));
+      setStatus("saved");
+    } catch {
+      setStatus("error");
+    }
+  }
+
   return (
-    <div className="item-grid">
-      <div className="item-name">
-        <span className="item-name-txt">{name}</span>
+    <>
+      <div className="item-grid">
+        <div className="item-name">
+          <span className="item-name-txt">{name}</span>
+        </div>
+        <div className="num">
+          <span className="grams-edit">
+            <input
+              className="mono tnum"
+              type="number"
+              min={0}
+              max={2000}
+              value={grams}
+              aria-label={`grams of ${name}`}
+              onChange={(e) => setGrams(Number(e.target.value))}
+            />
+            <span>g</span>
+          </span>
+        </div>
+        <div className="num mono tnum">{cell(base.kcal)}</div>
+        <div className="num mono tnum dim">{cell(base.protein)}</div>
+        <div className="num mono tnum dim">{cell(base.carb)}</div>
+        <div className="num mono tnum dim">{cell(base.fat)}</div>
       </div>
-      <div className="num">
-        <span className="grams-edit">
-          <input
-            className="mono tnum"
-            type="number"
-            min={0}
-            max={2000}
-            value={grams}
-            aria-label={`grams of ${name}`}
-            onChange={(e) => setGrams(Number(e.target.value))}
-          />
-          <span>g</span>
-        </span>
-      </div>
-      <div className="num mono tnum">{cell(base.kcal)}</div>
-      <div className="num mono tnum dim">{cell(base.protein)}</div>
-      <div className="num mono tnum dim">{cell(base.carb)}</div>
-      <div className="num mono tnum dim">{cell(base.fat)}</div>
-    </div>
+
+      {changed && (
+        <div className="correct-bar">
+          <span className="correct-hint">Looks off? Teach DietTrace the right portion.</span>
+          <button
+            type="button"
+            className="correct-btn mono"
+            onClick={save}
+            disabled={status === "saving"}
+          >
+            {status === "saving" ? "saving…" : `correct → ${grams} g`}
+          </button>
+          {status === "error" && (
+            <span className="correct-err">couldn&apos;t save — try again</span>
+          )}
+        </div>
+      )}
+
+      {status === "saved" && result && (
+        <div className="correct-bar saved">
+          <Check size={12} color="var(--accent)" />
+          <span className="correct-hint">
+            Added to the Arize eval set as ground truth — the next eval run will
+            score against it.
+          </span>
+          <a
+            href={result.phoenix_url}
+            target="_blank"
+            rel="noreferrer"
+            className="correct-link mono"
+          >
+            view in Phoenix →
+          </a>
+        </div>
+      )}
+    </>
   );
 }
 

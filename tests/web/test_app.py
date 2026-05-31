@@ -10,6 +10,7 @@ import json
 from fastapi.testclient import TestClient
 
 from dietrace.web.app import create_app
+from dietrace.web.feedback import FeedbackStore
 from dietrace.web.store import MealLogStore
 
 _STUB_TOTALS = [{"code": "208", "name": "Energy", "amount": 105.0, "unit": "kcal"}]
@@ -19,9 +20,15 @@ def _stub_logger(text: str) -> dict:
     return {"totals": _STUB_TOTALS, "per_item": [{"description": text, "grams": 118.0}]}
 
 
-def _client(tmp_path, logger=_stub_logger):
+def _client(tmp_path, logger=_stub_logger, pusher=lambda *a: False):
     store = MealLogStore(tmp_path / "log.sqlite")
-    app = create_app(meal_logger=logger, store=store, tracer_init=lambda name: None)
+    app = create_app(
+        meal_logger=logger,
+        store=store,
+        feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        feedback_pusher=pusher,
+        tracer_init=lambda name: None,
+    )
     return TestClient(app), store
 
 
@@ -213,6 +220,49 @@ def test_log_response_carries_ordered_trace(tmp_path) -> None:
     # The final step carries the summed totals.
     assert trace[-1]["step"] == "log_entry"
     assert trace[-1]["totals"] == _STUB_TOTALS
+
+
+def test_feedback_records_and_pushes_a_correction_to_arize(tmp_path) -> None:
+    pushed: list[tuple] = []
+
+    def recording_pusher(inp, out, meta) -> bool:
+        pushed.append((inp, out, meta))
+        return True
+
+    client, _ = _client(tmp_path, pusher=recording_pusher)
+
+    response = client.post(
+        "/feedback",
+        json={
+            "food": "Five Guys Bacon Cheeseburger",
+            "original_grams": 317.0,
+            "corrected_grams": 158.5,
+            "nutrients": [{"code": "208", "name": "Energy", "amount": 920.0, "unit": "kcal"}],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] and body["added_to_arize"] is True
+    assert body["total_corrections"] == 1
+    # The pushed example carries the corrected (halved) ground truth.
+    inp, out, _meta = pushed[0]
+    assert inp == {"text": "Five Guys Bacon Cheeseburger"}
+    assert out["grams"] == 158.5 and out["calories"] == 460.0
+
+
+def test_feedback_is_recorded_even_when_the_arize_push_fails(tmp_path) -> None:
+    # Phoenix unreachable → push returns False, but the correction is still saved.
+    client, _ = _client(tmp_path, pusher=lambda *a: False)
+
+    body = client.post(
+        "/feedback",
+        json={"food": "x", "original_grams": 100.0, "corrected_grams": 50.0, "nutrients": []},
+    ).json()
+
+    assert body["added_to_arize"] is False
+    assert body["total_corrections"] == 1
+    assert client.get("/feedback").json()["total_corrections"] == 1
 
 
 def _web_trace_logger(text: str) -> dict:

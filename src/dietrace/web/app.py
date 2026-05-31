@@ -24,7 +24,16 @@ from pydantic import BaseModel
 
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
-from dietrace.web.accuracy import accuracy_report
+from dietrace.web.accuracy import accuracy_report, phoenix_dashboard_url
+from dietrace.web.feedback import (
+    FEEDBACK_DATASET,
+    Correction,
+    FeedbackPusher,
+    FeedbackStore,
+    corrected_expected,
+    phoenix_push,
+    to_example,
+)
 from dietrace.web.goals import load_goals
 from dietrace.web.store import MealLogStore
 
@@ -185,11 +194,16 @@ def create_app(
     meal_logger: MealLogger | None = None,
     meal_streamer: MealStreamer | None = None,
     store: MealLogStore | None = None,
+    feedback_store: FeedbackStore | None = None,
+    feedback_pusher: FeedbackPusher = phoenix_push,
     tracer_init: Callable[[str], Any] = init_tracer,
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     log_store = store or MealLogStore(os.environ.get("DIETRACE_LOG_DB", "data/log.sqlite"))
+    corrections = feedback_store or FeedbackStore(
+        os.environ.get("DIETRACE_FEEDBACK_DB", "data/feedback.sqlite")
+    )
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
@@ -260,6 +274,33 @@ def create_app(
     def accuracy_panel() -> dict[str, Any]:
         """The Arize accuracy story + measured numbers for the web /accuracy page."""
         return accuracy_report()
+
+    @app.post("/feedback")
+    def feedback(correction: Correction) -> dict[str, Any]:
+        """Record a user portion correction and push it to Phoenix as ground truth.
+
+        The correction becomes a new example in the live eval dataset, so the next
+        experiment scores against it — the self-supervision loop, driven from the
+        UI. Recording is local-first; the Phoenix push is best-effort.
+        """
+        expected = corrected_expected(correction)
+        corrections.add(correction, expected)
+        added_to_arize = feedback_pusher(*to_example(correction))
+        return {
+            "ok": True,
+            "added_to_arize": added_to_arize,
+            "total_corrections": corrections.count(),
+            "dataset": FEEDBACK_DATASET,
+            "phoenix_url": phoenix_dashboard_url(),
+        }
+
+    @app.get("/feedback")
+    def feedback_summary() -> dict[str, Any]:
+        return {
+            "total_corrections": corrections.count(),
+            "dataset": FEEDBACK_DATASET,
+            "phoenix_url": phoenix_dashboard_url(),
+        }
 
     @app.get("/analysis")
     def analysis(date: str | None = None) -> dict[str, Any]:

@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { MealTrace } from "@/components/meal-trace";
-import type { LoggedItem, TraceStep } from "@/lib/api";
+import { submitCorrection, type LoggedItem, type TraceStep } from "@/lib/api";
+
+vi.mock("@/lib/api", () => ({ submitCorrection: vi.fn() }));
 
 // One logged food at 140 g, with its nutrient panel scaled to that portion.
 const perItem: LoggedItem[] = [
@@ -80,5 +82,33 @@ describe("MealTrace", () => {
     const row = screen.getByText("chicken breast, grilled").closest(".item-grid") as HTMLElement;
     // 231 kcal at 140 g → 462 kcal at 280 g.
     expect(within(row).getByText("462")).toBeInTheDocument();
+  });
+
+  it("offers a correction once grams change, and confirms it fed the Arize eval set", async () => {
+    vi.mocked(submitCorrection).mockResolvedValue({
+      ok: true,
+      added_to_arize: true,
+      total_corrections: 1,
+      dataset: "dietrace-nutrition-v1",
+      phoenix_url: "https://app.phoenix.arize.com/s/demo",
+    });
+
+    render(<MealTrace trace={trace} perItem={perItem} />);
+    // No correction prompt until the portion is actually changed.
+    expect(screen.queryByRole("button", { name: /correct/i })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/grams of chicken breast, grilled/i), {
+      target: { value: "200" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /correct → 200 g/i }));
+
+    expect(submitCorrection).toHaveBeenCalledWith(perItem[0], 200);
+    await waitFor(() =>
+      expect(screen.getByText(/Added to the Arize eval set/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("link", { name: /view in Phoenix/i })).toHaveAttribute(
+      "href",
+      "https://app.phoenix.arize.com/s/demo",
+    );
   });
 });
