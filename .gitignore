@@ -31,6 +31,12 @@ docs/
 # --- Autonomous build tooling (kept locally, never tracked) ---
 tools/
 
+# --- Deploy context (kept locally, never tracked) ---
+.gcloudignore
+frontend/.gcloudignore
+cloudbuild*.yaml
+deploy*.sh
+
 # --- Nutrition data & DB implementation (obscured; sourced from USDA FDC, see README) ---
 data/
 *.sqlite

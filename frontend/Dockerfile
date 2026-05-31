@@ -6,6 +6,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# The backend Cloud Run URL is inlined into the client bundle at build time
+# (NEXT_PUBLIC_* vars are baked by `next build`), so it must be set before build.
+ARG NEXT_PUBLIC_API_BASE
+ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+
 # Build the Next app (next build).
 COPY . .
 RUN npm run build
