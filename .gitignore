@@ -60,3 +60,6 @@ src/dietrace/web/static/assets/
 .idea/
 .vscode/
 *.log
+
+# stray root node_modules (vitest cache) — never track
+node_modules/
