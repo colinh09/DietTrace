@@ -17,5 +17,10 @@ COPY evals/dataset ./evals/dataset
 # time so the running service can resolve foods without a network call.
 COPY data/food.sqlite ./data/food.sqlite
 
+# Curated common-foods overlay (gitignored mapping, so not in the installed wheel)
+# — baked in and pointed at by DIETRACE_OVERLAY at deploy time. load_overlay is
+# fail-soft, so its absence just disables the overlay (ranked search still works).
+COPY src/dietrace/nutrition/mappings/common_foods.json ./data/common_foods.json
+
 EXPOSE 8080
 CMD ["uvicorn", "dietrace.web.app:app", "--host", "0.0.0.0", "--port", "8080"]

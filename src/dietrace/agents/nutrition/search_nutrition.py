@@ -17,6 +17,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from dietrace.nutrition.models import Nutrient
+from dietrace.nutrition.overlay import overlay_fdc_id
 from dietrace.nutrition.repository import FoodRepository
 
 
@@ -46,12 +47,28 @@ class NutritionMatch(BaseModel):
         return None
 
 
-def search_nutrition(repository: FoodRepository, food: str) -> NutritionMatch | None:
+def search_nutrition(
+    repository: FoodRepository, food: str, overlay: dict[str, int] | None = None
+) -> NutritionMatch | None:
     """Look up *food* against the read layer, best match first.
 
-    Returns the top-ranked candidate hydrated into its ``fdc_id``, per-100 g
-    nutrient panel, and ``data_type``, or ``None`` when nothing matches.
+    A curated common-foods *overlay* is consulted first: if *food* is a pinned
+    common name, its hand-verified ``fdc_id`` is returned directly (score 4, the
+    deterministic head-of-distribution fix). Otherwise the ranked search runs and
+    the top candidate is hydrated. Returns ``None`` when nothing matches.
     """
+    pinned = overlay_fdc_id(food, overlay)
+    if pinned is not None:
+        hydrated = repository.get(pinned)
+        if hydrated is not None:
+            return NutritionMatch(
+                fdc_id=hydrated.fdc_id,
+                description=hydrated.description,
+                data_type=hydrated.data_type,
+                per_100g=hydrated.nutrients,
+                score=4,
+            )
+
     candidates = repository.search(food)
     if not candidates:
         return None

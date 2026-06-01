@@ -93,3 +93,18 @@ def test_missing_nutrient_code_is_none(repository) -> None:
     match = search_nutrition(repository, "egg")
 
     assert match.nutrient("999") is None
+
+
+def test_overlay_pins_a_common_food_over_the_ranked_search(repository) -> None:
+    """A curated overlay entry wins regardless of what the ranked search would pick."""
+    # Deliberately pin "toast" to the egg fdc_id — the pin must override ranking.
+    match = search_nutrition(repository, "toast", overlay={"toast": EGG_FDC_ID})
+    assert match is not None
+    assert match.fdc_id == EGG_FDC_ID
+    assert match.score == 4  # pinned matches are treated as exact
+
+
+def test_overlay_miss_falls_through_to_ranked_search(repository) -> None:
+    match = search_nutrition(repository, "avocado", overlay={"banana": EGG_FDC_ID})
+    assert match is not None
+    assert match.fdc_id == AVOCADO_FDC_ID  # not pinned → ranked search decides
