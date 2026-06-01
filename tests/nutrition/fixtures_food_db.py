@@ -50,6 +50,16 @@ COFFEE_BREWED_FDC_ID = 171881
 # raw-preference / dry penalty (not fdc_id order) keeps the raw produce on top.
 CARROT_DEHYDRATED_FDC_ID = 168153
 CARROT_RAW_FDC_ID = 170393
+# Basket anchors for the search-resolution regression test. Each
+# rounds out the set of common foods that must not regress: an apple (bare fruit
+# vs a prepared "Sauce, apple" — the 11.2 product-form pattern) and white rice (a
+# staple, so cooked is canonical and raw is the wrong form). In both pairs the
+# wrong variant (sauce, raw rice) has the LOWER fdc_id, so absent the canonical
+# ranking it would win the tie — pinning that the ranking, not fdc_id order, wins.
+APPLE_SAUCE_FDC_ID = 168151
+APPLE_RAW_FDC_ID = 171688
+RICE_RAW_FDC_ID = 169756
+RICE_COOKED_FDC_ID = 169757
 
 FIXTURE_FDC_IDS = (
     EGG_FDC_ID,
@@ -68,6 +78,10 @@ FIXTURE_FDC_IDS = (
     COFFEE_BREWED_FDC_ID,
     CARROT_DEHYDRATED_FDC_ID,
     CARROT_RAW_FDC_ID,
+    APPLE_SAUCE_FDC_ID,
+    APPLE_RAW_FDC_ID,
+    RICE_RAW_FDC_ID,
+    RICE_COOKED_FDC_ID,
 )
 
 _SCHEMA = """
@@ -154,6 +168,18 @@ _FOODS = [
     # win.
     (CARROT_DEHYDRATED_FDC_ID, "Carrots, dehydrated", "sr_legacy_food"),
     (CARROT_RAW_FDC_ID, "Carrots, raw", "sr_legacy_food"),
+    # "Sauce, apple" leads with a prepared product form ("sauce"), so the bare
+    # query "apple" must resolve to the fruit, not the sauce.
+    (APPLE_SAUCE_FDC_ID, "Sauce, apple, canned, unsweetened", "sr_legacy_food"),
+    (APPLE_RAW_FDC_ID, "Apples, raw, with skin", "sr_legacy_food"),
+    # White rice is a staple — eaten cooked — so "rice" must resolve to the cooked
+    # form (~130 kcal), not the raw grain (~365 kcal): the cooked-staple correction.
+    (RICE_RAW_FDC_ID, "Rice, white, long-grain, regular, raw, enriched", "sr_legacy_food"),
+    (
+        RICE_COOKED_FDC_ID,
+        "Rice, white, long-grain, regular, cooked, enriched",
+        "sr_legacy_food",
+    ),
 ]
 
 # fdc_id -> {nutrient code: amount per 100 g}, USDA-grounded.
@@ -174,6 +200,10 @@ _FOOD_NUTRIENTS = {
     COFFEE_BREWED_FDC_ID: {"208": 1.0, "203": 0.12, "204": 0.02, "205": 0.0},
     CARROT_DEHYDRATED_FDC_ID: {"208": 341.0, "203": 8.12, "204": 1.49, "205": 79.6},
     CARROT_RAW_FDC_ID: {"208": 41.0, "203": 0.93, "204": 0.24, "205": 9.58},
+    APPLE_SAUCE_FDC_ID: {"208": 42.0, "203": 0.17, "204": 0.05, "205": 11.29},
+    APPLE_RAW_FDC_ID: {"208": 52.0, "203": 0.26, "204": 0.17, "205": 13.81},
+    RICE_RAW_FDC_ID: {"208": 365.0, "203": 7.13, "204": 0.66, "205": 79.95},
+    RICE_COOKED_FDC_ID: {"208": 130.0, "203": 2.69, "204": 0.28, "205": 28.17},
 }
 
 # fdc_id -> list of (amount, unit, gram_weight, description, sequence_number)
