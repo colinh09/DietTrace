@@ -107,7 +107,7 @@ class FoodRepository:
                     continue
                 ranked.append(
                     (
-                        score,
+                        _effective_score(score, row["description"], query),
                         _canonical_score(row["description"], query),
                         SearchCandidate(
                             fdc_id=row["fdc_id"],
@@ -240,9 +240,32 @@ _PART_TERMS = frozenset({"peel", "rind", "zest", "leaf", "leave", "stalk", "skin
 # bare skin part — so "skin" should not trigger the part penalty.
 _WHOLE_WITH_SKIN = frozenset({"flesh", "meat", "with", "without"})
 
+# Markers of a processed PRODUCT rather than the bare food. These demote a
+# candidate by one match-strength tier (below) so a whole raw food can outrank an
+# exact-alias product: USDA auto-aliases give "Carrot, dehydrated" the exact alias
+# "carrot" (score 4) while plural "Carrots, raw" only matches all-words (score 3),
+# so without this the dehydrated/deli/flour product wins the score tier before
+# canonical ranking can ever apply. Cooked staples are exempt (cooked IS canonical
+# for them), and a form the user explicitly asked for is exempt (it's in the query).
+_DEMOTE_FORMS = _DELI_TERMS | _PRODUCT_FORMS | frozenset({
+    "dehydrated", "dried", "flour", "juice", "nectar", "powder", "powdered",
+    "concentrate", "sliced", "jerky", "chip", "cracker", "wurst", "salami",
+    "pancake", "yogurt", "babyfood", "dessert", "jam", "jelly", "syrup", "salad",
+    "vinegar", "smoothie",
+})
+
 
 def _singular(word: str) -> str:
-    """Drop a trailing plural 's' so "banana" matches "Bananas" (light stemming)."""
+    """Singularize a plural so "banana" matches "Bananas" and — crucially — "potato"
+    matches "Potatoes" and "peach" matches "Peaches".
+
+    The -es plurals (after o/ch/sh/x/s/z) drop "es"; a naive trailing-s drop would
+    mangle "potatoes" → "potatoe" and "peaches" → "peache", which then fail to match
+    the singular query and exclude the raw fruit/veg from the candidates entirely.
+    """
+    for suffix in ("oes", "ches", "shes", "xes", "sses", "zzes"):
+        if len(word) > len(suffix) and word.endswith(suffix):
+            return word[:-2]
     return word[:-1] if len(word) > 3 and word.endswith("s") else word
 
 
@@ -276,6 +299,23 @@ def _text_score(query: str, fields: list[str]) -> tuple[int, str]:
     return best, best_field
 
 
+def _effective_score(score: int, description: str, query: str) -> int:
+    """The match strength used for ranking, demoting unrequested processed products.
+
+    A candidate carrying a product marker the query didn't ask for (and that isn't
+    a cooked staple) drops one tier, so a bare-ingredient query's whole raw food
+    (all-words, tier 3) can outrank an exact-alias product (tier 4) — then the
+    canonical score decides. ``search`` keeps the *raw* score on the candidate so
+    the orchestrator's substring-only (tier 1) web-fallback gate is unaffected.
+    """
+    toks = _tokens(description)
+    if _COOKED_STAPLES & toks:
+        return score
+    if (_DEMOTE_FORMS & toks) - _tokens(query):
+        return max(1, score - 1)
+    return score
+
+
 def _canonical_score(description: str, query: str = "") -> float:
     """Higher for a more canonical food description, given the *query*.
 
@@ -300,10 +340,12 @@ def _canonical_score(description: str, query: str = "") -> float:
         score += 3.0
     if "whole" in toks:
         score += 0.5
-    # The primary noun is the head word of the first comma/paren segment.
-    primary = re.split(r"[,(]", description.lower(), maxsplit=1)[0].split()
-    head = _singular(primary[0]) if primary else ""
-    if head and head in qtokens:
+    # The primary name (first comma/paren segment) matches when its words are all
+    # in the query — i.e. it introduces no noun beyond what was asked. So "apple" →
+    # "Apples, raw" gets the bonus, but the compound "Lemon grass" does NOT for
+    # "lemon" (it adds "grass"), nor "Rose-apples" for "apple".
+    primary_tokens = _tokens(re.split(r"[,(]", description.lower(), maxsplit=1)[0])
+    if primary_tokens and primary_tokens <= qtokens:
         score += 1.5
     # A bare-ingredient query (head noun is the ingredient) should not resolve to
     # a prepared/branded product of it: penalize product-form terms the query did
@@ -313,9 +355,9 @@ def _canonical_score(description: str, query: str = "") -> float:
     score -= float(len(_PROCESSED_TERMS & toks))
     score -= 2.0 * len(_DELI_TERMS & toks)
     parts = _PART_TERMS & toks
-    if "skin" in parts and _WHOLE_WITH_SKIN & toks:
-        parts -= {"skin"}  # "flesh and skin" / "without skin" is the whole food
+    if parts and _WHOLE_WITH_SKIN & toks:
+        parts = set()  # "with/without/flesh/meat <part>" is the whole edible food
     if parts:
-        score -= 5.0  # a part descriptor must lose to the whole food
+        score -= 5.0  # a bare part descriptor must lose to the whole food
     score -= 0.02 * len(description)
     return score

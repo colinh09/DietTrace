@@ -315,3 +315,40 @@ def test_canonical_scoring_corrections() -> None:
     assert _canonical_score("Bananas, raw", "banana") > _canonical_score(
         "Pepper, banana, raw", "banana"
     )
+
+
+def test_singularizer_handles_es_plurals() -> None:
+    """The -es plurals must singularize correctly or the raw fruit/veg is excluded."""
+    from dietrace.nutrition.repository import _singular
+
+    assert _singular("potatoes") == "potato"
+    assert _singular("peaches") == "peach"
+    assert _singular("tomatoes") == "tomato"
+    assert _singular("bananas") == "banana"  # plain -s still works
+    assert _singular("grapes") == "grape"
+
+
+def test_without_peel_is_the_whole_fruit_not_a_part() -> None:
+    """"Lemons, raw, without peel" is the edible fruit and must beat "Lemon grass"."""
+    from dietrace.nutrition.repository import _canonical_score
+
+    assert _canonical_score("Lemons, raw, without peel", "lemon") > _canonical_score(
+        "Lemon grass (citronella), raw", "lemon"
+    )
+    # A bare part still loses to the whole food.
+    assert _canonical_score("Oranges, raw", "orange") > _canonical_score(
+        "Orange peel, raw", "orange"
+    )
+
+
+def test_effective_score_demotes_unrequested_products() -> None:
+    """An exact-alias product drops a tier so a raw whole food can outrank it."""
+    from dietrace.nutrition.repository import _effective_score
+
+    # "Carrot, dehydrated" matches exactly (4) but is demoted to 3 so raw (3) ties
+    # and canonical wins it.
+    assert _effective_score(4, "Carrot, dehydrated", "carrot") == 3
+    assert _effective_score(4, "Chicken breast, deli, sliced", "chicken breast") == 3
+    # Cooked staples are exempt; a requested product form is exempt.
+    assert _effective_score(3, "Rice, white, cooked", "white rice") == 3
+    assert _effective_score(3, "Potato flour", "potato flour") == 3
