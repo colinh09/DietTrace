@@ -51,8 +51,12 @@ Return ONLY JSON of this exact shape (numbers only, no units in the values):
 "calories": <kcal>, "protein_g": <g>, "fat_g": <g>, "carb_g": <g>, \
 "fiber_g": <g or null>, "sodium_mg": <mg or null>, "sugar_g": <g or null>}}
 
-Use the item's standard single serving. If you cannot find reliable data, return \
-{{"description": "", "serving_grams": null, "calories": null}}.
+Use the item's standard single serving. If the food is a recognizable dish or \
+ingredient (e.g. shakshuka, risotto, pad thai), give your best published or \
+typical-recipe estimate — do NOT give up just because an exact label isn't \
+published. Only return empty (\
+{{"description": "", "serving_grams": null, "calories": null}}) if the food is \
+genuinely unrecognizable or gibberish.
 """
 
 
@@ -61,27 +65,42 @@ def _positive(value: Any) -> bool:
     return isinstance(value, (int, float)) and math.isfinite(value) and value > 0
 
 
-def web_nutrition(food: str, brand: str = "", *, client: Any | None = None) -> Food | None:
+def web_nutrition(
+    food: str, brand: str = "", *, client: Any | None = None, attempts: int = 2
+) -> Food | None:
     """Look up *food* (optionally a *brand*'s) nutrition facts via grounded Gemini.
 
     Returns a synthetic :class:`Food` — per-100 g nutrient panel plus a single
     serving's gram weight — or ``None`` when the lookup yields no usable data. The
-    *client* is a ``google.genai`` client (mocked in tests); when omitted a Vertex
-    client is built lazily so importing this module needs no credentials.
+    grounded model is non-deterministic and sometimes bails to its empty fallback
+    even for a recognizable dish, so a None is **retried** up to *attempts* times
+    (cheap, and a retry usually succeeds). The *client* is a ``google.genai``
+    client (mocked in tests); when omitted a Vertex client is built lazily.
     """
     try:
         if client is None:
             client = _default_client()
+    except Exception:
+        # A credentials failure must never crash a meal log.
+        return None
+
+    for _ in range(max(1, attempts)):
+        food_obj = _lookup_once(client, food, brand)
+        if food_obj is not None:
+            return food_obj
+    return None
+
+
+def _lookup_once(client: Any, food: str, brand: str) -> Food | None:
+    """One grounded lookup attempt; None on any failure or empty result."""
+    try:
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=_PROMPT.format(food=food, brand=brand or "(none)"),
             config=_grounded_config(),
         )
     except Exception:
-        # A grounded-search/credentials failure must never crash a meal log — the
-        # caller falls back to its DB match or skips the item.
         return None
-
     raw_text = getattr(response, "text", None)
     if not raw_text:
         return None
@@ -89,7 +108,6 @@ def web_nutrition(food: str, brand: str = "", *, client: Any | None = None) -> F
         payload = json.loads(_strip_fences(raw_text))
     except (json.JSONDecodeError, ValueError):
         return None
-
     return _to_food(payload, food, brand)
 
 
