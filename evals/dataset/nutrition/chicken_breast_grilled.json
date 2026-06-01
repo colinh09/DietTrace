@@ -1,0 +1,17 @@
+{
+  "input": { "text": "3 oz grilled skinless chicken breast" },
+  "expected": {
+    "calories": 128.35,
+    "protein_g": 25.93,
+    "fat_g": 2.69,
+    "carb_g": 0.0,
+    "grams": 85.0,
+    "micros": { "307": 44.2, "306": 332.4, "305": 219.3 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 171534,
+    "source": "USDA SR Legacy — Chicken, broiler or fryers, breast, skinless, boneless, meat only, cooked, grilled",
+    "notes": "3 oz cooked ~85 g."
+  }
+}

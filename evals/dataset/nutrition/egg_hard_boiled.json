@@ -1,0 +1,17 @@
+{
+  "input": { "text": "one large hard-boiled egg" },
+  "expected": {
+    "calories": 77.5,
+    "protein_g": 6.3,
+    "fat_g": 5.3,
+    "carb_g": 0.56,
+    "grams": 50.0,
+    "micros": { "307": 62.0, "305": 86.0, "301": 25.0 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 173424,
+    "source": "USDA SR Legacy — Egg, whole, cooked, hard-boiled",
+    "notes": "1 large egg ~50 g."
+  }
+}

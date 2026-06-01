@@ -1,0 +1,17 @@
+{
+  "input": { "text": "1 oz of dry roasted almonds" },
+  "expected": {
+    "calories": 169.5,
+    "protein_g": 5.95,
+    "fat_g": 14.88,
+    "carb_g": 5.95,
+    "grams": 28.35,
+    "micros": { "304": 79.1, "301": 76.0, "306": 202.1 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 170158,
+    "source": "USDA SR Legacy — Nuts, almonds, dry roasted, without salt added",
+    "notes": "1 oz (~22 whole kernels) ~28.35 g."
+  }
+}

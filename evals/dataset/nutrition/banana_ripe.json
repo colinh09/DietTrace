@@ -1,0 +1,17 @@
+{
+  "input": { "text": "one ripe banana" },
+  "expected": {
+    "calories": 111.6,
+    "protein_g": 0.85,
+    "fat_g": 0.33,
+    "carb_g": 26.45,
+    "grams": 115.0,
+    "micros": { "306": 374.9, "401": 14.1, "304": 32.2 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 1105314,
+    "source": "USDA Foundation — Bananas, ripe and slightly ripe, raw",
+    "notes": "1 peeled banana ~115 g."
+  }
+}

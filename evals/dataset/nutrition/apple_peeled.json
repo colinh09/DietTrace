@@ -1,0 +1,17 @@
+{
+  "input": { "text": "1 medium apple, peeled" },
+  "expected": {
+    "calories": 77.3,
+    "protein_g": 0.43,
+    "fat_g": 0.21,
+    "carb_g": 20.61,
+    "grams": 161.0,
+    "micros": { "306": 144.9, "401": 6.4, "291": 2.1 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 171689,
+    "source": "USDA SR Legacy — Apples, raw, without skin",
+    "notes": "1 medium (3\" dia) peeled apple ~161 g."
+  }
+}

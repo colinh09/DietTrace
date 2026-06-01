@@ -1,0 +1,17 @@
+{
+  "input": { "text": "a container of plain nonfat Greek yogurt, 170 grams" },
+  "expected": {
+    "calories": 100.3,
+    "protein_g": 17.34,
+    "fat_g": 0.66,
+    "carb_g": 6.12,
+    "grams": 170.0
+  },
+  "metadata": {
+    "nutrient_tier": "label",
+    "fdc_id": 170894,
+    "tolerance": 0.2,
+    "source": "USDA SR Legacy — Yogurt, Greek, plain, nonfat (label-subset scoring)",
+    "notes": "1 container ~170 g; scored on the label macro subset."
+  }
+}

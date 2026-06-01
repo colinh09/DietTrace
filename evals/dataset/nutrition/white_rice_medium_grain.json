@@ -1,0 +1,17 @@
+{
+  "input": { "text": "1 cup of cooked medium-grain white rice" },
+  "expected": {
+    "calories": 241.8,
+    "protein_g": 4.43,
+    "fat_g": 0.39,
+    "carb_g": 53.2,
+    "grams": 186.0,
+    "micros": { "305": 68.8, "306": 53.9, "304": 24.2 }
+  },
+  "metadata": {
+    "nutrient_tier": "full",
+    "fdc_id": 168880,
+    "source": "USDA SR Legacy — Rice, white, medium-grain, enriched, cooked",
+    "notes": "1 cup cooked ~186 g."
+  }
+}
