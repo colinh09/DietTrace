@@ -43,6 +43,13 @@ PEACH_FDC_ID = 169928
 PEACH_PIE_FDC_ID = 174988
 COFFEE_SOYMILK_FDC_ID = 171880
 COFFEE_BREWED_FDC_ID = 171881
+# A non-staple produce query has to choose between the raw form and a dehydrated
+# one: "carrot" -> "Carrots, raw" over "Carrots, dehydrated". Both
+# carry the base noun (equal text match); the dehydrated variant has the LOWER
+# fdc_id, so absent a ranking signal it would win the tie — pinning that the
+# raw-preference / dry penalty (not fdc_id order) keeps the raw produce on top.
+CARROT_DEHYDRATED_FDC_ID = 168153
+CARROT_RAW_FDC_ID = 170393
 
 FIXTURE_FDC_IDS = (
     EGG_FDC_ID,
@@ -59,6 +66,8 @@ FIXTURE_FDC_IDS = (
     PEACH_PIE_FDC_ID,
     COFFEE_SOYMILK_FDC_ID,
     COFFEE_BREWED_FDC_ID,
+    CARROT_DEHYDRATED_FDC_ID,
+    CARROT_RAW_FDC_ID,
 )
 
 _SCHEMA = """
@@ -140,6 +149,11 @@ _FOODS = [
     # prepared product (the "soymilk" form), so it must lose to brewed coffee.
     (COFFEE_SOYMILK_FDC_ID, "Coffee soymilk", "branded_food"),
     (COFFEE_BREWED_FDC_ID, "Coffee, brewed", "sr_legacy_food"),
+    # A dehydrated carrot is concentrated (≈8× the calories of the raw root), so
+    # resolving "carrot" to it would badly overstate a meal — the raw form must
+    # win.
+    (CARROT_DEHYDRATED_FDC_ID, "Carrots, dehydrated", "sr_legacy_food"),
+    (CARROT_RAW_FDC_ID, "Carrots, raw", "sr_legacy_food"),
 ]
 
 # fdc_id -> {nutrient code: amount per 100 g}, USDA-grounded.
@@ -158,6 +172,8 @@ _FOOD_NUTRIENTS = {
     PEACH_PIE_FDC_ID: {"208": 223.0, "203": 1.8, "204": 9.5, "205": 33.0},
     COFFEE_SOYMILK_FDC_ID: {"208": 43.0, "203": 2.5, "204": 1.5, "205": 5.0},
     COFFEE_BREWED_FDC_ID: {"208": 1.0, "203": 0.12, "204": 0.02, "205": 0.0},
+    CARROT_DEHYDRATED_FDC_ID: {"208": 341.0, "203": 8.12, "204": 1.49, "205": 79.6},
+    CARROT_RAW_FDC_ID: {"208": 41.0, "203": 0.93, "204": 0.24, "205": 9.58},
 }
 
 # fdc_id -> list of (amount, unit, gram_weight, description, sequence_number)

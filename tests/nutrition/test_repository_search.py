@@ -12,6 +12,8 @@ from dietrace.nutrition.models import SearchCandidate
 from dietrace.nutrition.repository import FoodRepository
 from tests.nutrition.fixtures_food_db import (
     AVOCADO_FDC_ID,
+    CARROT_DEHYDRATED_FDC_ID,
+    CARROT_RAW_FDC_ID,
     CHICKEN_BREAST_COOKED_FDC_ID,
     CHICKEN_BREAST_RAW_FDC_ID,
     CHICKEN_DELI_FDC_ID,
@@ -232,6 +234,51 @@ def test_canonical_scoring_parts_lose_to_whole() -> None:
     # food, so they must not be read as a bare "skin" part.
     assert _canonical_score("Apples, raw, with skin", "apple") > _canonical_score(
         "Apple peel, raw", "apple"
+    )
+
+
+def test_search_carrot_prefers_raw_over_dehydrated(food_db) -> None:
+    """"carrot" resolves to the raw form, never the dehydrated one.
+
+    "Carrots, raw" and "Carrots, dehydrated" both carry the base noun "carrot"
+    and tie on text relevance; the dehydrated variant has the lower fdc_id, so
+    absent a ranking signal it would win the tie. The raw-preference (and the
+    "dehydrated" processed-term penalty) keeps the raw produce on top — a
+    non-staple fruit/veg is eaten raw, not dried.
+    """
+    repo = FoodRepository(food_db)
+
+    candidates = repo.search("carrot")
+
+    assert [c.fdc_id for c in candidates] == [
+        CARROT_RAW_FDC_ID,
+        CARROT_DEHYDRATED_FDC_ID,
+    ]
+    assert all(c.score == candidates[0].score for c in candidates)
+
+
+def test_canonical_scoring_raw_produce_beats_dehydrated() -> None:
+    """Raw non-staple produce outranks its dehydrated/dried form.
+
+    The dry/processed penalties order produce correctly while leaving the staple
+    cooked-preference intact: a staple still prefers cooked over its dry form.
+    """
+    from dietrace.nutrition.repository import _canonical_score
+
+    # Non-staple produce: raw beats both dehydrated and dried.
+    assert _canonical_score("Carrots, raw", "carrot") > _canonical_score(
+        "Carrots, dehydrated", "carrot"
+    )
+    assert _canonical_score("Apricots, raw", "apricot") > _canonical_score(
+        "Apricots, dehydrated", "apricot"
+    )
+    assert _canonical_score("Carrots, raw", "carrot") > _canonical_score(
+        "Carrots, dried", "carrot"
+    )
+    # No regression: a staple still prefers cooked over its dry form, so the
+    # produce penalties did not flip the staple correction.
+    assert _canonical_score("Rice, white, cooked", "white rice") > _canonical_score(
+        "Rice, white, raw, enriched", "white rice"
     )
 
 
