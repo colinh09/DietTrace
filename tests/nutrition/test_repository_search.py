@@ -127,3 +127,24 @@ def test_search_blank_query_returns_empty(food_db) -> None:
     repo = FoodRepository(food_db)
 
     assert repo.search("   ") == []
+
+
+def test_canonical_scoring_corrections() -> None:
+    """The two ranking fixes: staples prefer cooked, and head-noun beats compound."""
+    from dietrace.nutrition.repository import _canonical_score
+
+    # Staples (rice, oats, pasta) are eaten cooked → cooked outranks raw.
+    assert _canonical_score("Rice, white, cooked", "white rice") > _canonical_score(
+        "Rice, white, raw, enriched", "white rice"
+    )
+    # Non-staples keep the raw preference.
+    assert _canonical_score("Broccoli, raw", "broccoli") > _canonical_score(
+        "Broccoli, cooked, boiled", "broccoli"
+    )
+    # The query's base food (head noun) beats an unrelated hyphenated compound.
+    assert _canonical_score("Apples, raw, without skin", "apple") > _canonical_score(
+        "Rose-apples, raw", "apple"
+    )
+    assert _canonical_score("Bananas, raw", "banana") > _canonical_score(
+        "Pepper, banana, raw", "banana"
+    )

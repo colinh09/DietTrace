@@ -77,6 +77,22 @@ def test_branded_item_absent_from_db_logs_the_web_result(tmp_path) -> None:
     assert energy is not None and round(energy.amount) == 780  # 312/100 × 250 g
 
 
+def test_substring_only_match_is_not_trusted_and_tries_the_web(tmp_path) -> None:
+    # "read" only matches "Bread, …" as a loose substring (score 1) — too weak to
+    # trust (cf. "pho" → a candy bar via "symPHOny"), so the web is tried instead.
+    client = _parse_client([{"food": "read", "quantity": 1, "unit": "", "brand": ""}])
+    calls: list[str] = []
+
+    def web_lookup(food: str, brand: str, _client) -> Food:
+        calls.append(food)
+        return _web_food()
+
+    meal = log_meal("read", _repo(tmp_path), client=client, web_lookup=web_lookup)
+
+    assert calls == ["read"]  # weak DB match bypassed in favor of the web
+    assert meal.per_item[0].description == "Five Guys bacon cheeseburger"
+
+
 def test_unbranded_db_match_never_calls_the_web(tmp_path) -> None:
     # A plain food the DB carries must resolve locally — no grounded call.
     client = _parse_client([{"food": "egg", "quantity": 1, "unit": "large"}])

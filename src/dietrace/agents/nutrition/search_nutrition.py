@@ -33,6 +33,10 @@ class NutritionMatch(BaseModel):
     description: str
     data_type: str
     per_100g: list[Nutrient] = []
+    # Match strength from the ranked search: exact (4) > all-words (3) > prefix (2)
+    # > loose substring (1). A 1 means the query was only a substring of some word
+    # ("pho" in "symPHOny") — too weak to trust over a grounded web lookup.
+    score: int = 0
 
     def nutrient(self, code: str) -> Nutrient | None:
         """Return the per-100 g nutrient for *code* (USDA number), or None."""
@@ -61,4 +65,5 @@ def search_nutrition(repository: FoodRepository, food: str) -> NutritionMatch | 
         description=hydrated.description,
         data_type=hydrated.data_type,
         per_100g=hydrated.nutrients,
+        score=candidates[0].score,
     )

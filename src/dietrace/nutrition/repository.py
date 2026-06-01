@@ -108,7 +108,7 @@ class FoodRepository:
                 ranked.append(
                     (
                         score,
-                        _canonical_score(row["description"]),
+                        _canonical_score(row["description"], query),
                         SearchCandidate(
                             fdc_id=row["fdc_id"],
                             description=row["description"],
@@ -204,6 +204,17 @@ _DELI_TERMS = frozenset({
     "nugget", "prepackaged",
 })
 
+# Staple grains/legumes are eaten cooked, so for THESE foods "cooked" is the
+# canonical form and "raw"/"dry" is the wrong one — the opposite of the default
+# raw-preference (which is right for fruit, veg, nuts). So "a cup of white rice"
+# resolves to cooked rice (~205 kcal), not raw rice (~700 kcal).
+_COOKED_STAPLES = frozenset({
+    "rice", "pasta", "spaghetti", "macaroni", "noodle", "noodles", "oat", "oats",
+    "oatmeal", "lentil", "lentils", "bean", "beans", "quinoa", "barley", "grits",
+    "couscous", "bulgur", "farro", "millet", "cornmeal", "polenta",
+})
+_DRY_TERMS = frozenset({"raw", "dry", "dried", "uncooked", "unprepared"})
+
 
 def _singular(word: str) -> str:
     """Drop a trailing plural 's' so "banana" matches "Bananas" (light stemming)."""
@@ -240,18 +251,31 @@ def _text_score(query: str, fields: list[str]) -> tuple[int, str]:
     return best, best_field
 
 
-def _canonical_score(description: str) -> float:
-    """Higher for a more canonical (raw/whole, simple, short) food description.
+def _canonical_score(description: str, query: str = "") -> float:
+    """Higher for a more canonical food description, given the *query*.
 
-    Cooking-method and processing words each cost a little; deli / luncheon-meat
-    markers cost more, so a plainly-cooked cut still outranks a deli product.
+    Defaults to preferring raw/whole/simple/short. Two corrections: a **staple**
+    (rice, oats, pasta, beans) prefers *cooked* and is penalized for *raw* — it's
+    eaten cooked; and a **head-noun match** (the query word is the description's
+    primary noun, not a buried modifier) is rewarded, so "apple" → "Apples, raw"
+    beats the unrelated "Rose-apples, raw". Deli markers still cost the most.
     """
     toks = _tokens(description)
     score = 0.0
-    if "raw" in toks:
+    if _COOKED_STAPLES & toks:
+        if {"cooked", "boiled"} & toks:
+            score += 4.0  # outweighs the processed-term penalty on "cooked"
+        if _DRY_TERMS & toks:
+            score -= 3.0
+    elif "raw" in toks:
         score += 3.0
     if "whole" in toks:
         score += 0.5
+    # The primary noun is the head word of the first comma/paren segment.
+    primary = re.split(r"[,(]", description.lower(), maxsplit=1)[0].split()
+    head = _singular(primary[0]) if primary else ""
+    if head and head in _tokens(query):
+        score += 1.5
     score -= float(len(_PROCESSED_TERMS & toks))
     score -= 2.0 * len(_DELI_TERMS & toks)
     score -= 0.02 * len(description)

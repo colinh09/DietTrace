@@ -70,10 +70,12 @@ def _resolve_food(
     match = search_nutrition(repository, item.food)
     usda_food = repository.get(match.fdc_id) if match else None
 
-    if match and usda_food and _brand_satisfied(item.brand, match.description):
+    # A strong DB match that honors any named brand wins. A substring-only match
+    # (score 1, e.g. "pho" → a candy bar via "symPHOny") is too weak to trust.
+    if match and usda_food and match.score > 1 and _brand_satisfied(item.brand, match.description):
         return usda_food, "usda", match.description
 
-    # Branded item the DB didn't satisfy, or no match at all — try the web.
+    # No confident DB match (weak/absent), or a brand the DB didn't honor — try the web.
     web_food = web_lookup(item.food, item.brand, client)
     if web_food is not None:
         return web_food, "web", web_food.description
