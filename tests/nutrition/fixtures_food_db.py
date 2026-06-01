@@ -33,6 +33,16 @@ ORANGE_FDC_ID = 169097
 ORANGE_PEEL_FDC_ID = 169926
 POTATO_FDC_ID = 170026
 SWEET_POTATO_LEAVES_FDC_ID = 168484
+# A bare-ingredient query has to choose between the ingredient and a prepared or
+# branded product of it: "peach" -> the fruit over "Pie, peach", and
+# "coffee" -> brewed coffee over a branded coffee soymilk. The product shares the
+# ingredient word (equal text match), so only a product-form penalty keeps the
+# ingredient on top. COFFEE_SOYMILK is the lower fdc_id so, absent the penalty,
+# it would win the tie — pinning that the penalty (not fdc_id order) decides.
+PEACH_FDC_ID = 169928
+PEACH_PIE_FDC_ID = 174988
+COFFEE_SOYMILK_FDC_ID = 171880
+COFFEE_BREWED_FDC_ID = 171881
 
 FIXTURE_FDC_IDS = (
     EGG_FDC_ID,
@@ -45,6 +55,10 @@ FIXTURE_FDC_IDS = (
     ORANGE_PEEL_FDC_ID,
     POTATO_FDC_ID,
     SWEET_POTATO_LEAVES_FDC_ID,
+    PEACH_FDC_ID,
+    PEACH_PIE_FDC_ID,
+    COFFEE_SOYMILK_FDC_ID,
+    COFFEE_BREWED_FDC_ID,
 )
 
 _SCHEMA = """
@@ -120,6 +134,12 @@ _FOODS = [
     # part — only a standalone "skin"/leaves/peel is penalized.
     (POTATO_FDC_ID, "Potato, raw, flesh and skin", "sr_legacy_food"),
     (SWEET_POTATO_LEAVES_FDC_ID, "Sweet potato leaves, raw", "sr_legacy_food"),
+    (PEACH_FDC_ID, "Peach, raw", "sr_legacy_food"),
+    (PEACH_PIE_FDC_ID, "Pie, peach", "sr_legacy_food"),
+    # A branded coffee soymilk leads with the ingredient word "coffee" yet is a
+    # prepared product (the "soymilk" form), so it must lose to brewed coffee.
+    (COFFEE_SOYMILK_FDC_ID, "Coffee soymilk", "branded_food"),
+    (COFFEE_BREWED_FDC_ID, "Coffee, brewed", "sr_legacy_food"),
 ]
 
 # fdc_id -> {nutrient code: amount per 100 g}, USDA-grounded.
@@ -134,6 +154,10 @@ _FOOD_NUTRIENTS = {
     ORANGE_PEEL_FDC_ID: {"208": 97.0, "203": 1.5, "204": 0.2, "205": 25.0},
     POTATO_FDC_ID: {"208": 77.0, "203": 2.05, "204": 0.09, "205": 17.49},
     SWEET_POTATO_LEAVES_FDC_ID: {"208": 42.0, "203": 4.0, "204": 0.51, "205": 8.0},
+    PEACH_FDC_ID: {"208": 39.0, "203": 0.91, "204": 0.25, "205": 9.54},
+    PEACH_PIE_FDC_ID: {"208": 223.0, "203": 1.8, "204": 9.5, "205": 33.0},
+    COFFEE_SOYMILK_FDC_ID: {"208": 43.0, "203": 2.5, "204": 1.5, "205": 5.0},
+    COFFEE_BREWED_FDC_ID: {"208": 1.0, "203": 0.12, "204": 0.02, "205": 0.0},
 }
 
 # fdc_id -> list of (amount, unit, gram_weight, description, sequence_number)

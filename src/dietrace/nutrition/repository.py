@@ -215,6 +215,17 @@ _COOKED_STAPLES = frozenset({
 })
 _DRY_TERMS = frozenset({"raw", "dry", "dried", "uncooked", "unprepared"})
 
+# Prepared/branded product forms — a dish or manufactured good, not the bare
+# ingredient. When a query is a bare ingredient, a description carrying one of
+# these (the unrequested "Pie" of "Pie, peach", the "soymilk" of a branded
+# "Coffee soymilk") is the wrong resolution and is penalized so "peach" → the
+# fruit and "coffee" → brewed coffee — . Tokens are singularized, so the
+# set holds singular stems ("candies" → "candie"). A form the user explicitly
+# asks for (e.g. "peach pie") is exempt, since it then appears in the query.
+_PRODUCT_FORMS = frozenset({
+    "pie", "sauce", "candy", "candie", "soda", "soymilk", "soup",
+})
+
 # Non-edible / non-flesh parts of a plant or animal. A descriptor naming the part
 # rather than the whole food is heavily penalized so "orange"/"lemon" resolve to
 # the fruit (not "Orange peel, raw") and "potato" to the tuber (not "Sweet potato
@@ -268,13 +279,17 @@ def _text_score(query: str, fields: list[str]) -> tuple[int, str]:
 def _canonical_score(description: str, query: str = "") -> float:
     """Higher for a more canonical food description, given the *query*.
 
-    Defaults to preferring raw/whole/simple/short. Two corrections: a **staple**
+    Defaults to preferring raw/whole/simple/short. Corrections: a **staple**
     (rice, oats, pasta, beans) prefers *cooked* and is penalized for *raw* — it's
-    eaten cooked; and a **head-noun match** (the query word is the description's
+    eaten cooked; a **head-noun match** (the query word is the description's
     primary noun, not a buried modifier) is rewarded, so "apple" → "Apples, raw"
-    beats the unrelated "Rose-apples, raw". Deli markers still cost the most.
+    beats the unrelated "Rose-apples, raw"; and an unrequested **product form**
+    (a pie, sauce, candy, branded soymilk) is penalized so a bare ingredient
+    query keeps the ingredient, not a prepared product of it. Deli markers and
+    non-edible parts still cost the most.
     """
     toks = _tokens(description)
+    qtokens = _tokens(query)
     score = 0.0
     if _COOKED_STAPLES & toks:
         if {"cooked", "boiled"} & toks:
@@ -288,8 +303,13 @@ def _canonical_score(description: str, query: str = "") -> float:
     # The primary noun is the head word of the first comma/paren segment.
     primary = re.split(r"[,(]", description.lower(), maxsplit=1)[0].split()
     head = _singular(primary[0]) if primary else ""
-    if head and head in _tokens(query):
+    if head and head in qtokens:
         score += 1.5
+    # A bare-ingredient query (head noun is the ingredient) should not resolve to
+    # a prepared/branded product of it: penalize product-form terms the query did
+    # not ask for, so "peach" loses the pie and "coffee" loses the soymilk.
+    if (_PRODUCT_FORMS & toks) - qtokens:
+        score -= 4.0
     score -= float(len(_PROCESSED_TERMS & toks))
     score -= 2.0 * len(_DELI_TERMS & toks)
     parts = _PART_TERMS & toks

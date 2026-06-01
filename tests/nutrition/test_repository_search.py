@@ -15,9 +15,13 @@ from tests.nutrition.fixtures_food_db import (
     CHICKEN_BREAST_COOKED_FDC_ID,
     CHICKEN_BREAST_RAW_FDC_ID,
     CHICKEN_DELI_FDC_ID,
+    COFFEE_BREWED_FDC_ID,
+    COFFEE_SOYMILK_FDC_ID,
     EGG_FDC_ID,
     ORANGE_FDC_ID,
     ORANGE_PEEL_FDC_ID,
+    PEACH_FDC_ID,
+    PEACH_PIE_FDC_ID,
     POTATO_FDC_ID,
     SWEET_POTATO_LEAVES_FDC_ID,
     TOAST_FDC_ID,
@@ -149,6 +153,64 @@ def test_search_potato_prefers_tuber_over_leaves(food_db) -> None:
         POTATO_FDC_ID,
         SWEET_POTATO_LEAVES_FDC_ID,
     ]
+
+
+def test_search_peach_prefers_fruit_over_pie(food_db) -> None:
+    """"peach" resolves to the fruit, never the prepared pie.
+
+    Both “Peach, raw” and “Pie, peach” carry the word “peach” and are equal
+    all-words text matches; the pie is a prepared product whose primary noun is
+    "pie", so it must rank below the bare fruit.
+    """
+    repo = FoodRepository(food_db)
+
+    candidates = repo.search("peach")
+
+    assert [c.fdc_id for c in candidates] == [PEACH_FDC_ID, PEACH_PIE_FDC_ID]
+    assert all(c.score == candidates[0].score for c in candidates)
+
+
+def test_search_coffee_prefers_brewed_over_branded_soymilk(food_db) -> None:
+    """"coffee" resolves to brewed coffee, never a branded coffee soymilk (11.2).
+
+    "Coffee, brewed" and the branded "Coffee soymilk" both carry "coffee" and
+    tie on text relevance; without a product-form penalty the soymilk (the lower
+    fdc_id) would win the tie. Penalizing the "soymilk" product form keeps the
+    plain brewed ingredient on top.
+    """
+    repo = FoodRepository(food_db)
+
+    candidates = repo.search("coffee")
+
+    assert [c.fdc_id for c in candidates] == [
+        COFFEE_BREWED_FDC_ID,
+        COFFEE_SOYMILK_FDC_ID,
+    ]
+    assert all(c.score == candidates[0].score for c in candidates)
+
+
+def test_canonical_scoring_product_forms_lose_to_ingredient() -> None:
+    """A bare ingredient outranks a prepared/branded product of it."""
+    from dietrace.nutrition.repository import _canonical_score
+
+    # A prepared pie loses to the bare fruit.
+    assert _canonical_score("Peaches, raw", "peach") > _canonical_score(
+        "Pie, peach", "peach"
+    )
+    # A branded coffee soymilk loses to brewed coffee even though both lead with
+    # the ingredient word — the unrequested "soymilk" product form is penalized.
+    assert _canonical_score("Coffee, brewed", "coffee") > _canonical_score(
+        "Coffee soymilk", "coffee"
+    )
+    # A sauce / candy product loses to the bare ingredient too.
+    assert _canonical_score("Apples, raw", "apple") > _canonical_score(
+        "Sauce, apple", "apple"
+    )
+    # But a product the user explicitly asked for is NOT penalized: "peach pie"
+    # scores the pie higher than the bare-ingredient query "peach" does.
+    assert _canonical_score("Pie, peach", "peach pie") > _canonical_score(
+        "Pie, peach", "peach"
+    )
 
 
 def test_canonical_scoring_parts_lose_to_whole() -> None:
