@@ -16,6 +16,10 @@ from tests.nutrition.fixtures_food_db import (
     CHICKEN_BREAST_RAW_FDC_ID,
     CHICKEN_DELI_FDC_ID,
     EGG_FDC_ID,
+    ORANGE_FDC_ID,
+    ORANGE_PEEL_FDC_ID,
+    POTATO_FDC_ID,
+    SWEET_POTATO_LEAVES_FDC_ID,
     TOAST_FDC_ID,
 )
 
@@ -113,6 +117,60 @@ def test_search_chicken_breast_prefers_plain_cut_over_deli(food_db) -> None:
     ]
     assert all(c.score == candidates[0].score for c in candidates)
     assert candidates[-1].fdc_id == CHICKEN_DELI_FDC_ID
+
+
+def test_search_orange_prefers_fruit_over_peel(food_db) -> None:
+    """"orange" resolves to the fruit, never the non-edible peel.
+
+    Both "Oranges, raw, ..." and "Orange peel, raw" carry the base noun and are
+    "raw", so each is an equal all-words text match; only the part-penalty on
+    "peel" keeps the fruit ranked above its peel.
+    """
+    repo = FoodRepository(food_db)
+
+    candidates = repo.search("orange")
+
+    assert [c.fdc_id for c in candidates] == [ORANGE_FDC_ID, ORANGE_PEEL_FDC_ID]
+    assert all(c.score == candidates[0].score for c in candidates)
+
+
+def test_search_potato_prefers_tuber_over_leaves(food_db) -> None:
+    """"potato" resolves to the tuber, not the leaves; "flesh and skin" is whole.
+
+    The tuber's description says "flesh and skin", which names the whole food —
+    that "skin" must not be read as a non-edible part. "Sweet potato leaves" is a
+    part and is penalized, so the tuber ranks first.
+    """
+    repo = FoodRepository(food_db)
+
+    candidates = repo.search("potato")
+
+    assert [c.fdc_id for c in candidates] == [
+        POTATO_FDC_ID,
+        SWEET_POTATO_LEAVES_FDC_ID,
+    ]
+
+
+def test_canonical_scoring_parts_lose_to_whole() -> None:
+    """Non-edible parts (peel, rind, leaves, stalk, skin) rank below the whole."""
+    from dietrace.nutrition.repository import _canonical_score
+
+    assert _canonical_score("Oranges, raw", "orange") > _canonical_score(
+        "Orange peel, raw", "orange"
+    )
+    assert _canonical_score("Lemon, raw", "lemon") > _canonical_score(
+        "Lemon peel, raw", "lemon"
+    )
+    # "flesh and skin" is the whole tuber, so it must outrank a leaf part and
+    # must not itself be penalized for the word "skin".
+    assert _canonical_score(
+        "Potato, raw, flesh and skin", "potato"
+    ) > _canonical_score("Sweet potato leaves, raw", "potato")
+    # USDA's whole-fruit names "with skin" / "without skin" describe the edible
+    # food, so they must not be read as a bare "skin" part.
+    assert _canonical_score("Apples, raw, with skin", "apple") > _canonical_score(
+        "Apple peel, raw", "apple"
+    )
 
 
 def test_search_no_match_returns_empty(food_db) -> None:

@@ -26,6 +26,13 @@ TOAST_FDC_ID = 172686
 CHICKEN_BREAST_RAW_FDC_ID = 171477
 CHICKEN_BREAST_COOKED_FDC_ID = 171534
 CHICKEN_DELI_FDC_ID = 172865
+# An "orange"/"potato" query has to choose between the whole food and a
+# non-edible part — the peel or the leaves. The part shares the base
+# noun and is also "raw", so only a part-penalty keeps the fruit/tuber on top.
+ORANGE_FDC_ID = 169097
+ORANGE_PEEL_FDC_ID = 169926
+POTATO_FDC_ID = 170026
+SWEET_POTATO_LEAVES_FDC_ID = 168484
 
 FIXTURE_FDC_IDS = (
     EGG_FDC_ID,
@@ -34,6 +41,10 @@ FIXTURE_FDC_IDS = (
     CHICKEN_BREAST_RAW_FDC_ID,
     CHICKEN_BREAST_COOKED_FDC_ID,
     CHICKEN_DELI_FDC_ID,
+    ORANGE_FDC_ID,
+    ORANGE_PEEL_FDC_ID,
+    POTATO_FDC_ID,
+    SWEET_POTATO_LEAVES_FDC_ID,
 )
 
 _SCHEMA = """
@@ -103,6 +114,12 @@ _FOODS = [
         "sr_legacy_food",
     ),
     (CHICKEN_DELI_FDC_ID, "Chicken breast, deli, sliced", "branded_food"),
+    (ORANGE_FDC_ID, "Oranges, raw, all commercial varieties", "sr_legacy_food"),
+    (ORANGE_PEEL_FDC_ID, "Orange peel, raw", "sr_legacy_food"),
+    # "flesh and skin" names the WHOLE tuber, so its "skin" must not be read as a
+    # part — only a standalone "skin"/leaves/peel is penalized.
+    (POTATO_FDC_ID, "Potato, raw, flesh and skin", "sr_legacy_food"),
+    (SWEET_POTATO_LEAVES_FDC_ID, "Sweet potato leaves, raw", "sr_legacy_food"),
 ]
 
 # fdc_id -> {nutrient code: amount per 100 g}, USDA-grounded.
@@ -113,6 +130,10 @@ _FOOD_NUTRIENTS = {
     CHICKEN_BREAST_RAW_FDC_ID: {"208": 120.0, "203": 22.5, "204": 2.62, "205": 0.0},
     CHICKEN_BREAST_COOKED_FDC_ID: {"208": 165.0, "203": 31.0, "204": 3.57, "205": 0.0},
     CHICKEN_DELI_FDC_ID: {"208": 92.0, "203": 17.0, "204": 1.5, "205": 2.0},
+    ORANGE_FDC_ID: {"208": 47.0, "203": 0.94, "204": 0.12, "205": 11.75},
+    ORANGE_PEEL_FDC_ID: {"208": 97.0, "203": 1.5, "204": 0.2, "205": 25.0},
+    POTATO_FDC_ID: {"208": 77.0, "203": 2.05, "204": 0.09, "205": 17.49},
+    SWEET_POTATO_LEAVES_FDC_ID: {"208": 42.0, "203": 4.0, "204": 0.51, "205": 8.0},
 }
 
 # fdc_id -> list of (amount, unit, gram_weight, description, sequence_number)

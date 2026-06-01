@@ -215,6 +215,20 @@ _COOKED_STAPLES = frozenset({
 })
 _DRY_TERMS = frozenset({"raw", "dry", "dried", "uncooked", "unprepared"})
 
+# Non-edible / non-flesh parts of a plant or animal. A descriptor naming the part
+# rather than the whole food is heavily penalized so "orange"/"lemon" resolve to
+# the fruit (not "Orange peel, raw") and "potato" to the tuber (not "Sweet potato
+# leaves, raw") — . Tokens are singularized, so the set holds the
+# singular stems ("leaves" → "leave"). "skin" is special-cased below: it names a
+# part only standing alone — USDA's "flesh and skin", "meat and skin", "with
+# skin", and "without skin" all describe the whole edible food, so those contexts
+# must not be penalized.
+_PART_TERMS = frozenset({"peel", "rind", "zest", "leaf", "leave", "stalk", "skin"})
+
+# When any of these sits beside "skin", the descriptor is the whole food, not the
+# bare skin part — so "skin" should not trigger the part penalty.
+_WHOLE_WITH_SKIN = frozenset({"flesh", "meat", "with", "without"})
+
 
 def _singular(word: str) -> str:
     """Drop a trailing plural 's' so "banana" matches "Bananas" (light stemming)."""
@@ -278,5 +292,10 @@ def _canonical_score(description: str, query: str = "") -> float:
         score += 1.5
     score -= float(len(_PROCESSED_TERMS & toks))
     score -= 2.0 * len(_DELI_TERMS & toks)
+    parts = _PART_TERMS & toks
+    if "skin" in parts and _WHOLE_WITH_SKIN & toks:
+        parts -= {"skin"}  # "flesh and skin" / "without skin" is the whole food
+    if parts:
+        score -= 5.0  # a part descriptor must lose to the whole food
     score -= 0.02 * len(description)
     return score
