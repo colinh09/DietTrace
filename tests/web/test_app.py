@@ -790,10 +790,10 @@ def test_accuracy_endpoint_returns_the_report(tmp_path) -> None:
     assert body["phoenix_url"]
 
 
-def test_log_flags_disordered_eating_with_a_safety_block(tmp_path) -> None:
-    # A flagged input still logs, but the response carries a supportive safety
-    # block (category + message) the UI surfaces as a calm notice.
-    client, _ = _client(tmp_path)
+def test_log_flags_disordered_eating_and_does_not_log_it(tmp_path) -> None:
+    # A safety-flagged input is NOT a meal: surface the supportive block and log
+    # nothing (no id, nothing persisted) — the guardrail short-circuits.
+    client, store = _client(tmp_path)
 
     body = client.post(
         "/log", json={"text": "ate a salad then made myself throw up after"}
@@ -803,9 +803,9 @@ def test_log_flags_disordered_eating_with_a_safety_block(tmp_path) -> None:
     assert safety["flagged"] is True
     assert safety["category"] == "disordered_eating"
     assert safety["message"]
-    # The meal is still logged normally — the guardrail is additive, not a block.
-    assert isinstance(body["id"], int)
-    assert body["totals"][0]["code"] == "208"
+    assert body["logged"] is False
+    assert "id" not in body and body["per_item"] == []
+    assert store.list() == []  # nothing was persisted
 
 
 def test_normal_log_is_not_flagged(tmp_path) -> None:

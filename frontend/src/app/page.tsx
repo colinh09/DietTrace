@@ -120,6 +120,13 @@ export default function Home() {
           );
           return;
         }
+        // A safety-flagged input is not a meal: show the supportive notice and
+        // log nothing (no row, no totals).
+        if (event.safety?.flagged) {
+          setSafety(event.safety);
+          setLive(null);
+          return;
+        }
         const id = event.id ?? 0;
         const meal: Meal = {
           id,

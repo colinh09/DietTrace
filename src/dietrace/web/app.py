@@ -349,6 +349,10 @@ def create_app(
 
     @app.post("/log")
     def log_meal(req: LogRequest, user: str = Depends(current_user)) -> dict[str, Any]:
+        safety = safety_check(req.text)
+        if safety["flagged"]:
+            # A safety-flagged input is not a meal — surface support, log nothing.
+            return {"safety": safety, "logged": False, "per_item": [], "totals": [], "trace": []}
         recalled = learning.recall(user, req.text)
         if recalled is not None:
             per_item, totals = recalled["per_item"], recalled["totals"]
@@ -363,7 +367,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
-                "safety": safety_check(req.text),
+                "safety": safety,
                 **review,
                 "trace": [_recall_step()] + _build_trace(per_item, totals),
             }
@@ -379,7 +383,7 @@ def create_app(
             **result,
             "confidence": quality["confidence"],
             "reasons": quality["reasons"],
-            "safety": safety_check(req.text),
+            "safety": safety,
             **review,
             "trace": _build_trace(per_item, totals),
         }
@@ -392,7 +396,14 @@ def create_app(
         pipeline step, then a ``result`` event (which also persists the meal)."""
 
         pace = float(os.environ.get("DIETRACE_STREAM_PACE", str(_STREAM_PACE)))
+        safety = safety_check(req.text)
         recalled = learning.recall(user, req.text)
+
+        def safety_events() -> Iterator[str]:
+            # A safety-flagged input is not a meal — surface support, log nothing.
+            result = {"type": "result", "safety": safety, "logged": False,
+                      "per_item": [], "totals": [], "trace": []}
+            yield f"data: {json.dumps(result)}\n\n"
 
         def cached_events() -> Iterator[str]:
             # A meal the user already corrected — recall it instead of re-running.
@@ -410,7 +421,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
-                "safety": safety_check(req.text),
+                "safety": safety,
                 **review,
                 "trace": [_recall_step()],
             }
@@ -427,14 +438,19 @@ def create_app(
                     review = review_flag(quality)
                     event["confidence"] = quality["confidence"]
                     event["reasons"] = quality["reasons"]
-                    event["safety"] = safety_check(req.text)
+                    event["safety"] = safety
                     event.update(review)
                     _record_trust(per_item, quality, review, user, req.text)
                 elif pace:
                     time.sleep(pace)  # let fast steps arrive one at a time
                 yield f"data: {json.dumps(event)}\n\n"
 
-        stream = cached_events() if recalled is not None else events()
+        if safety["flagged"]:
+            stream = safety_events()
+        elif recalled is not None:
+            stream = cached_events()
+        else:
+            stream = events()
         return StreamingResponse(stream, media_type="text/event-stream")
 
     @app.delete("/meals/{meal_id}")
