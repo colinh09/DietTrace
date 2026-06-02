@@ -224,6 +224,77 @@ def test_log_response_carries_ordered_trace(tmp_path) -> None:
     assert trace[-1]["totals"] == _STUB_TOTALS
 
 
+_CLEAN_TOTALS = [
+    {"code": "208", "name": "Energy", "amount": 384.0, "unit": "kcal"},
+    {"code": "203", "name": "Protein", "amount": 30.0, "unit": "g"},
+    {"code": "205", "name": "Carbohydrate", "amount": 40.0, "unit": "g"},
+    {"code": "204", "name": "Total lipid (fat)", "amount": 11.6, "unit": "g"},
+]
+
+
+def _clean_logger(text: str, examples=()) -> dict:
+    """A logger whose item resolved cleanly to USDA and reconciles by Atwater."""
+    return {
+        "totals": _CLEAN_TOTALS,
+        "per_item": [{"description": "chicken breast", "fdc_id": 171477, "grams": 140.0}],
+    }
+
+
+def test_log_response_carries_confidence_and_reasons(tmp_path) -> None:
+    # A clean log (USDA match, plausible portion, calories reconcile) scores high
+    # with no reasons; the response surfaces the online-eval result.
+    client, _ = _client(tmp_path, logger=_clean_logger)
+
+    body = client.post("/log", json={"text": "a chicken breast"}).json()
+
+    assert isinstance(body["confidence"], (int, float))
+    assert 0.0 <= body["confidence"] <= 1.0
+    assert body["confidence"] > 0.9
+    assert body["reasons"] == []
+
+
+def test_log_response_reports_low_confidence_with_reasons(tmp_path) -> None:
+    # The default stub item has no fdc_id (web-trust) and its energy doesn't
+    # reconcile to its (absent) macros — confidence drops and reasons explain why.
+    client, _ = _client(tmp_path)
+
+    body = client.post("/log", json={"text": "1 banana"}).json()
+
+    assert body["confidence"] < 0.9
+    assert isinstance(body["reasons"], list) and body["reasons"]
+
+
+def test_recalled_log_carries_confidence_and_reasons(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    client.post(
+        "/correct",
+        json={
+            "meal_text": "chipotle bowl",
+            "items": [
+                {
+                    "description": "Chipotle Chicken",
+                    "fdc_id": 171477,
+                    "original_grams": 113.0,
+                    "corrected_grams": 113.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 180.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+        headers={"X-DietTrace-User": "alice"},
+    )
+
+    body = client.post(
+        "/log", json={"text": "chipotle bowl"}, headers={"X-DietTrace-User": "alice"}
+    ).json()
+
+    assert body["recalled"] is True
+    assert isinstance(body["confidence"], (int, float))
+    assert 0.0 <= body["confidence"] <= 1.0
+    assert isinstance(body["reasons"], list)
+
+
 def test_meals_are_scoped_per_user(tmp_path) -> None:
     # Each user only sees their own meals — the per-user memory layer.
     client, _ = _client(tmp_path)
@@ -553,6 +624,9 @@ def test_log_stream_emits_events_and_persists(tmp_path, monkeypatch) -> None:
     ]
     assert [e["type"] for e in events] == ["step", "step", "result"]
     assert isinstance(events[-1]["id"], int)
+    # The result event also carries the online-eval confidence + reasons (12.2).
+    assert isinstance(events[-1]["confidence"], (int, float))
+    assert isinstance(events[-1]["reasons"], list)
     assert len(store.list()) == 1
 
 

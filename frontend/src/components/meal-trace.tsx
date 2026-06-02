@@ -113,11 +113,13 @@ function ItemRow({
 export function MealTrace({
   trace,
   perItem,
+  reasons,
   mealText,
   onCorrected,
 }: {
   trace: TraceStep[];
   perItem: LoggedItem[];
+  reasons?: string[];
   mealText?: string;
   onCorrected?: () => void;
 }) {
@@ -165,6 +167,19 @@ export function MealTrace({
           <StepLine key={i} step={step} isLast={i === trace.length - 1} />
         ))}
       </ol>
+
+      {reasons && reasons.length > 0 && (
+        <div className="conf-reasons">
+          <div className="conf-reasons-head mono">why this confidence</div>
+          <ul className="conf-reasons-list">
+            {reasons.map((reason, i) => (
+              <li key={i} className="conf-reason">
+                {reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="exp-pad">
         <div className="item-grid item-head">

@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from dietrace.evals.online import evaluate_log
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
 from dietrace.web.accuracy import accuracy_report, phoenix_dashboard_url
@@ -327,18 +328,28 @@ def create_app(
         if recalled is not None:
             per_item, totals = recalled["per_item"], recalled["totals"]
             entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
+            quality = evaluate_log(req.text, per_item, totals)
             return {
                 "id": entry_id,
                 "per_item": per_item,
                 "totals": totals,
                 "recalled": True,
+                "confidence": quality["confidence"],
+                "reasons": quality["reasons"],
                 "trace": [_recall_step()] + _build_trace(per_item, totals),
             }
         result = logger_fn(req.text, examples=learning.examples(user))
         totals = result.get("totals", [])
         per_item = result.get("per_item", [])
         entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
-        return {"id": entry_id, **result, "trace": _build_trace(per_item, totals)}
+        quality = evaluate_log(req.text, per_item, totals)
+        return {
+            "id": entry_id,
+            **result,
+            "confidence": quality["confidence"],
+            "reasons": quality["reasons"],
+            "trace": _build_trace(per_item, totals),
+        }
 
     @app.post("/log/stream")
     def log_meal_stream(
@@ -355,12 +366,15 @@ def create_app(
             per_item, totals = recalled["per_item"], recalled["totals"]
             yield f"data: {json.dumps(_recall_step())}\n\n"
             entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
+            quality = evaluate_log(req.text, per_item, totals)
             result = {
                 "type": "result",
                 "id": entry_id,
                 "per_item": per_item,
                 "totals": totals,
                 "recalled": True,
+                "confidence": quality["confidence"],
+                "reasons": quality["reasons"],
                 "trace": [_recall_step()],
             }
             yield f"data: {json.dumps(result)}\n\n"
@@ -371,6 +385,11 @@ def create_app(
                     event["id"] = log_store.add(
                         req.text, event.get("totals", []), date=req.date, user_id=user
                     )
+                    quality = evaluate_log(
+                        req.text, event.get("per_item", []), event.get("totals", [])
+                    )
+                    event["confidence"] = quality["confidence"]
+                    event["reasons"] = quality["reasons"]
                 elif pace:
                     time.sleep(pace)  # let fast steps arrive one at a time
                 yield f"data: {json.dumps(event)}\n\n"

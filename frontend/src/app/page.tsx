@@ -117,7 +117,12 @@ export default function Home() {
         setMeals((current) => [meal, ...current.filter((m) => m.id !== id)]);
         setDetails((current) => ({
           ...current,
-          [id]: { trace: event.trace ?? [], perItem: event.per_item ?? [] },
+          [id]: {
+            trace: event.trace ?? [],
+            perItem: event.per_item ?? [],
+            confidence: event.confidence,
+            reasons: event.reasons,
+          },
         }));
         setLive(null);
         loadHistory();

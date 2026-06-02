@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { MealList } from "@/components/meal-list";
+import { MealList, type MealDetail } from "@/components/meal-list";
 import type { LoggedItem, Meal, TraceStep } from "@/lib/api";
 
 // Two days-worth of /history meals: one whose macros reconcile cleanly (High)
@@ -118,6 +118,43 @@ describe("MealList", () => {
     expect(
       within(row).getByRole("button", { name: /something's off/i }),
     ).toBeInTheDocument();
+  });
+
+  it("uses the backend confidence from the meal's detail over the macro heuristic", () => {
+    // The clean meal's macros reconcile (heuristic → High), but the backend's
+    // online-eval scored it low; the chip must follow the backend value (12.2).
+    const detail: MealDetail = {
+      trace: [],
+      perItem: [],
+      confidence: 0.42,
+      reasons: ["lower-trust source(s): web"],
+    };
+    render(<MealList meals={meals} detailsById={{ 2: detail }} />);
+    const clean = screen
+      .getByText("grilled chicken salad with olive oil")
+      .closest("li") as HTMLElement;
+    expect(within(clean).getByText(/Medium/)).toBeInTheDocument();
+    expect(within(clean).getByText(/42%/)).toBeInTheDocument();
+  });
+
+  it("shows the confidence reasons when a row with a backend score is expanded", () => {
+    const detail: MealDetail = {
+      trace: [
+        { step: "parse_meal", summary: "Parsed 1 food(s): chicken", foods: ["chicken"] },
+      ],
+      perItem: [],
+      confidence: 0.42,
+      reasons: ["lower-trust source(s): web", "118 kcal logged but the macros total zero energy"],
+    };
+    render(<MealList meals={meals} detailsById={{ 2: detail }} />);
+    const row = screen
+      .getByText("grilled chicken salad with olive oil")
+      .closest("li") as HTMLElement;
+    // Collapsed: the reasons aren't in the DOM yet.
+    expect(screen.queryByText(/lower-trust source/)).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: /expand/i }));
+    expect(within(row).getByText(/lower-trust source/)).toBeInTheDocument();
+    expect(within(row).getByText(/macros total zero energy/)).toBeInTheDocument();
   });
 
   it("shows a calm note when an expanded row has no trace detail", () => {

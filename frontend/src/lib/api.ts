@@ -59,12 +59,15 @@ export interface TraceStep {
   totals?: Nutrient[];
 }
 
-// `POST /log` — the logged meal plus the agent's-work trace.
+// `POST /log` — the logged meal plus the agent's-work trace. `confidence`
+// (0–1) and `reasons` come from the online quality eval.
 export interface LogResponse {
   id: number;
   per_item: LoggedItem[];
   totals: Nutrient[];
   trace: TraceStep[];
+  confidence: number;
+  reasons: string[];
 }
 
 // A persisted meal as stored by `dietrace.web.store.MealLogStore`.
@@ -316,6 +319,9 @@ export interface StreamEvent {
   per_item?: LoggedItem[];
   trace?: TraceStep[];
   id?: number;
+  // On the final `result` event: the online quality eval.
+  confidence?: number;
+  reasons?: string[];
 }
 
 // Stream a meal log: `onEvent` fires for each step as the agent works, then once

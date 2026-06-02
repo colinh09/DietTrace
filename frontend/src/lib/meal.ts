@@ -51,3 +51,19 @@ export function confidenceOf(macros: MacroSummary): Confidence {
   const pct = Math.max(60, Math.min(97, Math.round(100 - error * 100)));
   return { level: error <= 0.12 ? "High" : "Medium", pct };
 }
+
+// At or above this backend score the chip reads High.
+const HIGH_CONFIDENCE = 0.8;
+
+// The chip for a meal whose real online-eval confidence the backend reported
+//: the deterministic [0,1] score becomes a level + percent.
+// This is the source of truth for a freshly logged meal — it supersedes the
+// macro-reconciliation heuristic in `confidenceOf`, which only stands in for a
+// meal read back from history without a backend score.
+export function confidenceFromScore(score: number): Confidence {
+  const clamped = Math.max(0, Math.min(1, score));
+  return {
+    level: clamped >= HIGH_CONFIDENCE ? "High" : "Medium",
+    pct: Math.round(clamped * 100),
+  };
+}

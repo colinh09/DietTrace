@@ -9,15 +9,19 @@
 import { useState } from "react";
 import { ChevronDown, Sparkle } from "lucide-react";
 import type { LoggedItem, Meal, TraceStep } from "@/lib/api";
-import { confidenceOf, macrosOf } from "@/lib/meal";
+import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
 import { MealTrace } from "@/components/meal-trace";
 
 // The agent's-work detail for a meal, captured from its `/log` response: the
-// reconstructed trace steps and the per-item nutrient panels.
+// reconstructed trace steps, the per-item nutrient panels, and the online
+// quality eval (`confidence` in [0,1] + `reasons`) the backend reported
+//.
 export interface MealDetail {
   trace: TraceStep[];
   perItem: LoggedItem[];
+  confidence?: number;
+  reasons?: string[];
 }
 
 const fmt = new Intl.NumberFormat("en-US");
@@ -37,7 +41,13 @@ function MealRow({
 }) {
   const [open, setOpen] = useState(false);
   const macros = macrosOf(meal.totals);
-  const conf = confidenceOf(macros);
+  // Prefer the backend's real online-eval confidence when we have it (a freshly
+  // logged meal carries it in its detail); fall back to the macro-reconciliation
+  // heuristic for a meal read back from history without a backend score (12.2).
+  const conf =
+    detail?.confidence != null
+      ? confidenceFromScore(detail.confidence)
+      : confidenceOf(macros);
   const chip = conf.level === "High" ? "high" : "med";
 
   return (
@@ -92,6 +102,7 @@ function MealRow({
               <MealTrace
                 trace={detail.trace}
                 perItem={detail.perItem}
+                reasons={detail.reasons}
                 mealText={meal.text}
                 onCorrected={onCorrected}
               />
