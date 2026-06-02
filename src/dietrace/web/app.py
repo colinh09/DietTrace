@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from dietrace.evals.online import evaluate_log, review_flag
+from dietrace.evals.online import evaluate_log, review_flag, sources_of
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
 from dietrace.web.accuracy import accuracy_report, phoenix_dashboard_url
@@ -40,6 +40,7 @@ from dietrace.web.identity import current_user
 from dietrace.web.memory import build_memory, calories_of, sum_totals
 from dietrace.web.store import MealLogStore
 from dietrace.web.stores import build_stores
+from dietrace.web.trust import TrustStore
 
 SERVICE_NAME = "dietrace-web"
 
@@ -283,18 +284,20 @@ def create_app(
     meal_streamer: MealStreamer | None = None,
     store: MealLogStore | None = None,
     feedback_store: FeedbackStore | None = None,
+    trust_store: TrustStore | None = None,
     memory: Any | None = None,
     feedback_pusher: FeedbackPusher = phoenix_push,
     tracer_init: Callable[[str], Any] = init_tracer,
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
-    if store is not None and feedback_store is not None:
-        log_store, corrections = store, feedback_store
+    if store is not None and feedback_store is not None and trust_store is not None:
+        log_store, corrections, trust = store, feedback_store, trust_store
     else:
-        default_meals, default_feedback = build_stores()
+        default_meals, default_feedback, default_trust = build_stores()
         log_store = store or default_meals
         corrections = feedback_store or default_feedback
+        trust = trust_store or default_trust
     learning = memory or build_memory()
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
@@ -322,6 +325,17 @@ def create_app(
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
+    def _record_trust(
+        per_item: list[Any], quality: dict[str, Any], review: dict[str, Any], user: str
+    ) -> None:
+        """Persist a logged meal's online-eval result for the /trust rollup (12.4)."""
+        trust.record(
+            confidence=quality["confidence"],
+            needs_review=bool(review["needs_review"]),
+            sources=sources_of(per_item),
+            user_id=user,
+        )
+
     @app.post("/log")
     def log_meal(req: LogRequest, user: str = Depends(current_user)) -> dict[str, Any]:
         recalled = learning.recall(user, req.text)
@@ -329,6 +343,8 @@ def create_app(
             per_item, totals = recalled["per_item"], recalled["totals"]
             entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
             quality = evaluate_log(req.text, per_item, totals)
+            review = review_flag(quality)
+            _record_trust(per_item, quality, review, user)
             return {
                 "id": entry_id,
                 "per_item": per_item,
@@ -336,7 +352,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
-                **review_flag(quality),
+                **review,
                 "trace": [_recall_step()] + _build_trace(per_item, totals),
             }
         result = logger_fn(req.text, examples=learning.examples(user))
@@ -344,12 +360,14 @@ def create_app(
         per_item = result.get("per_item", [])
         entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
         quality = evaluate_log(req.text, per_item, totals)
+        review = review_flag(quality)
+        _record_trust(per_item, quality, review, user)
         return {
             "id": entry_id,
             **result,
             "confidence": quality["confidence"],
             "reasons": quality["reasons"],
-            **review_flag(quality),
+            **review,
             "trace": _build_trace(per_item, totals),
         }
 
@@ -369,6 +387,8 @@ def create_app(
             yield f"data: {json.dumps(_recall_step())}\n\n"
             entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
             quality = evaluate_log(req.text, per_item, totals)
+            review = review_flag(quality)
+            _record_trust(per_item, quality, review, user)
             result = {
                 "type": "result",
                 "id": entry_id,
@@ -377,7 +397,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
-                **review_flag(quality),
+                **review,
                 "trace": [_recall_step()],
             }
             yield f"data: {json.dumps(result)}\n\n"
@@ -388,12 +408,13 @@ def create_app(
                     event["id"] = log_store.add(
                         req.text, event.get("totals", []), date=req.date, user_id=user
                     )
-                    quality = evaluate_log(
-                        req.text, event.get("per_item", []), event.get("totals", [])
-                    )
+                    per_item = event.get("per_item", [])
+                    quality = evaluate_log(req.text, per_item, event.get("totals", []))
+                    review = review_flag(quality)
                     event["confidence"] = quality["confidence"]
                     event["reasons"] = quality["reasons"]
-                    event.update(review_flag(quality))
+                    event.update(review)
+                    _record_trust(per_item, quality, review, user)
                 elif pace:
                     time.sleep(pace)  # let fast steps arrive one at a time
                 yield f"data: {json.dumps(event)}\n\n"
@@ -478,6 +499,15 @@ def create_app(
     @app.get("/memory")
     def memory_summary(user: str = Depends(current_user)) -> dict[str, Any]:
         return {"corrections": learning.count(user)}
+
+    @app.get("/trust")
+    def trust_summary(user: str = Depends(current_user)) -> dict[str, Any]:
+        """Rolling trust stats from each log's online-eval result.
+
+        Count, mean confidence, the fraction flagged for review, and the source
+        breakdown — scoped to the calling user (the per-user memory layer, §6/§7).
+        """
+        return trust.stats(user_id=user)
 
     @app.post("/retune")
     def retune(user: str = Depends(current_user)) -> dict[str, Any]:

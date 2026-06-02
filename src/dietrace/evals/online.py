@@ -103,6 +103,16 @@ def _source_of(item: Any) -> str:
     return "usda" if fdc_id else "web"
 
 
+def sources_of(per_item: list[Any]) -> list[str]:
+    """Each logged item's resolution source (the trust store's source breakdown).
+
+    Reuses the same source resolution the source-quality sub-score scores by, so
+    the per-log trust record and its confidence agree on where each number came
+    from.
+    """
+    return [_source_of(item) for item in per_item or []]
+
+
 def _totals_by_code(totals: Any) -> dict[str, float]:
     """Map a totals list (dicts or Nutrient models) to ``code -> amount``."""
     out: dict[str, float] = {}

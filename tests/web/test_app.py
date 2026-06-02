@@ -13,6 +13,7 @@ from dietrace.web.app import create_app
 from dietrace.web.feedback import FeedbackStore
 from dietrace.web.memory import SqliteMemory
 from dietrace.web.store import MealLogStore
+from dietrace.web.trust import TrustStore
 
 _STUB_TOTALS = [{"code": "208", "name": "Energy", "amount": 105.0, "unit": "kcal"}]
 
@@ -27,6 +28,7 @@ def _client(tmp_path, logger=_stub_logger, pusher=lambda *a: False):
         meal_logger=logger,
         store=store,
         feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        trust_store=TrustStore(tmp_path / "trust.sqlite"),
         memory=SqliteMemory(tmp_path / "memory.sqlite"),
         feedback_pusher=pusher,
         tracer_init=lambda name: None,
@@ -310,6 +312,7 @@ def test_stream_result_carries_needs_review(tmp_path, monkeypatch) -> None:
         meal_streamer=_low_conf_streamer,
         store=MealLogStore(tmp_path / "log.sqlite"),
         feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        trust_store=TrustStore(tmp_path / "trust.sqlite"),
         memory=SqliteMemory(tmp_path / "memory.sqlite"),
         tracer_init=lambda name: None,
     )
@@ -381,6 +384,53 @@ def test_one_user_cannot_delete_anothers_meal(tmp_path) -> None:
     assert denied["deleted"] is False
     alice = client.get("/history", headers={"X-DietTrace-User": "alice"}).json()["meals"]
     assert len(alice) == 1
+
+
+def test_trust_endpoint_rolls_up_logged_eval_results(tmp_path) -> None:
+    # Each /log persists its online-eval result; /trust returns the rolling stats
+    # (count, mean confidence, % needs_review, source breakdown) — .
+    client, _ = _client(tmp_path, logger=_clean_logger)
+
+    client.post("/log", json={"text": "a chicken breast"})
+    client.post("/log", json={"text": "a chicken breast"})
+
+    trust = client.get("/trust").json()
+    assert trust["count"] == 2
+    assert 0.0 <= trust["mean_confidence"] <= 1.0
+    assert trust["mean_confidence"] > 0.9
+    assert trust["needs_review_pct"] == 0.0
+    # The clean logger resolves to a real USDA id, so the source is usda.
+    assert trust["source_breakdown"].get("usda") == 2
+
+
+def test_trust_counts_low_confidence_logs_as_needs_review(tmp_path) -> None:
+    client, _ = _client(tmp_path, logger=_low_conf_logger)
+
+    client.post("/log", json={"text": "a mystery dish"})
+
+    trust = client.get("/trust").json()
+    assert trust["count"] == 1
+    assert trust["needs_review_pct"] == 1.0
+    assert trust["source_breakdown"].get("web") == 1
+
+
+def test_trust_stats_are_per_user(tmp_path) -> None:
+    # One user's logs never leak into another's trust stats (per-user isolation).
+    client, _ = _client(tmp_path, logger=_clean_logger)
+    client.post(
+        "/log", json={"text": "a chicken breast"}, headers={"X-DietTrace-User": "alice"}
+    )
+    client.post(
+        "/log", json={"text": "a chicken breast"}, headers={"X-DietTrace-User": "bob"}
+    )
+    client.post(
+        "/log", json={"text": "a chicken breast"}, headers={"X-DietTrace-User": "bob"}
+    )
+
+    alice = client.get("/trust", headers={"X-DietTrace-User": "alice"}).json()
+    bob = client.get("/trust", headers={"X-DietTrace-User": "bob"}).json()
+    assert alice["count"] == 1
+    assert bob["count"] == 2
 
 
 def test_correction_counts_are_per_user(tmp_path) -> None:
@@ -671,6 +721,7 @@ def test_log_stream_emits_events_and_persists(tmp_path, monkeypatch) -> None:
         meal_streamer=_fake_streamer,
         store=store,
         feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        trust_store=TrustStore(tmp_path / "trust.sqlite"),
         memory=SqliteMemory(tmp_path / "memory.sqlite"),
         tracer_init=lambda name: None,
     )

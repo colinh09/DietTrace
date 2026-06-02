@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import datetime
 import time
+from collections import Counter
 from typing import Any
 
 from dietrace.web.feedback import Correction
@@ -22,6 +23,7 @@ from dietrace.web.identity import DEMO_USER
 
 _MEALS = "meals"
 _CORRECTIONS = "corrections"
+_TRUST = "trust_logs"
 
 
 def _client(project: str | None) -> Any:
@@ -120,3 +122,55 @@ class FirestoreFeedbackStore:
     def count(self, user_id: str = DEMO_USER) -> int:
         query = self._db.collection(_CORRECTIONS).where(filter=_filter("user_id", user_id))
         return sum(1 for _ in query.stream())
+
+
+class FirestoreTrustStore:
+    """Per-user online-eval result store on Firestore (mirrors TrustStore)."""
+
+    def __init__(self, project: str | None = None) -> None:
+        self._db = _client(project)
+
+    def record(
+        self,
+        confidence: float,
+        needs_review: bool,
+        sources: list[str],
+        user_id: str = DEMO_USER,
+        created_at: datetime.datetime | None = None,
+    ) -> int:
+        when = created_at or datetime.datetime.now(tz=datetime.UTC)
+        row_id = int(time.time() * 1_000_000)
+        self._db.collection(_TRUST).document(str(row_id)).set(
+            {
+                "id": row_id,
+                "user_id": user_id,
+                "created_at": when.isoformat(),
+                "confidence": float(confidence),
+                "needs_review": bool(needs_review),
+                "sources": list(sources),
+            }
+        )
+        return row_id
+
+    def stats(self, user_id: str = DEMO_USER) -> dict[str, Any]:
+        query = self._db.collection(_TRUST).where(filter=_filter("user_id", user_id))
+        rows = [doc.to_dict() for doc in query.stream()]
+        count = len(rows)
+        if count == 0:
+            return {
+                "count": 0,
+                "mean_confidence": 0.0,
+                "needs_review_pct": 0.0,
+                "source_breakdown": {},
+            }
+        mean_confidence = sum(float(r.get("confidence", 0.0)) for r in rows) / count
+        flagged = sum(1 for r in rows if r.get("needs_review"))
+        breakdown: Counter[str] = Counter()
+        for r in rows:
+            breakdown.update(r.get("sources", []))
+        return {
+            "count": count,
+            "mean_confidence": round(mean_confidence, 3),
+            "needs_review_pct": round(flagged / count, 3),
+            "source_breakdown": dict(breakdown),
+        }
