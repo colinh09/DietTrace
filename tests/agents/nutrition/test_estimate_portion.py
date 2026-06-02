@@ -65,11 +65,15 @@ def test_one_egg_uses_primary_serving() -> None:
 
 
 def test_half_avocado_scales_primary_serving() -> None:
-    """"half an avocado" → half the whole-fruit serving (201 g → 100.5 g)."""
+    """"half an avocado" → half the whole-fruit serving (201 g → 100.5 g).
+
+    The avocado lists a serving whose description names the fruit ("half an
+    avocado"), so the unit resolves through the more-specific serving-size match.
+    """
     est = estimate_portion(_avocado(), 0.5, "avocado")
 
     assert est.grams == pytest.approx(100.5)
-    assert est.source == "whole_item"
+    assert est.source == "serving_size"
 
 
 def test_one_slice_toast_matches_serving_unit() -> None:
@@ -203,3 +207,150 @@ def test_explicit_package_unit_is_honored() -> None:
 
     assert est.grams == pytest.approx(340.0)
     assert est.source == "serving_size"
+
+
+# ---- FNDDS-style portions: a per-piece serving, sized pieces, and the survey's
+# "Quantity not specified" as-eaten default (the portion-import fix). ----
+
+
+def _almonds() -> Food:
+    """An FNDDS food: a single-piece serving ("1 nut") plus larger measures."""
+    return Food(
+        fdc_id=2707485,
+        description="Almonds, NFS",
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="nut", gram_weight=1.2, description="1 nut"),
+            ServingSize(amount=1.0, unit="cup", gram_weight=141.0, description="1 cup"),
+            ServingSize(amount=1.0, unit="oz", gram_weight=28.35, description="1 oz"),
+            ServingSize(
+                amount=1.0, unit="quantity not specified", gram_weight=28.0,
+                description="Quantity not specified",
+            ),
+        ],
+    )
+
+
+def _shrimp() -> Food:
+    """An FNDDS food with tiny/small-medium/large sized pieces."""
+    return Food(
+        fdc_id=2706360,
+        description="Shrimp, NFS",
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(
+                amount=1.0, unit="tiny shrimp", gram_weight=5.0, description="1 tiny shrimp"
+            ),
+            ServingSize(
+                amount=1.0, unit="small/medium shrimp", gram_weight=10.0,
+                description="1 small/medium shrimp",
+            ),
+            ServingSize(
+                amount=1.0, unit="large/jumbo shrimp", gram_weight=15.0,
+                description="1 large/jumbo shrimp",
+            ),
+            ServingSize(
+                amount=1.0, unit="quantity not specified", gram_weight=85.0,
+                description="Quantity not specified",
+            ),
+        ],
+    )
+
+
+def _latte() -> Food:
+    """An FNDDS beverage whose first serving is a tiny per-fl-oz reference."""
+    return Food(
+        fdc_id=2710386,
+        description="Coffee, Latte",
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="fl oz", gram_weight=30.0, description="1 fl oz"),
+            ServingSize(amount=1.0, unit="cup", gram_weight=240.0, description="1 cup (8 fl oz)"),
+            ServingSize(
+                amount=1.0, unit="quantity not specified", gram_weight=360.0,
+                description="Quantity not specified",
+            ),
+        ],
+    )
+
+
+def _pizza() -> Food:
+    """An FNDDS pizza whose pieces are labeled "piece", not "slice"."""
+    return Food(
+        fdc_id=2709876,
+        description="Pizza, cheese, whole wheat thin crust",
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="piece", gram_weight=119.0, description="1 piece"),
+            ServingSize(
+                amount=1.0, unit="personal size pizza", gram_weight=175.0,
+                description="1 personal size pizza",
+            ),
+        ],
+    )
+
+
+def test_counted_small_pieces_use_per_piece_serving() -> None:
+    """"10 almonds" scales the single-almond weight, not a cup or package (12 g)."""
+    est = estimate_portion(_almonds(), 10.0, "almonds")
+
+    assert est.grams == pytest.approx(12.0)  # 10 × 1.2 g, NOT 10 × 100 g
+    assert est.source == "whole_item"
+
+
+def test_bare_item_uses_quantity_not_specified_default() -> None:
+    """A bare item ("almonds") scales the FNDDS as-eaten default (28 g), not a piece."""
+    est = estimate_portion(_almonds(), 1.0, "")
+
+    assert est.grams == pytest.approx(28.0)
+    assert est.source == "whole_item"
+
+
+def test_sized_piece_count_prefers_medium() -> None:
+    """"5 shrimp" picks the small/medium piece (10 g each), not tiny or jumbo (50 g)."""
+    est = estimate_portion(_shrimp(), 5.0, "shrimp")
+
+    assert est.grams == pytest.approx(50.0)
+    assert est.source == "serving_size"
+
+
+def test_bare_beverage_uses_default_not_tiny_reference() -> None:
+    """"a latte" scales the as-eaten default (360 g), not the per-fl-oz reference (30 g)."""
+    est = estimate_portion(_latte(), 1.0, "")
+
+    assert est.grams == pytest.approx(360.0)
+    assert est.source == "whole_item"
+
+
+def test_pizza_slice_uses_food_piece_not_bread_fallback() -> None:
+    """"2 slices of pizza" use the pizza's own piece (119 g), not the 28 g slice guess."""
+    est = estimate_portion(_pizza(), 2.0, "slice")
+
+    assert est.grams == pytest.approx(238.0)
+    assert est.source == "whole_item"
+
+
+def _whole_avocado() -> Food:
+    """An FNDDS avocado with a small "slice" serving and a whole "fruit" one."""
+    return Food(
+        fdc_id=2709223,
+        description="Avocado, raw",
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="slice", gram_weight=15.0, description="1 slice"),
+            ServingSize(amount=1.0, unit="fruit", gram_weight=150.0, description="1 fruit"),
+            ServingSize(amount=1.0, unit="cup", gram_weight=150.0, description="1 cup"),
+            ServingSize(
+                amount=1.0, unit="quantity not specified", gram_weight=30.0,
+                description="Quantity not specified",
+            ),
+        ],
+    )
+
+
+def test_counted_whole_fruit_prefers_whole_over_slice() -> None:
+    """"an avocado" is one whole fruit (150 g), not the smallest "1 slice" (15 g)."""
+    est = estimate_portion(_whole_avocado(), 1.0, "avocado")
+
+    assert est.grams == pytest.approx(150.0)
+    assert est.source == "whole_item"

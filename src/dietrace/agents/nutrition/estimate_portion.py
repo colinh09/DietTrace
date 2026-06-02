@@ -55,10 +55,39 @@ _FALLBACK_GRAMS: dict[str, float] = {
 # Units that denote a whole piece of the food rather than a named measure.
 _WHOLE_ITEM_WORDS = frozenset({"", "whole", "each", "piece", "item", "unit", "serving"})
 
+# Generic "one piece" words. A query in these ("a slice" of pizza, "a piece" of
+# chicken) counts single pieces of the food, so when no serving's own unit matches
+# it scales the food's single-piece serving — "2 slices of pizza" → 2 × the pizza's
+# "1 piece" (119 g), not 28 g and not the as-eaten 2-piece default.
+_PIECE_WORDS = frozenset({"slice", "piece", "wedge", "portion", "item", "unit"})
+
+# Words for a bare/unspecified portion ("a latte", "1 serving of soup"): scale the
+# food's as-eaten default serving, not a single piece.
+_DEFAULT_PORTION_WORDS = frozenset({"", "whole", "each", "serving"})
+
+# Volume/weight measures (a serving's unit naming one of these is a measure, not a
+# single edible piece) — used to skip them when picking a per-piece weight for a
+# counted query like "10 almonds" (the piece is the "1 nut", not the "1 cup").
+_MEASURE_UNITS = frozenset({
+    "cup", "tablespoon", "tbsp", "teaspoon", "tsp", "fl oz", "floz", "oz",
+    "ounce", "cubic inch", "linear inch", "gram", "g", "kg", "ml", "l", "liter",
+    "quart", "pint", "gallon", "quantity not specified",
+})
+
 # Markers (in a serving's description/unit) of an NLEA label / edible-portion
 # serving — USDA's reference amount, the most trustworthy single serving to scale
 # a bare count by.
 _PREFERRED_SERVING_WORDS = frozenset({"nlea", "edible"})
+
+# The FNDDS "as-eaten" default portion ("Quantity not specified") — the survey's
+# own answer to "one typical serving of this food," and the best default to scale
+# a bare item ("a latte" → 360 g, "grilled chicken" → 100 g) by.
+_DEFAULT_SERVING_PHRASE = "quantity not specified"
+
+# Generic whole-unit serving words. A serving whose unit is one of these — or the
+# food's own name — is one whole item ("1 fruit" of an avocado, "1 banana"), the
+# right per-piece weight for "an avocado" over a smaller "1 slice" serving.
+_WHOLE_UNIT_WORDS = frozenset({"fruit", "whole"})
 
 # Markers of a whole-package/container serving, which is often oversized (a whole
 # box or bag holding several portions) and a poor default for a bare count. These
@@ -94,6 +123,11 @@ def _singular(word: str) -> str:
     return word
 
 
+def _food_name_tokens(food: Food) -> set[str]:
+    """The singularized word tokens of the food's description."""
+    return {_singular(token) for token in food.description.replace(",", " ").split()}
+
+
 def _matches_whole_item(food: Food, unit: str) -> bool:
     """True when *unit* names a whole piece of *food* (its name or a count word)."""
     if unit in _WHOLE_ITEM_WORDS:
@@ -101,8 +135,7 @@ def _matches_whole_item(food: Food, unit: str) -> bool:
     target = _singular(unit)
     if not target:
         return True
-    tokens = {_singular(token) for token in food.description.replace(",", " ").split()}
-    return target in tokens
+    return target in _food_name_tokens(food)
 
 
 def _serving_words(serving: ServingSize) -> set[str]:
@@ -111,18 +144,38 @@ def _serving_words(serving: ServingSize) -> set[str]:
     return {_singular(token) for token in text.split()}
 
 
+def _is_default_serving(serving: ServingSize) -> bool:
+    """True for the FNDDS "Quantity not specified" as-eaten default serving."""
+    text = f"{serving.description or ''} {serving.unit or ''}".lower()
+    return _DEFAULT_SERVING_PHRASE in text
+
+
+def _is_medium_size(serving: ServingSize) -> bool:
+    """True when a serving names the medium/regular size of a sized food.
+
+    Substring, not token, so it catches "small/medium shrimp" (the slash keeps
+    "medium" from being its own word) and "1 medium or regular slice".
+    """
+    text = f"{serving.description or ''} {serving.unit or ''}".lower()
+    return "medium" in text or "regular" in text
+
+
 def representative_serving(servings: list[ServingSize]) -> ServingSize | None:
     """Pick the serving that best represents one edible portion.
 
     USDA foods may list servings in any order, sometimes leading with an oversized
-    whole-package serving (a whole box or bag) ahead of the edible NLEA reference
+    whole-package serving (a whole box or bag) ahead of the edible reference
     amount. Used to scale a bare count or a fallback, that package wildly overstates
-    a portion. So prefer, in order: an NLEA/edible-portion serving, then any serving
-    that is not a whole-package one, then — fail-soft — the first listed serving so a
-    food whose only serving is a package still resolves.
+    a portion. So prefer, in order: the FNDDS "Quantity not specified" as-eaten
+    serving (the survey's own typical portion), then an NLEA/edible-portion serving,
+    then any serving that is not a whole-package one, then — fail-soft — the first
+    listed serving so a food whose only serving is a package still resolves.
     """
     if not servings:
         return None
+    for serving in servings:
+        if _is_default_serving(serving):
+            return serving
     for serving in servings:
         if _serving_words(serving) & _PREFERRED_SERVING_WORDS:
             return serving
@@ -130,6 +183,62 @@ def representative_serving(servings: list[ServingSize]) -> ServingSize | None:
         if not (_serving_words(serving) & _OVERSIZED_SERVING_WORDS):
             return serving
     return servings[0]
+
+
+def _best_unit_match(matches: list[ServingSize], key: str) -> ServingSize:
+    """Among servings whose tokens include the query *unit*, pick the best one.
+
+    Prefer a serving whose own unit IS the query unit ("cup" → "1 cup"); else a
+    medium/regular size when the food lists small/medium/large variants (so "5
+    shrimp" takes the small/medium piece, not the tiny or jumbo one); else the
+    first listed.
+    """
+    for serving in matches:
+        if _singular((serving.unit or "").lower()) == key:
+            return serving
+    for serving in matches:
+        if _is_medium_size(serving):
+            return serving
+    return matches[0]
+
+
+def _per_piece_serving(food: Food) -> ServingSize | None:
+    """The serving that represents ONE physical piece of *food*, for a counted query.
+
+    "an avocado" is one whole fruit ("1 fruit", 150 g), but "10 almonds" is ten of
+    the small piece ("1 nut", 1.2 g) — both counts, opposite sizes. So among the
+    genuine single pieces (skip measure units, the as-eaten default, and oversized
+    packages) prefer, in order: a serving named after the whole food itself ("1
+    banana", "1 fruit"), an explicit "not further specified" piece ("1 piece,
+    NFS"), a medium/regular size, then — for a truly granular food — the smallest.
+    Falls back to the representative serving when the food lists no piece.
+    """
+    servings = food.serving_sizes
+    pieces = [
+        s
+        for s in servings
+        if s.amount
+        and s.gram_weight
+        and _singular((s.unit or "").lower()) not in _MEASURE_UNITS_SINGULAR
+        and not _is_default_serving(s)
+        and not (_serving_words(s) & _OVERSIZED_SERVING_WORDS)
+    ]
+    if not pieces:
+        return representative_serving(servings)
+    whole = _food_name_tokens(food) | _WHOLE_UNIT_WORDS
+    for serving in pieces:  # a whole-food piece ("1 banana", "1 fruit")
+        if _singular((serving.unit or "").lower()) in whole:
+            return serving
+    for serving in pieces:  # an explicit "not further specified" single piece
+        if "nfs" in f"{serving.description or ''} {serving.unit or ''}".lower():
+            return serving
+    for serving in pieces:  # the medium/regular size of a sized piece
+        if _is_medium_size(serving):
+            return serving
+    return min(pieces, key=lambda s: s.gram_weight / s.amount)
+
+
+_MEASURE_UNITS_SINGULAR = frozenset(_singular(u) for u in _MEASURE_UNITS)
 
 
 def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> PortionEstimate:
@@ -149,22 +258,36 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
             grams=quantity * _MASS_GRAMS[key], source="mass", confidence=1.0
         )
 
-    # 2. A serving size whose unit matches — scale its per-unit weight.
-    for serving in food.serving_sizes:
-        if serving.amount and _singular(serving.unit) == key:
-            per_unit = serving.gram_weight / serving.amount
+    # 2. A serving whose unit/description names the query unit — scale it. Token
+    #    matching catches a measure ("1 cup") and a counted piece, including a
+    #    sized one ("5 shrimp" → "1 small/medium shrimp").
+    if key and key not in _WHOLE_ITEM_WORDS:
+        matches = [s for s in food.serving_sizes if s.amount and key in _serving_words(s)]
+        if matches:
+            best = _best_unit_match(matches, key)
+            per_unit = best.gram_weight / best.amount
             return PortionEstimate(
                 grams=quantity * per_unit,
                 source="serving_size",
                 confidence=_SERVING_CONFIDENCE,
             )
 
-    # 3. A whole-item count — use the food's representative (edible, not oversized)
-    #    serving rather than blindly the first one listed.
-    if food.serving_sizes and _matches_whole_item(food, normalized):
-        primary = representative_serving(food.serving_sizes)
-        if primary and primary.amount:
-            per_item = primary.gram_weight / primary.amount
+    # 3. A whole-item count. Counting single pieces — the named food ("10 almonds")
+    #    or a generic "slice"/"piece" ("2 slices of pizza") — scales ONE physical
+    #    piece; a bare/unspecified portion ("a latte") scales the food's as-eaten
+    #    default serving instead.
+    counts_pieces = key in _PIECE_WORDS or (
+        bool(key) and key not in _WHOLE_ITEM_WORDS and _matches_whole_item(food, normalized)
+    )
+    wants_default = normalized in _DEFAULT_PORTION_WORDS and not counts_pieces
+    if food.serving_sizes and (counts_pieces or wants_default):
+        serving = (
+            _per_piece_serving(food)
+            if counts_pieces
+            else representative_serving(food.serving_sizes)
+        )
+        if serving and serving.amount:
+            per_item = serving.gram_weight / serving.amount
             return PortionEstimate(
                 grams=quantity * per_item,
                 source="whole_item",

@@ -44,6 +44,12 @@ _ATWATER: dict[str, float] = {_PROTEIN: 4.0, _FAT: 9.0, _CARB: 4.0}
 _MIN_GRAMS = 1.0
 _MAX_GRAMS = 4000.0
 
+# A single food item rarely exceeds this many calories — more is the signature of
+# a portion blow-up (a count scaled by a 100 g default → a kilogram of almonds at
+# ~5800 kcal). Grams alone can't catch it (1000 g of soup is fine), but calories
+# per item can, so this flags it for the user to review.
+_MAX_ITEM_KCAL = 1800.0
+
 # Calorie total may diverge from the macro-derived Atwater estimate by this much
 # before it reads as inconsistent (mirrors the evaluators' default ±band, §6).
 _CALORIE_TOLERANCE = 0.15
@@ -159,22 +165,37 @@ def _source_quality(per_item: list[Any]) -> dict[str, Any] | None:
     }
 
 
+def _item_energy(item: Any) -> float:
+    """The logged calories of a single item (its scaled energy nutrient)."""
+    for nutrient in _field(item, "nutrients", []) or []:
+        if str(_field(nutrient, "code", "")) == _ENERGY:
+            return float(_field(nutrient, "amount", 0.0) or 0.0)
+    return 0.0
+
+
 def _portion_sanity(per_item: list[Any]) -> dict[str, Any] | None:
-    """Sub-score for the fraction of items whose grams sit in a plausible band."""
+    """Sub-score for items whose grams AND per-item calories are both plausible.
+
+    Grams catch a near-zero or huge weight; per-item calories catch a portion
+    blow-up that grams miss (a kilogram of almonds is under the gram ceiling but
+    is ~5800 kcal — far more than one food).
+    """
     if not per_item:
         return None
-    grams = [float(_field(item, "grams", 0.0) or 0.0) for item in per_item]
-    offenders = [g for g in grams if not _MIN_GRAMS <= g <= _MAX_GRAMS]
-    score = (len(grams) - len(offenders)) / len(grams)
+    offenders: list[str] = []
+    for item in per_item:
+        grams = float(_field(item, "grams", 0.0) or 0.0)
+        if not _MIN_GRAMS <= grams <= _MAX_GRAMS:
+            offenders.append(f"{grams:g} g")
+        elif _item_energy(item) > _MAX_ITEM_KCAL:
+            offenders.append(f"{_item_energy(item):.0f} kcal for one item")
     if not offenders:
         return {"score": 1.0}
+    score = (len(per_item) - len(offenders)) / len(per_item)
     return {
         "score": score,
         "flag": "implausible_portion",
-        "reason": (
-            f"{len(offenders)} portion(s) outside {_MIN_GRAMS:g}–{_MAX_GRAMS:g} g: "
-            + ", ".join(f"{g:g} g" for g in offenders)
-        ),
+        "reason": f"{len(offenders)} implausible portion(s): " + ", ".join(offenders),
     }
 
 

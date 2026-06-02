@@ -108,6 +108,20 @@ def test_zero_grams_is_implausible() -> None:
     assert "implausible_portion" in result["flags"]
 
 
+def test_absurd_per_item_calories_flagged_even_when_grams_in_band() -> None:
+    """A kilogram of almonds (~5800 kcal) is under the gram ceiling but is far more
+    calories than one food — caught by the per-item calorie check."""
+    item = {
+        "fdc_id": 1,
+        "description": "almonds",
+        "grams": 1000.0,  # within the 1–4000 g band
+        "nutrients": [{"code": "208", "name": "Energy", "amount": 5800.0, "unit": "kcal"}],
+    }
+    result = evaluate_log("10 almonds", [item], _macros(5800, 210, 500, 220))
+    assert "implausible_portion" in result["flags"]
+    assert result["confidence"] < 0.9
+
+
 def test_calorie_atwater_mismatch_flags() -> None:
     """Totalled calories that disagree with the macros' Atwater estimate flag."""
     # Atwater of (20,10,30) ≈ 290 kcal, but totals claim 900 → mismatch.
