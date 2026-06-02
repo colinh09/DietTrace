@@ -305,6 +305,8 @@ export interface AccuracyReport {
   source: "live" | "measured";
   // Number of Phoenix experiments behind the numbers (null on fallback).
   experiments: number | null;
+  // Each experiment's scores (oldest → newest) — the accuracy trend over time.
+  trend: { calorie: number; macro: number; within_tolerance: number; portion: number }[];
 }
 
 // Read the accuracy / Arize-observability report.

@@ -19,6 +19,56 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+const _LINES = [
+  { key: "calorie", label: "calorie", color: "var(--accent-ink)" },
+  { key: "macro", label: "macro", color: "var(--accent)" },
+  { key: "within_tolerance", label: "±15%", color: "var(--muted-ink)" },
+  { key: "portion", label: "portion", color: "var(--faint)" },
+] as const;
+
+// The accuracy trend across Phoenix experiments (oldest → newest) — a compact
+// multi-line SVG showing every metric climbing run over run.
+function TrendChart({ trend }: { trend: AccuracyReport["trend"] }) {
+  if (trend.length < 2) return null;
+  const W = 360;
+  const H = 132;
+  const px = 10;
+  const py = 14;
+  const n = trend.length;
+  const x = (i: number) => px + (i * (W - 2 * px)) / (n - 1);
+  const y = (v: number) => py + (1 - v) * (H - 2 * py);
+  return (
+    <div className="acc-trend">
+      <svg viewBox={`0 0 ${W} ${H}`} className="acc-trend-svg" role="img"
+           aria-label="accuracy across experiments">
+        {[0, 0.5, 1].map((g) => (
+          <line key={g} className="acc-trend-grid"
+                x1={px} x2={W - px} y1={y(g)} y2={y(g)} />
+        ))}
+        {_LINES.map((l) => (
+          <polyline key={l.key} className="acc-trend-line" style={{ stroke: l.color }}
+                    points={trend.map((t, i) => `${x(i)},${y(t[l.key])}`).join(" ")} />
+        ))}
+        {_LINES.flatMap((l) =>
+          trend.map((t, i) => (
+            <circle key={`${l.key}-${i}`} cx={x(i)} cy={y(t[l.key])} r={2.4}
+                    style={{ fill: l.color }} />
+          )),
+        )}
+      </svg>
+      <div className="acc-trend-legend">
+        {_LINES.map((l) => (
+          <span key={l.key} className="acc-trend-key">
+            <span className="acc-trend-dot" style={{ background: l.color }} />
+            {l.label}
+          </span>
+        ))}
+        <span className="acc-trend-x mono">experiment 1 → {n}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function AccuracyPage() {
   const [report, setReport] = useState<AccuracyReport | null>(null);
 
@@ -95,6 +145,16 @@ export default function AccuracyPage() {
                 ))}
               </div>
             </section>
+
+            {report.trend.length >= 2 && (
+              <section className="acc-block">
+                <div className="acc-block-head mono">
+                  accuracy over time · {report.trend.length} experiment
+                  {report.trend.length === 1 ? "" : "s"}
+                </div>
+                <TrendChart trend={report.trend} />
+              </section>
+            )}
 
             <section className="acc-block">
               <div className="acc-block-head mono">the self-supervision loop</div>

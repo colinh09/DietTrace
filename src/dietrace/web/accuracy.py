@@ -120,6 +120,7 @@ def _fetch_live_scores() -> dict[str, Any] | None:
             "baseline": runs[0]["scores"],
             "current": runs[-1]["scores"],
             "experiments": len(runs),
+            "series": [r["scores"] for r in runs],  # oldest → newest, for the trend
         }
     except Exception:
         return None
@@ -154,10 +155,14 @@ def accuracy_report(
         current = {k: live["current"].get(_EVALUATOR_OF[k], 0.0) for k in _EVALUATOR_OF}
         source = "live"
         experiments = live["experiments"]
+        series = live.get("series", [live["baseline"], live["current"]])
+        # Each experiment's scores mapped to the metric keys → a trend the page plots.
+        trend = [{k: s.get(_EVALUATOR_OF[k], 0.0) for k in _EVALUATOR_OF} for s in series]
     else:
         baseline, current = _BASELINE, _CURRENT
         source = "measured"
         experiments = None
+        trend = [dict(_BASELINE), dict(_CURRENT)]  # baseline → current, two points
 
     return {
         "headline": {
@@ -174,4 +179,5 @@ def accuracy_report(
         "phoenix_url": phoenix_dashboard_url(),
         "source": source,
         "experiments": experiments,
+        "trend": trend,
     }

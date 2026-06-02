@@ -359,6 +359,16 @@ body {
 .acc-bar-cur { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 999px; }
 .acc-bar-nums { color: var(--muted); font-size: 12px; text-align: right; }
 .acc-bar-nums b { color: var(--accent-ink); }
+
+/* accuracy-over-experiments trend chart */
+.acc-trend { display: flex; flex-direction: column; gap: 8px; }
+.acc-trend-svg { width: 100%; height: auto; display: block; }
+.acc-trend-grid { stroke: var(--line); stroke-width: 1; }
+.acc-trend-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.acc-trend-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted-ink); }
+.acc-trend-key { display: inline-flex; align-items: center; gap: 5px; }
+.acc-trend-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+.acc-trend-x { margin-left: auto; color: var(--faint); letter-spacing: 0.04em; }
 .acc-foot { display: flex; justify-content: space-between; align-items: center; gap: 14px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; flex-wrap: wrap; }
 .acc-link { color: var(--accent-ink); text-decoration: none; font-weight: 500; }
 .acc-link:hover { text-decoration: underline; }

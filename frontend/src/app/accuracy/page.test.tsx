@@ -18,6 +18,11 @@ const report: AccuracyReport = {
   phoenix_url: "https://app.phoenix.arize.com/s/demo",
   source: "live",
   experiments: 3,
+  trend: [
+    { calorie: 0.02, macro: 0.05, within_tolerance: 0.0, portion: 0.13 },
+    { calorie: 0.6, macro: 0.58, within_tolerance: 0.38, portion: 0.58 },
+    { calorie: 0.9, macro: 0.88, within_tolerance: 0.75, portion: 0.89 },
+  ],
 };
 
 describe("AccuracyPage", () => {
@@ -36,6 +41,11 @@ describe("AccuracyPage", () => {
     // The data is shown in-UI and labeled as live from Arize (no external link).
     expect(
       screen.getByText("Live from Arize Phoenix · 3 experiments"),
+    ).toBeInTheDocument();
+    // The accuracy-over-time trend renders.
+    expect(screen.getByText(/accuracy over time · 3 experiments/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /accuracy across experiments/i }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: /View on Arize Phoenix/i }),
