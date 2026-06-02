@@ -63,18 +63,24 @@ def test_search_is_case_insensitive(food_db) -> None:
     assert [c.fdc_id for c in repo.search("AVOCADO")] == [AVOCADO_FDC_ID]
 
 
-def test_search_ranks_exact_above_allwords_above_prefix(food_db) -> None:
-    """Match quality: exact (4) > all-words (3) > prefix (2)."""
+def test_search_ranks_exact_above_allwords_above_substring(food_db) -> None:
+    """Match quality: exact (4) > all-words (3) > substring (1).
+
+    A mid-word prefix ("avo" of "Avocados", "macaron" of "Macaroni") is only a
+    *substring* — prefix (2) requires a word boundary — so it scores 1 and the
+    agent routes it to the grounded web lookup rather than pulling the wrong food.
+    Real parsed queries are whole words, so this never bites them.
+    """
     repo = FoodRepository(food_db)
 
     exact = repo.search("egg")  # alias "egg" equals the query
     all_words = repo.search("wheat")  # "wheat" is a whole word of "whole-wheat"
-    prefix = repo.search("avo")  # "Avocados"/"avocado" start with, but isn't, "avo"
+    substring = repo.search("avo")  # mid-word prefix of "Avocados" → substring tier
 
     assert exact[0].score == 4
     assert all_words[0].score == 3
-    assert prefix[0].score == 2
-    assert exact[0].score > all_words[0].score > prefix[0].score
+    assert substring[0].score == 1
+    assert exact[0].score > all_words[0].score > substring[0].score
 
 
 def test_search_finds_multi_word_query_regardless_of_order(food_db) -> None:
@@ -352,3 +358,16 @@ def test_effective_score_demotes_unrequested_products() -> None:
     # Cooked staples are exempt; a requested product form is exempt.
     assert _effective_score(3, "Rice, white, cooked", "white rice") == 3
     assert _effective_score(3, "Potato flour", "potato flour") == 3
+
+
+def test_organ_meat_loses_to_the_muscle_cut() -> None:
+    """A bare animal query means the meat, not the organ ("duck" → not its liver)."""
+    from dietrace.nutrition.repository import _canonical_score
+
+    assert _canonical_score("Duck, meat only, raw", "duck") > _canonical_score(
+        "Duck, liver, raw", "duck"
+    )
+    # But an explicitly-requested organ is not penalized.
+    assert _canonical_score("Beef, liver, raw", "beef liver") > _canonical_score(
+        "Beef, ribeye, raw", "beef liver"
+    )

@@ -240,6 +240,14 @@ _PART_TERMS = frozenset({"peel", "rind", "zest", "leaf", "leave", "stalk", "skin
 # bare skin part — so "skin" should not trigger the part penalty.
 _WHOLE_WITH_SKIN = frozenset({"flesh", "meat", "with", "without"})
 
+# Organ / offal meats. A bare animal query ("duck", "beef", "turkey") means the
+# muscle meat, not the organ, so an unrequested organ term loses to the meat cut
+# (so "duck" → "Duck, meat only", not "Duck, liver"). Tokens are singularized.
+_ORGAN_TERMS = frozenset({
+    "liver", "giblet", "gizzard", "kidney", "heart", "tongue", "brain", "tripe",
+    "spleen", "offal", "chitterling",
+})
+
 # Markers of a processed PRODUCT rather than the bare food. These demote a
 # candidate by one match-strength tier (below) so a whole raw food can outrank an
 # exact-alias product: USDA auto-aliases give "Carrot, dehydrated" the exact alias
@@ -288,7 +296,11 @@ def _text_score(query: str, fields: list[str]) -> tuple[int, str]:
             score = 4
         elif qtokens and qtokens <= _tokens(field):
             score = 3
-        elif lowered.startswith(query):
+        elif lowered.startswith(query) and (
+            len(lowered) == len(query) or not lowered[len(query)].isalnum()
+        ):
+            # Prefix match only at a word boundary, so "macaron" does NOT match
+            # "macaroni" (which then falls through to the grounded web lookup).
             score = 2
         elif query in lowered:
             score = 1
@@ -351,6 +363,9 @@ def _canonical_score(description: str, query: str = "") -> float:
     # a prepared/branded product of it: penalize product-form terms the query did
     # not ask for, so "peach" loses the pie and "coffee" loses the soymilk.
     if (_PRODUCT_FORMS & toks) - qtokens:
+        score -= 4.0
+    # An unrequested organ meat loses to the muscle cut for a bare animal query.
+    if (_ORGAN_TERMS & toks) - qtokens:
         score -= 4.0
     score -= float(len(_PROCESSED_TERMS & toks))
     score -= 2.0 * len(_DELI_TERMS & toks)
