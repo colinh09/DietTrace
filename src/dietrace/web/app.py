@@ -326,14 +326,24 @@ def create_app(
         return {"status": "ok"}
 
     def _record_trust(
-        per_item: list[Any], quality: dict[str, Any], review: dict[str, Any], user: str
+        per_item: list[Any],
+        quality: dict[str, Any],
+        review: dict[str, Any],
+        user: str,
+        text: str,
     ) -> None:
-        """Persist a logged meal's online-eval result for the /trust rollup (12.4)."""
+        """Persist a logged meal's online-eval result for the /trust rollup (12.4).
+
+        Keeps the meal *text* and the review reason so /trust can list a user's
+        recent low-confidence meals with enough context to revisit them (12.5).
+        """
         trust.record(
             confidence=quality["confidence"],
             needs_review=bool(review["needs_review"]),
             sources=sources_of(per_item),
             user_id=user,
+            text=text,
+            review_reason=review["review_reason"],
         )
 
     @app.post("/log")
@@ -344,7 +354,7 @@ def create_app(
             entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
             quality = evaluate_log(req.text, per_item, totals)
             review = review_flag(quality)
-            _record_trust(per_item, quality, review, user)
+            _record_trust(per_item, quality, review, user, req.text)
             return {
                 "id": entry_id,
                 "per_item": per_item,
@@ -361,7 +371,7 @@ def create_app(
         entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
         quality = evaluate_log(req.text, per_item, totals)
         review = review_flag(quality)
-        _record_trust(per_item, quality, review, user)
+        _record_trust(per_item, quality, review, user, req.text)
         return {
             "id": entry_id,
             **result,
@@ -388,7 +398,7 @@ def create_app(
             entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
             quality = evaluate_log(req.text, per_item, totals)
             review = review_flag(quality)
-            _record_trust(per_item, quality, review, user)
+            _record_trust(per_item, quality, review, user, req.text)
             result = {
                 "type": "result",
                 "id": entry_id,
@@ -414,7 +424,7 @@ def create_app(
                     event["confidence"] = quality["confidence"]
                     event["reasons"] = quality["reasons"]
                     event.update(review)
-                    _record_trust(per_item, quality, review, user)
+                    _record_trust(per_item, quality, review, user, req.text)
                 elif pace:
                     time.sleep(pace)  # let fast steps arrive one at a time
                 yield f"data: {json.dumps(event)}\n\n"

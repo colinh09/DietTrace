@@ -414,6 +414,18 @@ def test_trust_counts_low_confidence_logs_as_needs_review(tmp_path) -> None:
     assert trust["source_breakdown"].get("web") == 1
 
 
+def test_trust_recent_low_confidence_carries_the_meal_text(tmp_path) -> None:
+    # The /trust dashboard's recent list needs the original meal text + reason
+    # so the user can see which logs to revisit.
+    client, _ = _client(tmp_path, logger=_low_conf_logger)
+
+    client.post("/log", json={"text": "a mystery dish"})
+
+    recent = client.get("/trust").json()["recent_low_confidence"]
+    assert recent and recent[0]["text"] == "a mystery dish"
+    assert recent[0]["review_reason"]
+
+
 def test_trust_stats_are_per_user(tmp_path) -> None:
     # One user's logs never leak into another's trust stats (per-user isolation).
     client, _ = _client(tmp_path, logger=_clean_logger)

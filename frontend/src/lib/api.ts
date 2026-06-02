@@ -301,6 +301,30 @@ export async function getAccuracy(): Promise<AccuracyReport> {
   return request<AccuracyReport>("/accuracy");
 }
 
+// One recent low-confidence meal the dashboard asks the user to revisit.
+export interface TrustRecentLog {
+  text: string;
+  confidence: number;
+  review_reason: string | null;
+  created_at: string;
+}
+
+// `GET /trust` — rolling trust stats for the calling user:
+// how many meals logged, the mean confidence, the fraction flagged for review,
+// where the numbers came from, and the recent meals worth a second look.
+export interface TrustReport {
+  count: number;
+  mean_confidence: number;
+  needs_review_pct: number;
+  source_breakdown: Record<string, number>;
+  recent_low_confidence: TrustRecentLog[];
+}
+
+// Read the user's trust report (powers the /trust dashboard).
+export async function getTrust(): Promise<TrustReport> {
+  return request<TrustReport>("/trust");
+}
+
 // A single Server-Sent Event from `POST /log/stream`: a `step` as the agent
 // works, or the final `result` (which also persists the meal and carries its id).
 export interface StreamEvent {

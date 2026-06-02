@@ -108,6 +108,9 @@ export function Header({ date, onShift, onPickDate }: HeaderProps) {
         <Link href="/accuracy" className="hdr-link mono">
           accuracy
         </Link>
+        <Link href="/trust" className="hdr-link mono">
+          trust
+        </Link>
       </div>
       <div className="datenav" ref={navRef}>
         <button

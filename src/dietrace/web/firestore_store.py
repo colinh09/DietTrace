@@ -25,6 +25,9 @@ _MEALS = "meals"
 _CORRECTIONS = "corrections"
 _TRUST = "trust_logs"
 
+# How many recent flagged logs the /trust dashboard shows.
+_RECENT_LIMIT = 5
+
 
 def _client(project: str | None) -> Any:
     """Build a Firestore client (lazy import keeps the dep out of offline tests)."""
@@ -137,6 +140,8 @@ class FirestoreTrustStore:
         sources: list[str],
         user_id: str = DEMO_USER,
         created_at: datetime.datetime | None = None,
+        text: str = "",
+        review_reason: str | None = None,
     ) -> int:
         when = created_at or datetime.datetime.now(tz=datetime.UTC)
         row_id = int(time.time() * 1_000_000)
@@ -148,6 +153,8 @@ class FirestoreTrustStore:
                 "confidence": float(confidence),
                 "needs_review": bool(needs_review),
                 "sources": list(sources),
+                "text": text,
+                "review_reason": review_reason,
             }
         )
         return row_id
@@ -162,15 +169,30 @@ class FirestoreTrustStore:
                 "mean_confidence": 0.0,
                 "needs_review_pct": 0.0,
                 "source_breakdown": {},
+                "recent_low_confidence": [],
             }
         mean_confidence = sum(float(r.get("confidence", 0.0)) for r in rows) / count
         flagged = sum(1 for r in rows if r.get("needs_review"))
         breakdown: Counter[str] = Counter()
         for r in rows:
             breakdown.update(r.get("sources", []))
+        recent = sorted(
+            (r for r in rows if r.get("needs_review")),
+            key=lambda r: r.get("id", 0),
+            reverse=True,
+        )[:_RECENT_LIMIT]
         return {
             "count": count,
             "mean_confidence": round(mean_confidence, 3),
             "needs_review_pct": round(flagged / count, 3),
             "source_breakdown": dict(breakdown),
+            "recent_low_confidence": [
+                {
+                    "text": r.get("text", ""),
+                    "confidence": r.get("confidence", 0.0),
+                    "review_reason": r.get("review_reason"),
+                    "created_at": r.get("created_at", ""),
+                }
+                for r in recent
+            ],
         }
