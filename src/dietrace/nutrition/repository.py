@@ -215,6 +215,25 @@ _COOKED_STAPLES = frozenset({
 })
 _DRY_TERMS = frozenset({"raw", "dry", "dried", "uncooked", "unprepared"})
 
+# Flesh foods are eaten cooked, so — like the staples above — "cooked" is the
+# canonical form for THESE and a bare "chicken"/"steak"/"ground beef" should
+# resolve to a cooked cut, not the raw one. People weigh and eat the cooked
+# portion, so the raw form (~25-30% fewer kcal/100g before water loss)
+# systematically undercounts. Matched on the animal noun, so cuts ("steak" →
+# "Beef, flank, steak") are covered without listing every cut. Fish/egg are
+# intentionally absent: sushi, sashimi, poke and "Egg, whole, raw" are genuine
+# raw-default foods, and salmon already resolves to its cooked form.
+_COOKED_MEATS = frozenset({
+    "chicken", "beef", "pork", "turkey", "lamb", "veal", "bison", "venison",
+})
+# Any one of these marks a plainly-cooked preparation; its presence makes a meat
+# canonical (mirrors the staple "cooked"/"boiled" reward). Several also live in
+# _PROCESSED_TERMS (a small per-term penalty), but the cooked reward dominates.
+_COOKING_METHODS = frozenset({
+    "cooked", "roasted", "grilled", "broiled", "braised", "baked", "fried",
+    "stewed", "boiled", "rotisserie",
+})
+
 # Prepared/branded product forms — a dish or manufactured good, not the bare
 # ingredient. When a query is a bare ingredient, a description carrying one of
 # these (the unrequested "Pie" of "Pie, peach", the "soymilk" of a branded
@@ -246,6 +265,14 @@ _WHOLE_WITH_SKIN = frozenset({"flesh", "meat", "with", "without"})
 _ORGAN_TERMS = frozenset({
     "liver", "giblet", "gizzard", "kidney", "heart", "tongue", "brain", "tripe",
     "spleen", "offal", "chitterling",
+})
+
+# Meat-substitute markers. A bare meat query ("chicken") means the animal, not a
+# vegetarian analogue ("Chicken, meatless, breaded, fried"), so an unrequested
+# substitute term loses to the real cut. Exempt when the query asks for it. Tokens
+# are singularized, so the set holds singular stems ("meatless" → "meatles").
+_SUBSTITUTE_TERMS = frozenset({
+    "meatles", "vegetarian", "vegan", "imitation", "substitute", "plant",
 })
 
 # Markers of a processed PRODUCT rather than the bare food. These demote a
@@ -333,8 +360,11 @@ def _canonical_score(description: str, query: str = "") -> float:
 
     Defaults to preferring raw/whole/simple/short. Corrections: a **staple**
     (rice, oats, pasta, beans) prefers *cooked* and is penalized for *raw* — it's
-    eaten cooked; a **head-noun match** (the query word is the description's
-    primary noun, not a buried modifier) is rewarded, so "apple" → "Apples, raw"
+    eaten cooked; a **meat** (chicken, beef, pork, …) prefers the *cooked* cut
+    over the raw one (people log the cooked portion), while a raw cut stays
+    neutral so it still beats a deli roll; a **head-noun match** (the query word
+    is the description's primary noun, not a buried modifier) is rewarded, so
+    "apple" → "Apples, raw"
     beats the unrelated "Rose-apples, raw"; and an unrequested **product form**
     (a pie, sauce, candy, branded soymilk) is penalized so a bare ingredient
     query keeps the ingredient, not a prepared product of it. Deli markers and
@@ -348,6 +378,12 @@ def _canonical_score(description: str, query: str = "") -> float:
             score += 4.0  # outweighs the processed-term penalty on "cooked"
         if _DRY_TERMS & toks:
             score -= 3.0
+    elif _COOKED_MEATS & toks:
+        # Reward the cooked cut so it beats the raw one; leave raw neutral (no
+        # penalty) so a plain raw cut still outranks a deli roll — the cooked cut
+        # wins, the raw cut is the runner-up, the processed product stays last.
+        if _COOKING_METHODS & toks:
+            score += 4.0
     elif "raw" in toks:
         score += 3.0
     if "whole" in toks:
@@ -366,6 +402,9 @@ def _canonical_score(description: str, query: str = "") -> float:
         score -= 4.0
     # An unrequested organ meat loses to the muscle cut for a bare animal query.
     if (_ORGAN_TERMS & toks) - qtokens:
+        score -= 4.0
+    # A bare meat query means the animal, not a meatless analogue of it.
+    if (_SUBSTITUTE_TERMS & toks) - qtokens:
         score -= 4.0
     score -= float(len(_PROCESSED_TERMS & toks))
     score -= 2.0 * len(_DELI_TERMS & toks)

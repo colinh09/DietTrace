@@ -110,21 +110,21 @@ def test_search_prefers_canonical_on_ties(food_db) -> None:
 
 
 def test_search_chicken_breast_prefers_plain_cut_over_deli(food_db) -> None:
-    """"chicken breast" resolves to a plain cut, never the deli roll.
+    """"chicken breast" resolves to the cooked cut, never the deli roll.
 
     The raw cut, the plainly-cooked cut, and the processed deli slice all carry
     the words "chicken" and "breast", so each is an equal all-words text match.
-    The canonical ranking must then prefer the raw cut first, the cooked cut
-    next, and bury the deli product last — a deli roll should never outrank a
-    plainly-cooked breast just because it has fewer cooking words.
+    Meat is eaten cooked, so the canonical ranking prefers the cooked cut first
+    (what the user actually ate), the raw cut next, and buries the deli product
+    last — a deli roll should never outrank a plain breast.
     """
     repo = FoodRepository(food_db)
 
     candidates = repo.search("chicken breast")
 
     assert [c.fdc_id for c in candidates] == [
-        CHICKEN_BREAST_RAW_FDC_ID,
         CHICKEN_BREAST_COOKED_FDC_ID,
+        CHICKEN_BREAST_RAW_FDC_ID,
         CHICKEN_DELI_FDC_ID,
     ]
     assert all(c.score == candidates[0].score for c in candidates)
@@ -321,6 +321,72 @@ def test_canonical_scoring_corrections() -> None:
     assert _canonical_score("Bananas, raw", "banana") > _canonical_score(
         "Pepper, banana, raw", "banana"
     )
+
+
+def test_canonical_scoring_meat_prefers_cooked() -> None:
+    """Bare meat queries resolve to the cooked cut, not the raw one (calorie accuracy).
+
+    People weigh and log the cooked portion, so a raw cut undercounts. Like the
+    staple correction, the cooked form is canonical for flesh foods — across the
+    animal noun and the cut, so "steak" and "ground beef" are covered too.
+    """
+    from dietrace.nutrition.repository import _canonical_score
+
+    assert _canonical_score(
+        "Chicken, broilers or fryers, breast, meat only, cooked, roasted", "chicken"
+    ) > _canonical_score("Chicken, ground, raw", "chicken")
+    assert _canonical_score(
+        "Beef, ground, 80% lean meat / 20% fat, cooked", "ground beef"
+    ) > _canonical_score("Beef, grass-fed, ground, raw", "ground beef")
+    assert _canonical_score(
+        "Beef, flank, steak, boneless, choice, cooked, grilled", "steak"
+    ) > _canonical_score("Beef, flank, steak, boneless, choice, raw", "steak")
+    assert _canonical_score(
+        "Pork, fresh, loin, chops, boneless, cooked, broiled", "pork chop"
+    ) > _canonical_score("Pork, fresh, loin, chops, boneless, raw", "pork chop")
+
+
+def test_canonical_scoring_meat_raw_cut_still_beats_deli() -> None:
+    """The cooked-meat reward must not let a deli roll outrank a plain raw cut.
+
+    Raw meat is left neutral (not penalized), so the order is cooked cut, then
+    raw cut, then the processed deli product — never deli above a plain cut.
+    """
+    from dietrace.nutrition.repository import _canonical_score
+
+    raw = _canonical_score(
+        "Chicken, broilers or fryers, breast, meat only, raw", "chicken breast"
+    )
+    deli = _canonical_score("Chicken breast, deli, sliced", "chicken breast")
+    assert raw > deli
+
+
+def test_canonical_scoring_meat_loses_to_no_meatless_substitute() -> None:
+    """A bare meat query means the animal, not a vegetarian analogue of it."""
+    from dietrace.nutrition.repository import _canonical_score
+
+    assert _canonical_score(
+        "Chicken, broilers or fryers, breast, meat only, cooked, roasted", "chicken"
+    ) > _canonical_score("Chicken, meatless, breaded, fried", "chicken")
+    # ...but a substitute the user explicitly asks for is not penalized.
+    assert _canonical_score("Chicken, meatless", "meatless chicken") > _canonical_score(
+        "Chicken, meatless, breaded, fried, with sauce", "meatless chicken"
+    )
+
+
+def test_canonical_scoring_meat_does_not_touch_produce_or_egg() -> None:
+    """Fish, egg and produce keep the raw default — only listed meats flip."""
+    from dietrace.nutrition.repository import _canonical_score
+
+    # Egg's canonical USDA form is raw; it is not a cooked-meat.
+    assert _canonical_score("Egg, whole, raw, fresh", "egg") > _canonical_score(
+        "Egg, whole, cooked, hard-boiled", "egg"
+    )
+    # Salmon is intentionally absent from the set (sushi/sashimi are real), so it
+    # keeps the raw-default preference at the canonical level.
+    assert _canonical_score(
+        "Fish, salmon, Atlantic, wild, raw", "salmon"
+    ) > _canonical_score("Fish, salmon, Atlantic, wild, cooked, dry heat", "salmon")
 
 
 def test_singularizer_handles_es_plurals() -> None:
