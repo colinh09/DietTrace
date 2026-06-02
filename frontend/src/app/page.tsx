@@ -11,9 +11,8 @@ import { DayMacros } from "@/components/day-macros";
 import { LogInput } from "@/components/log-input";
 import { LiveMeal, type LiveEntry } from "@/components/live-meal";
 import { MealList, type MealDetail } from "@/components/meal-list";
-import { RetunePanel } from "@/components/retune-panel";
 import { SafetyNotice } from "@/components/safety-notice";
-import { TaughtPanel } from "@/components/taught-panel";
+import { Dashboard, type LatestTrace } from "@/components/dashboard";
 import {
   deleteMeal,
   getAnalysis,
@@ -158,27 +157,42 @@ export default function Home() {
 
   const heading = isSameDay(date, new Date()) ? "Today" : "Logged";
 
+  // The latest agent trace to surface on the dashboard — the most recent meal
+  // logged this session (historical rows carry no captured trace).
+  const latestMeal = meals[0];
+  const latestTrace: LatestTrace | null =
+    latestMeal && details[latestMeal.id]?.trace?.length
+      ? { text: latestMeal.text, steps: details[latestMeal.id].trace }
+      : null;
+
   return (
     <div className="page">
-      <main className="wrap">
+      <main className="wrap wrap-wide">
         <Header
           date={date}
           onShift={(days) => setDate((d) => shiftDate(d, days))}
           onPickDate={setDate}
         />
-        <DayMacros goals={goals} />
-        <LogInput onSubmit={handleSubmit} busy={live !== null} />
-        <SafetyNotice safety={safety ?? undefined} />
-        {live && <LiveMeal entry={live} />}
-        <MealList
-          meals={meals}
-          heading={heading}
-          detailsById={details}
-          onEdit={handleDelete}
-          onCorrected={loadMemory}
-        />
-        <RetunePanel corrections={corrections} />
-        <TaughtPanel corrections={taught} />
+        <div className="layout">
+          <div className="col-log">
+            <DayMacros goals={goals} />
+            <LogInput onSubmit={handleSubmit} busy={live !== null} />
+            <SafetyNotice safety={safety ?? undefined} />
+            {live && <LiveMeal entry={live} />}
+            <MealList
+              meals={meals}
+              heading={heading}
+              detailsById={details}
+              onEdit={handleDelete}
+              onCorrected={loadMemory}
+            />
+          </div>
+          <Dashboard
+            corrections={corrections}
+            taught={taught}
+            latestTrace={latestTrace}
+          />
+        </div>
       </main>
     </div>
   );
