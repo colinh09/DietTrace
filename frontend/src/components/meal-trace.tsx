@@ -115,15 +115,19 @@ export function MealTrace({
   perItem,
   reasons,
   mealText,
+  startEditing = false,
   onCorrected,
 }: {
   trace: TraceStep[];
   perItem: LoggedItem[];
   reasons?: string[];
   mealText?: string;
+  // Mount straight into the editor — the "review?" affordance on a low-confidence
+  // meal opens the correction editor in one tap.
+  startEditing?: boolean;
   onCorrected?: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing && Boolean(mealText));
   const [items, setItems] = useState<EditItem[]>(() =>
     perItem.map((it) => ({ ...it, grams_edit: it.grams, removed: false })),
   );

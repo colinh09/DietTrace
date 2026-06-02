@@ -122,6 +122,8 @@ export default function Home() {
             perItem: event.per_item ?? [],
             confidence: event.confidence,
             reasons: event.reasons,
+            needsReview: event.needs_review,
+            reviewReason: event.review_reason,
           },
         }));
         setLive(null);

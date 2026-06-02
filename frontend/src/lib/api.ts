@@ -68,6 +68,10 @@ export interface LogResponse {
   trace: TraceStep[];
   confidence: number;
   reasons: string[];
+  // Set when confidence < 0.6: the backend asks the user to glance, carrying the
+  // top reason. `review_reason` is null when nothing to show.
+  needs_review: boolean;
+  review_reason: string | null;
 }
 
 // A persisted meal as stored by `dietrace.web.store.MealLogStore`.
@@ -322,6 +326,9 @@ export interface StreamEvent {
   // On the final `result` event: the online quality eval.
   confidence?: number;
   reasons?: string[];
+  // The low-confidence review flag + its top reason.
+  needs_review?: boolean;
+  review_reason?: string | null;
 }
 
 // Stream a meal log: `onEvent` fires for each step as the agent works, then once

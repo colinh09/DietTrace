@@ -22,6 +22,11 @@ export interface MealDetail {
   perItem: LoggedItem[];
   confidence?: number;
   reasons?: string[];
+  // Set when the backend's online-eval confidence fell below the review
+  // threshold: the row offers a calm "review?" affordance into
+  // the correction editor, with `reviewReason` the single top reason to glance at.
+  needsReview?: boolean;
+  reviewReason?: string | null;
 }
 
 const fmt = new Intl.NumberFormat("en-US");
@@ -40,6 +45,9 @@ function MealRow({
   onCorrected?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Set when the user taps "review?": it opens the row straight into the
+  // correction editor (vs. the chevron, which opens to the read-only trace).
+  const [reviewMode, setReviewMode] = useState(false);
   const macros = macrosOf(meal.totals);
   // Prefer the backend's real online-eval confidence when we have it (a freshly
   // logged meal carries it in its detail); fall back to the macro-reconciliation
@@ -49,6 +57,14 @@ function MealRow({
       ? confidenceFromScore(detail.confidence)
       : confidenceOf(macros);
   const chip = conf.level === "High" ? "high" : "med";
+  // A low-confidence log the backend flagged: offer a calm review affordance
+  // that drops the user into the correction editor.
+  const needsReview = detail?.needsReview ?? false;
+
+  const openForReview = () => {
+    setReviewMode(true);
+    setOpen(true);
+  };
 
   return (
     <li className="meal">
@@ -75,6 +91,16 @@ function MealRow({
             <span className="conf-label">{conf.level}</span>
             <span className="conf-pct tnum"> · {conf.pct}%</span>
           </span>
+          {needsReview && (
+            <button
+              type="button"
+              className="meal-review"
+              title={detail?.reviewReason ?? undefined}
+              onClick={openForReview}
+            >
+              review?
+            </button>
+          )}
           <button
             type="button"
             className="meal-edit"
@@ -104,6 +130,7 @@ function MealRow({
                 perItem={detail.perItem}
                 reasons={detail.reasons}
                 mealText={meal.text}
+                startEditing={reviewMode}
                 onCorrected={onCorrected}
               />
             ) : (

@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from dietrace.evals.online import evaluate_log
+from dietrace.evals.online import evaluate_log, review_flag
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
 from dietrace.web.accuracy import accuracy_report, phoenix_dashboard_url
@@ -336,6 +336,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
+                **review_flag(quality),
                 "trace": [_recall_step()] + _build_trace(per_item, totals),
             }
         result = logger_fn(req.text, examples=learning.examples(user))
@@ -348,6 +349,7 @@ def create_app(
             **result,
             "confidence": quality["confidence"],
             "reasons": quality["reasons"],
+            **review_flag(quality),
             "trace": _build_trace(per_item, totals),
         }
 
@@ -375,6 +377,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
+                **review_flag(quality),
                 "trace": [_recall_step()],
             }
             yield f"data: {json.dumps(result)}\n\n"
@@ -390,6 +393,7 @@ def create_app(
                     )
                     event["confidence"] = quality["confidence"]
                     event["reasons"] = quality["reasons"]
+                    event.update(review_flag(quality))
                 elif pace:
                     time.sleep(pace)  # let fast steps arrive one at a time
                 yield f"data: {json.dumps(event)}\n\n"

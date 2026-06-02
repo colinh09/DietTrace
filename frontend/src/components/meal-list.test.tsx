@@ -157,6 +157,67 @@ describe("MealList", () => {
     expect(within(row).getByText(/macros total zero energy/)).toBeInTheDocument();
   });
 
+  it("offers a calm 'review?' affordance only when the backend flags needs_review (12.3)", () => {
+    const flagged: MealDetail = {
+      trace: [],
+      perItem: [],
+      confidence: 0.42,
+      reasons: ["lower-trust source(s): web"],
+      needsReview: true,
+      reviewReason: "lower-trust source(s): web",
+    };
+    render(<MealList meals={meals} detailsById={{ 2: flagged }} />);
+
+    const flaggedRow = screen
+      .getByText("grilled chicken salad with olive oil")
+      .closest("li") as HTMLElement;
+    expect(
+      within(flaggedRow).getByRole("button", { name: /review/i }),
+    ).toBeInTheDocument();
+
+    // A meal with no review flag (the other row) shows no review affordance.
+    const calmRow = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
+    expect(
+      within(calmRow).queryByRole("button", { name: /review/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the correction editor when the 'review?' affordance is clicked (12.3)", () => {
+    const perItem: LoggedItem[] = [
+      {
+        fdc_id: 0,
+        description: "mystery dish",
+        grams: 9000,
+        nutrients: [{ code: "208", name: "Energy", amount: 105, unit: "kcal" }],
+      },
+    ];
+    const flagged: MealDetail = {
+      trace: [],
+      perItem,
+      confidence: 0.4,
+      reasons: ["implausible portion"],
+      needsReview: true,
+      reviewReason: "implausible portion",
+    };
+    render(<MealList meals={meals} detailsById={{ 2: flagged }} />);
+    const row = screen
+      .getByText("grilled chicken salad with olive oil")
+      .closest("li") as HTMLElement;
+
+    // Collapsed: the editor isn't mounted yet.
+    expect(
+      within(row).queryByRole("button", { name: /save correction/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(row).getByRole("button", { name: /review/i }));
+
+    // The row expands straight into the existing correction editor.
+    expect(within(row).getByText(/the agent's work/i)).toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: /save correction/i }),
+    ).toBeInTheDocument();
+  });
+
   it("shows a calm note when an expanded row has no trace detail", () => {
     render(<MealList meals={meals} />);
     const row = screen.getByText("a mystery pastry").closest("li") as HTMLElement;

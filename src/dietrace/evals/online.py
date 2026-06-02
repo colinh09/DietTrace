@@ -69,6 +69,11 @@ _SOURCE_QUALITY: dict[str, float] = {
 # Below this mean source weight, the log carries a low-quality-source flag.
 _SOURCE_FLAG_THRESHOLD = 0.8
 
+# Below this overall confidence a log is flagged for the user to glance at — the
+# meal row offers a calm "review?" affordance into the correction editor
+#.
+REVIEW_THRESHOLD = 0.6
+
 # Delimiters that separate the foods named in a free-text meal. Crude but
 # deterministic — enough to notice "eggs, toast and juice" is three foods.
 _ITEM_SPLIT = re.compile(r",|;|\+|&|\n|\band\b|\bwith\b|\bplus\b", re.IGNORECASE)
@@ -226,4 +231,21 @@ def evaluate_log(
         "confidence": max(0.0, min(1.0, confidence)),
         "flags": flags,
         "reasons": reasons,
+    }
+
+
+def review_flag(result: dict[str, Any]) -> dict[str, Any]:
+    """Whether an ``evaluate_log`` *result* warrants a user review.
+
+    Confidence below :data:`REVIEW_THRESHOLD` sets ``needs_review`` and surfaces a
+    single ``review_reason`` — the eval's top (first) reason — so the meal row can
+    offer a calm "review?" affordance into the correction editor. A confident log,
+    or one with no reason to show, carries ``review_reason: None``. This is policy
+    over the measurement: ``evaluate_log`` scores, ``review_flag`` decides.
+    """
+    needs_review = result["confidence"] < REVIEW_THRESHOLD
+    reasons = result.get("reasons") or []
+    return {
+        "needs_review": needs_review,
+        "review_reason": reasons[0] if (needs_review and reasons) else None,
     }

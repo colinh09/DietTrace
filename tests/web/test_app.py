@@ -264,6 +264,68 @@ def test_log_response_reports_low_confidence_with_reasons(tmp_path) -> None:
     assert isinstance(body["reasons"], list) and body["reasons"]
 
 
+def _low_conf_logger(text: str, examples=()) -> dict:
+    """A web-trust item with an absurd portion and no macros to reconcile the
+    energy against — several axes fail, so confidence lands below 0.6 (12.3)."""
+    return {"totals": _STUB_TOTALS, "per_item": [{"description": text, "grams": 9000.0}]}
+
+
+def test_low_confidence_log_flags_needs_review(tmp_path) -> None:
+    # Below the 0.6 review threshold the response sets needs_review with the top
+    # reason, so the meal row can offer a calm "review?" affordance.
+    client, _ = _client(tmp_path, logger=_low_conf_logger)
+
+    body = client.post("/log", json={"text": "a mystery dish"}).json()
+
+    assert body["confidence"] < 0.6
+    assert body["needs_review"] is True
+    assert isinstance(body["review_reason"], str) and body["review_reason"]
+
+
+def test_high_confidence_log_does_not_need_review(tmp_path) -> None:
+    # A confident log isn't flagged and carries no review reason.
+    client, _ = _client(tmp_path, logger=_clean_logger)
+
+    body = client.post("/log", json={"text": "a chicken breast"}).json()
+
+    assert body["needs_review"] is False
+    assert body["review_reason"] is None
+
+
+def _low_conf_streamer(text, examples=()):
+    # A web-trust item with an absurd portion + only-energy totals → low confidence.
+    yield {"type": "step", "step": "parse_meal", "status": "done", "summary": "1 food"}
+    yield {
+        "type": "result",
+        "per_item": [{"description": text, "grams": 9000.0}],
+        "totals": _STUB_TOTALS,
+        "trace": [],
+    }
+
+
+def test_stream_result_carries_needs_review(tmp_path, monkeypatch) -> None:
+    # The streamed result event also surfaces the review flag.
+    monkeypatch.setenv("DIETRACE_STREAM_PACE", "0")
+    app = create_app(
+        meal_streamer=_low_conf_streamer,
+        store=MealLogStore(tmp_path / "log.sqlite"),
+        feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        memory=SqliteMemory(tmp_path / "memory.sqlite"),
+        tracer_init=lambda name: None,
+    )
+    response = TestClient(app).post("/log/stream", json={"text": "a mystery dish"})
+
+    events = [
+        json.loads(line[6:])
+        for line in response.text.split("\n\n")
+        if line.startswith("data: ")
+    ]
+    result = events[-1]
+    assert result["type"] == "result"
+    assert result["needs_review"] is True
+    assert isinstance(result["review_reason"], str) and result["review_reason"]
+
+
 def test_recalled_log_carries_confidence_and_reasons(tmp_path) -> None:
     client, _ = _client(tmp_path)
     client.post(

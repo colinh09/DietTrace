@@ -15,7 +15,7 @@ the pipeline hands the web layer dicts but tools return models.
 """
 
 from dietrace.agents.nutrition.log_entry import LoggedItem
-from dietrace.evals.online import evaluate_log
+from dietrace.evals.online import REVIEW_THRESHOLD, evaluate_log, review_flag
 from dietrace.nutrition.models import Nutrient
 
 
@@ -160,3 +160,57 @@ def test_many_low_confidence_signals_stack() -> None:
         "implausible_portion",
         "calorie_mismatch",
     } <= set(result["flags"])
+
+
+# --- review flag: the low-confidence threshold ---
+
+
+def test_review_flag_shape() -> None:
+    flag = review_flag({"confidence": 0.5, "flags": [], "reasons": ["x"]})
+    assert set(flag) == {"needs_review", "review_reason"}
+
+
+def test_low_confidence_sets_needs_review_with_top_reason() -> None:
+    """Below the threshold the flag is set, carrying the eval's first reason."""
+    result = {
+        "confidence": 0.42,
+        "flags": ["low_source_quality"],
+        "reasons": ["lower-trust source(s): web", "118 kcal off"],
+    }
+    flag = review_flag(result)
+    assert flag["needs_review"] is True
+    assert flag["review_reason"] == "lower-trust source(s): web"
+
+
+def test_confidence_at_or_above_threshold_does_not_need_review() -> None:
+    """A confident log isn't flagged and carries no review reason."""
+    assert review_flag({"confidence": 0.92, "flags": [], "reasons": []}) == {
+        "needs_review": False,
+        "review_reason": None,
+    }
+
+
+def test_threshold_boundary_is_strict_less_than() -> None:
+    """Exactly at the threshold is not flagged; just under it is (0.6)."""
+    assert review_flag({"confidence": REVIEW_THRESHOLD, "reasons": ["x"]})[
+        "needs_review"
+    ] is False
+    assert review_flag({"confidence": REVIEW_THRESHOLD - 0.001, "reasons": ["x"]})[
+        "needs_review"
+    ] is True
+
+
+def test_review_reason_is_none_when_no_reasons() -> None:
+    """A low score with nothing to explain flags review but carries no reason."""
+    flag = review_flag({"confidence": 0.1, "flags": [], "reasons": []})
+    assert flag["needs_review"] is True
+    assert flag["review_reason"] is None
+
+
+def test_review_flag_over_a_real_low_confidence_log() -> None:
+    """End-to-end: a mostly-unresolved log evaluates below the threshold."""
+    result = evaluate_log("eggs, toast and orange juice", [], [])
+    assert result["confidence"] < REVIEW_THRESHOLD
+    flag = review_flag(result)
+    assert flag["needs_review"] is True
+    assert flag["review_reason"]  # a human-readable reason is carried
