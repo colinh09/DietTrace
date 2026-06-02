@@ -358,6 +358,8 @@ def test_recalled_log_carries_confidence_and_reasons(tmp_path) -> None:
     assert isinstance(body["confidence"], (int, float))
     assert 0.0 <= body["confidence"] <= 1.0
     assert isinstance(body["reasons"], list)
+    # The recalled path also runs the safety guardrail.
+    assert body["safety"]["flagged"] is False
 
 
 def test_meals_are_scoped_per_user(tmp_path) -> None:
@@ -760,3 +762,58 @@ def test_accuracy_endpoint_returns_the_report(tmp_path) -> None:
     body = client.get("/accuracy").json()
     assert "metrics" in body and len(body["loop"]) == 4
     assert body["phoenix_url"]
+
+
+def test_log_flags_disordered_eating_with_a_safety_block(tmp_path) -> None:
+    # A flagged input still logs, but the response carries a supportive safety
+    # block (category + message) the UI surfaces as a calm notice.
+    client, _ = _client(tmp_path)
+
+    body = client.post(
+        "/log", json={"text": "ate a salad then made myself throw up after"}
+    ).json()
+
+    safety = body["safety"]
+    assert safety["flagged"] is True
+    assert safety["category"] == "disordered_eating"
+    assert safety["message"]
+    # The meal is still logged normally — the guardrail is additive, not a block.
+    assert isinstance(body["id"], int)
+    assert body["totals"][0]["code"] == "208"
+
+
+def test_normal_log_is_not_flagged(tmp_path) -> None:
+    # An ordinary meal carries an all-clear safety block and is otherwise unaffected.
+    client, _ = _client(tmp_path)
+
+    body = client.post("/log", json={"text": "two eggs and toast"}).json()
+
+    assert body["safety"]["flagged"] is False
+    assert body["safety"]["category"] is None
+    assert isinstance(body["id"], int)
+
+
+def test_stream_result_carries_safety_block(tmp_path, monkeypatch) -> None:
+    # The streamed result event also surfaces the safety block.
+    monkeypatch.setenv("DIETRACE_STREAM_PACE", "0")
+    app = create_app(
+        meal_streamer=_fake_streamer,
+        store=MealLogStore(tmp_path / "log.sqlite"),
+        feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        trust_store=TrustStore(tmp_path / "trust.sqlite"),
+        memory=SqliteMemory(tmp_path / "memory.sqlite"),
+        tracer_init=lambda name: None,
+    )
+    response = TestClient(app).post(
+        "/log/stream", json={"text": "starve myself this week"}
+    )
+
+    events = [
+        json.loads(line[6:])
+        for line in response.text.split("\n\n")
+        if line.startswith("data: ")
+    ]
+    result = events[-1]
+    assert result["type"] == "result"
+    assert result["safety"]["flagged"] is True
+    assert result["safety"]["category"] == "disordered_eating"

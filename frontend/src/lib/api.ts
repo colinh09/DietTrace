@@ -59,6 +59,15 @@ export interface TraceStep {
   totals?: Nutrient[];
 }
 
+// The rule-based safety guardrail result for a logged input.
+// `flagged` is true when the text matched a supportive-care concern; `category`
+// names it and `message` is the calm notice to surface (empty when clear).
+export interface Safety {
+  flagged: boolean;
+  category: string | null;
+  message: string;
+}
+
 // `POST /log` — the logged meal plus the agent's-work trace. `confidence`
 // (0–1) and `reasons` come from the online quality eval.
 export interface LogResponse {
@@ -72,6 +81,8 @@ export interface LogResponse {
   // top reason. `review_reason` is null when nothing to show.
   needs_review: boolean;
   review_reason: string | null;
+  // The rule-based safety guardrail result.
+  safety: Safety;
 }
 
 // A persisted meal as stored by `dietrace.web.store.MealLogStore`.
@@ -353,6 +364,8 @@ export interface StreamEvent {
   // The low-confidence review flag + its top reason.
   needs_review?: boolean;
   review_reason?: string | null;
+  // The rule-based safety guardrail result.
+  safety?: Safety;
 }
 
 // Stream a meal log: `onEvent` fires for each step as the agent works, then once

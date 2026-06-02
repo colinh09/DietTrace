@@ -168,6 +168,11 @@ body {
 .loginput-btn:hover { background: var(--accent-ink); }
 .loginput-btn:disabled { opacity: 0.6; cursor: default; }
 
+/* calm safety notice — supportive, non-blocking, above the meals */
+.safety-notice { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; padding: 13px 15px; border-radius: var(--radius); background: var(--accent-soft); border: 1px solid var(--accent-softer); }
+.safety-notice-icon { flex: none; margin-top: 1px; color: var(--accent-ink); }
+.safety-notice-msg { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--accent-ink); }
+
 /* today's logged meals — compact rows from /history */
 .meals { margin-top: 30px; }
 .meals-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }

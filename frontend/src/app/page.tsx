@@ -12,6 +12,7 @@ import { LogInput } from "@/components/log-input";
 import { LiveMeal, type LiveEntry } from "@/components/live-meal";
 import { MealList, type MealDetail } from "@/components/meal-list";
 import { RetunePanel } from "@/components/retune-panel";
+import { SafetyNotice } from "@/components/safety-notice";
 import {
   deleteMeal,
   getAnalysis,
@@ -21,6 +22,7 @@ import {
   logMealStream,
   type GoalProgress,
   type Meal,
+  type Safety,
 } from "@/lib/api";
 import { isSameDay, shiftDate, toISODate } from "@/lib/date";
 
@@ -35,6 +37,9 @@ export default function Home() {
   const [live, setLive] = useState<LiveEntry | null>(null);
   // How many corrections this user has taught — drives the re-tune panel.
   const [corrections, setCorrections] = useState(0);
+  // The safety guardrail result from the most recent log, or null when clear —
+  // surfaces a calm supportive notice above the meals.
+  const [safety, setSafety] = useState<Safety | null>(null);
 
   const loadMemory = useCallback(() => {
     getMemory()
@@ -99,6 +104,7 @@ export default function Home() {
     (text: string) => {
       const day = toISODate(date);
       setLive({ text, steps: [] });
+      setSafety(null);
       logMealStream(text, day, (event) => {
         if (event.type === "step") {
           setLive((current) =>
@@ -126,6 +132,7 @@ export default function Home() {
             reviewReason: event.review_reason,
           },
         }));
+        setSafety(event.safety ?? null);
         setLive(null);
         loadHistory();
         loadAnalysis();
@@ -146,6 +153,7 @@ export default function Home() {
         />
         <DayMacros goals={goals} />
         <LogInput onSubmit={handleSubmit} busy={live !== null} />
+        <SafetyNotice safety={safety ?? undefined} />
         {live && <LiveMeal entry={live} />}
         <MealList
           meals={meals}

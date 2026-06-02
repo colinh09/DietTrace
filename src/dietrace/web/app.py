@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from dietrace.agents.nutrition.safety import safety_check
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
@@ -362,6 +363,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
+                "safety": safety_check(req.text),
                 **review,
                 "trace": [_recall_step()] + _build_trace(per_item, totals),
             }
@@ -377,6 +379,7 @@ def create_app(
             **result,
             "confidence": quality["confidence"],
             "reasons": quality["reasons"],
+            "safety": safety_check(req.text),
             **review,
             "trace": _build_trace(per_item, totals),
         }
@@ -407,6 +410,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
+                "safety": safety_check(req.text),
                 **review,
                 "trace": [_recall_step()],
             }
@@ -423,6 +427,7 @@ def create_app(
                     review = review_flag(quality)
                     event["confidence"] = quality["confidence"]
                     event["reasons"] = quality["reasons"]
+                    event["safety"] = safety_check(req.text)
                     event.update(review)
                     _record_trust(per_item, quality, review, user, req.text)
                 elif pace:
