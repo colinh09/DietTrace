@@ -167,6 +167,13 @@ def _recall_step() -> dict[str, Any]:
     }
 
 
+# A recalled meal IS the user's own correction — already vouched for, so it's
+# full-confidence and never flagged for review (the quality eval would otherwise
+# read its sparse/synthetic panel as uncertain).
+_VOUCHED_QUALITY = {"confidence": 1.0, "flags": [], "reasons": ["recalled from your correction"]}
+_NO_REVIEW = {"needs_review": False, "review_reason": None}
+
+
 def _rescale_item(item: CorrectionItem) -> dict[str, Any]:
     """A corrected item: its panel rescaled from the logged to the corrected grams."""
     factor = item.corrected_grams / item.original_grams if item.original_grams else 0.0
@@ -357,8 +364,7 @@ def create_app(
         if recalled is not None:
             per_item, totals = recalled["per_item"], recalled["totals"]
             entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
-            quality = evaluate_log(req.text, per_item, totals)
-            review = review_flag(quality)
+            quality, review = dict(_VOUCHED_QUALITY), dict(_NO_REVIEW)
             _record_trust(per_item, quality, review, user, req.text)
             return {
                 "id": entry_id,
@@ -410,8 +416,7 @@ def create_app(
             per_item, totals = recalled["per_item"], recalled["totals"]
             yield f"data: {json.dumps(_recall_step())}\n\n"
             entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
-            quality = evaluate_log(req.text, per_item, totals)
-            review = review_flag(quality)
+            quality, review = dict(_VOUCHED_QUALITY), dict(_NO_REVIEW)
             _record_trust(per_item, quality, review, user, req.text)
             result = {
                 "type": "result",
