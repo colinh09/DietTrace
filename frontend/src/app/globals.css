@@ -115,7 +115,7 @@ body {
    mobile. The column spans its container and is
    capped by max-width; on narrow screens the page padding (below) tightens so
    content runs essentially edge-to-edge. */
-.page { min-height: 100vh; padding: 52px 24px 120px; }
+.page { min-height: 100vh; padding: 52px clamp(24px, 4vw, 96px) 120px; }
 .wrap { width: 100%; max-width: 900px; margin: 0 auto; }
 
 /* header — ✦ brand + date navigation */
@@ -394,9 +394,19 @@ body {
 
 /* ── Two-column day view: logging on the left, the accountability dashboard on
    the right (a sticky rail). Collapses to one column on narrow screens. ── */
-.wrap-wide { max-width: 1180px; }
-.layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(298px, 354px); gap: 40px; align-items: start; padding-top: 6px; }
+/* Scale with the viewport rather than pinning to a fixed cap — the content grows
+   fluidly and only centers (with framing padding) on very wide screens, so it
+   doesn't sit as a narrow strip on a large/ultrawide monitor. */
+.wrap-wide { max-width: 1520px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.62fr) minmax(308px, 392px); gap: clamp(36px, 3.6vw, 60px); align-items: start; padding-top: 6px; }
 .col-log { min-width: 0; }
+
+/* Big screens: give the wrap and the dashboard rail a bit more room so the extra
+   width is shared, not dumped into one stretched column. */
+@media (min-width: 1700px) {
+  .wrap-wide { max-width: 1680px; }
+  .layout { grid-template-columns: minmax(0, 1.66fr) minmax(340px, 432px); }
+}
 
 .dash { position: sticky; top: 26px; display: flex; flex-direction: column; gap: 13px; }
 .dash-head { display: flex; align-items: baseline; justify-content: space-between; padding: 2px 2px 2px; }
