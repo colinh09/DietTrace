@@ -283,6 +283,15 @@ body {
 .retune-arrow.big { font-size: 18px; }
 .retune-caption { margin-top: 9px; font-size: 12px; color: var(--muted-ink); }
 
+/* "what you've taught" — the user's portion corrections, before → after grams */
+.taught { margin: 18px 0 6px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--accent-softer); }
+.taught-title { margin: 0 0 10px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+.taught-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.taught-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.taught-row:last-child { border-bottom: none; }
+.taught-food { color: var(--ink); font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taught-grams { flex: none; color: var(--accent-ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+
 /* live eval readout — each corrected meal scored, streamed in */
 .retune-eval { margin-top: 12px; }
 .retune-eval-head { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }

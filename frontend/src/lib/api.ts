@@ -336,6 +336,26 @@ export async function getTrust(): Promise<TrustReport> {
   return request<TrustReport>("/trust");
 }
 
+// One portion correction the user has taught the agent: a food and the grams
+// they fixed, before → after.
+export interface RecentCorrection {
+  food: string;
+  original_grams: number;
+  corrected_grams: number;
+  created_at: string;
+}
+
+// `GET /feedback/recent` — the user's recent corrections for the
+// "what you've taught" panel, newest first.
+export interface RecentFeedbackResponse {
+  corrections: RecentCorrection[];
+}
+
+// Read the user's recent corrections (powers the "what you've taught" panel).
+export async function getRecentFeedback(): Promise<RecentFeedbackResponse> {
+  return request<RecentFeedbackResponse>("/feedback/recent");
+}
+
 // A single Server-Sent Event from `POST /log/stream`: a `step` as the agent
 // works, or the final `result` (which also persists the meal and carries its id).
 export interface StreamEvent {

@@ -126,6 +126,25 @@ class FirestoreFeedbackStore:
         query = self._db.collection(_CORRECTIONS).where(filter=_filter("user_id", user_id))
         return sum(1 for _ in query.stream())
 
+    def recent(
+        self, user_id: str = DEMO_USER, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        query = self._db.collection(_CORRECTIONS).where(filter=_filter("user_id", user_id))
+        rows = sorted(
+            (doc.to_dict() for doc in query.stream()),
+            key=lambda r: r.get("id", 0),
+            reverse=True,
+        )[:limit]
+        return [
+            {
+                "food": r.get("food", ""),
+                "original_grams": r.get("original_grams", 0.0),
+                "corrected_grams": r.get("corrected_grams", 0.0),
+                "created_at": r.get("created_at", ""),
+            }
+            for r in rows
+        ]
+
 
 class FirestoreTrustStore:
     """Per-user online-eval result store on Firestore (mirrors TrustStore)."""

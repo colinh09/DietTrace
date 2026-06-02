@@ -68,3 +68,28 @@ def test_store_persists_and_counts_corrections(tmp_path) -> None:
     store.add(correction, corrected_expected(correction))
 
     assert store.count() == 2
+
+
+def test_store_lists_recent_corrections_newest_first_per_user(tmp_path) -> None:
+    # The "what you've taught" panel reads each correction's food + before→after
+    # grams, newest first, scoped to the user.
+    store = FeedbackStore(tmp_path / "feedback.sqlite")
+    burger = _correction(317.0, 200.0)
+    oatmeal = Correction(
+        food="oatmeal", original_grams=80.0, corrected_grams=120.0, nutrients=[]
+    )
+    store.add(burger, corrected_expected(burger), user_id="alice")
+    store.add(oatmeal, corrected_expected(oatmeal), user_id="alice")
+    store.add(burger, corrected_expected(burger), user_id="bob")
+
+    recent = store.recent(user_id="alice")
+    assert [r["food"] for r in recent] == [
+        "oatmeal",
+        "Five Guys Bacon Cheeseburger",
+    ]
+    assert recent[0]["original_grams"] == 80.0
+    assert recent[0]["corrected_grams"] == 120.0
+    assert recent[0]["created_at"]
+    # Bob's correction never leaks into alice's panel.
+    bob = store.recent(user_id="bob")
+    assert [r["food"] for r in bob] == ["Five Guys Bacon Cheeseburger"]

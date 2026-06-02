@@ -486,6 +486,16 @@ def create_app(
             "phoenix_url": phoenix_dashboard_url(),
         }
 
+    @app.get("/feedback/recent")
+    def feedback_recent(user: str = Depends(current_user)) -> dict[str, Any]:
+        """The user's recent portion corrections — the "what you've taught" panel.
+
+        Each item is a food with its before→after grams, newest first, so the UI
+        can show the user the ground truth they've contributed (,
+        /§7 — the self-supervision loop, made visible in-app).
+        """
+        return {"corrections": corrections.recent(user_id=user)}
+
     @app.post("/correct")
     def correct(
         correction: MealCorrection, user: str = Depends(current_user)

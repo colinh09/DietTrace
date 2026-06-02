@@ -460,6 +460,32 @@ def test_correction_counts_are_per_user(tmp_path) -> None:
     assert bob["total_corrections"] == 1
 
 
+def test_feedback_recent_lists_a_users_corrections(tmp_path) -> None:
+    # The "what you've taught" panel reads recent corrections (food, before→after
+    # grams) for the calling user only.
+    client, _ = _client(tmp_path)
+    client.post(
+        "/feedback",
+        json={
+            "food": "oatmeal",
+            "original_grams": 80.0,
+            "corrected_grams": 120.0,
+            "nutrients": [],
+        },
+        headers={"X-DietTrace-User": "alice"},
+    )
+
+    alice = client.get(
+        "/feedback/recent", headers={"X-DietTrace-User": "alice"}
+    ).json()
+    assert alice["corrections"][0]["food"] == "oatmeal"
+    assert alice["corrections"][0]["original_grams"] == 80.0
+    assert alice["corrections"][0]["corrected_grams"] == 120.0
+
+    bob = client.get("/feedback/recent", headers={"X-DietTrace-User": "bob"}).json()
+    assert bob["corrections"] == []
+
+
 def test_correction_rescales_items_and_reports_totals(tmp_path) -> None:
     client, _ = _client(tmp_path)
     body = client.post(

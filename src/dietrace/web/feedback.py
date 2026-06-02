@@ -195,3 +195,27 @@ class FeedbackStore:
                 "SELECT COUNT(*) AS n FROM corrections WHERE user_id = ?", (user_id,)
             ).fetchone()
             return int(row["n"]) if row else 0
+
+    def recent(
+        self, user_id: str = DEMO_USER, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """*user_id*'s most recent corrections, newest first (the "what you've taught" panel).
+
+        Each row carries the food and its before→after grams so the UI can show
+        what the user has taught the agent without re-deriving anything (12.8).
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT created_at, food, original_grams, corrected_grams "
+                "FROM corrections WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        return [
+            {
+                "food": row["food"],
+                "original_grams": row["original_grams"],
+                "corrected_grams": row["corrected_grams"],
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]

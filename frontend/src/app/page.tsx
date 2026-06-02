@@ -13,15 +13,18 @@ import { LiveMeal, type LiveEntry } from "@/components/live-meal";
 import { MealList, type MealDetail } from "@/components/meal-list";
 import { RetunePanel } from "@/components/retune-panel";
 import { SafetyNotice } from "@/components/safety-notice";
+import { TaughtPanel } from "@/components/taught-panel";
 import {
   deleteMeal,
   getAnalysis,
   getGoals,
   getHistory,
   getMemory,
+  getRecentFeedback,
   logMealStream,
   type GoalProgress,
   type Meal,
+  type RecentCorrection,
   type Safety,
 } from "@/lib/api";
 import { isSameDay, shiftDate, toISODate } from "@/lib/date";
@@ -37,6 +40,8 @@ export default function Home() {
   const [live, setLive] = useState<LiveEntry | null>(null);
   // How many corrections this user has taught — drives the re-tune panel.
   const [corrections, setCorrections] = useState(0);
+  // The user's recent corrections — drives the "what you've taught" panel (12.8).
+  const [taught, setTaught] = useState<RecentCorrection[]>([]);
   // The safety guardrail result from the most recent log, or null when clear —
   // surfaces a calm supportive notice above the meals.
   const [safety, setSafety] = useState<Safety | null>(null);
@@ -44,6 +49,9 @@ export default function Home() {
   const loadMemory = useCallback(() => {
     getMemory()
       .then((res) => setCorrections(res.corrections))
+      .catch(() => {});
+    getRecentFeedback()
+      .then((res) => setTaught(res.corrections))
       .catch(() => {});
   }, []);
 
@@ -163,6 +171,7 @@ export default function Home() {
           onCorrected={loadMemory}
         />
         <RetunePanel corrections={corrections} />
+        <TaughtPanel corrections={taught} />
       </main>
     </div>
   );
