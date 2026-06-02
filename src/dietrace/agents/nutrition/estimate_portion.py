@@ -272,12 +272,15 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
                 confidence=_SERVING_CONFIDENCE,
             )
 
-    # 3. A whole-item count. Counting single pieces — the named food ("10 almonds")
-    #    or a generic "slice"/"piece" ("2 slices of pizza") — scales ONE physical
-    #    piece; a bare/unspecified portion ("a latte") scales the food's as-eaten
-    #    default serving instead.
-    counts_pieces = key in _PIECE_WORDS or (
-        bool(key) and key not in _WHOLE_ITEM_WORDS and _matches_whole_item(food, normalized)
+    # 3. A whole-item count. Counting single pieces — the named food ("10 almonds"),
+    #    a generic "slice"/"piece" ("2 slices of pizza"), or a plain multi-count whose
+    #    unit the parse left bare ("10 almonds" → quantity 10, no unit) — scales ONE
+    #    physical piece; a single bare/unspecified portion ("a latte") scales the
+    #    food's as-eaten default serving instead.
+    counts_pieces = (
+        key in _PIECE_WORDS
+        or (bool(key) and key not in _WHOLE_ITEM_WORDS and _matches_whole_item(food, normalized))
+        or (normalized in _DEFAULT_PORTION_WORDS and quantity >= 2)
     )
     wants_default = normalized in _DEFAULT_PORTION_WORDS and not counts_pieces
     if food.serving_sizes and (counts_pieces or wants_default):

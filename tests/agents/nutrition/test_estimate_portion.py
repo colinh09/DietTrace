@@ -306,6 +306,15 @@ def test_bare_item_uses_quantity_not_specified_default() -> None:
     assert est.source == "whole_item"
 
 
+def test_bare_multi_count_scales_a_single_piece_not_the_default() -> None:
+    """"10 almonds" when the parse leaves the unit bare still counts pieces (12 g),
+    not ten as-eaten handfuls (280 g)."""
+    est = estimate_portion(_almonds(), 10.0, "")
+
+    assert est.grams == pytest.approx(12.0)
+    assert est.source == "whole_item"
+
+
 def test_sized_piece_count_prefers_medium() -> None:
     """"5 shrimp" picks the small/medium piece (10 g each), not tiny or jumbo (50 g)."""
     est = estimate_portion(_shrimp(), 5.0, "shrimp")
