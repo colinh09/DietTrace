@@ -24,9 +24,32 @@ from pathlib import Path
 _DEFAULT_PATH = Path(__file__).parent / "mappings" / "common_foods.json"
 
 
+def _singularize(word: str) -> str:
+    """Singularize one word so plural and singular names converge on one key.
+
+    The agent's parse emits the singular ("10 almonds" → "almond") while a curated
+    key may be plural ("almonds"); normalizing both sides to the singular makes them
+    match. Handles -ies → -y (berries → berry), the -es plurals (tomatoes → tomato),
+    and a bare trailing -s, leaving short words and -ss endings (e.g. an -us word
+    like "asparagus") untouched — those still match because both sides transform
+    identically.
+    """
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    for suffix in ("oes", "ches", "shes", "xes", "sses", "zzes"):
+        if len(word) > len(suffix) and word.endswith(suffix):
+            return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
 def normalize(text: str) -> str:
-    """The overlay key for a food name: lowercased, punctuation-stripped, collapsed."""
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", " ", text.lower())).strip()
+    """The overlay key for a food name: lowercased, punctuation-stripped, collapsed,
+    and singularized word-by-word so "almonds"/"almond" and "green beans"/"green
+    bean" resolve to the same pinned food."""
+    cleaned = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", " ", text.lower())).strip()
+    return " ".join(_singularize(word) for word in cleaned.split())
 
 
 @lru_cache(maxsize=1)
