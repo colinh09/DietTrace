@@ -167,6 +167,9 @@ body {
 .loginput-btn { background: var(--accent); color: #fff; border: none; border-radius: 9px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 16px; transition: background .14s ease, opacity .14s ease; }
 .loginput-btn:hover { background: var(--accent-ink); }
 .loginput-btn:disabled { opacity: 0.6; cursor: default; }
+.loginput-mic { display: inline-flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: var(--faint); padding: 6px; border-radius: 8px; transition: color .14s ease, background .14s ease; }
+.loginput-mic:hover { color: var(--accent-ink); background: var(--accent-soft, rgba(94,122,92,0.1)); }
+.loginput-mic.on { color: var(--accent); }
 
 /* calm safety notice — supportive, non-blocking, above the meals */
 .safety-notice { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; padding: 13px 15px; border-radius: var(--radius); background: var(--accent-soft); border: 1px solid var(--accent-softer); }
