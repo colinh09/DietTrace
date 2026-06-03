@@ -4,7 +4,6 @@
 // shows the agent's work streaming in — one trace line per step as it happens
 // (parse → search/portion per food → totals) — before the row settles into a
 // normal logged meal. Mirrors the MealTrace step rail so it reads identically.
-import { Sparkle } from "lucide-react";
 import type { StreamEvent } from "@/lib/api";
 import { StepGlyph } from "@/components/meal-trace";
 
@@ -20,9 +19,6 @@ export function LiveMeal({ entry }: { entry: LiveEntry }) {
       <ul className="meals-list">
         <li className="meal live">
           <div className="meal-head">
-            <span className="meal-bullet" aria-hidden="true">
-              <Sparkle size={11} fill="var(--accent)" color="var(--accent)" />
-            </span>
             <span className="meal-main">
               <span className="meal-text">{entry.text}</span>
             </span>
@@ -51,7 +47,9 @@ export function LiveMeal({ entry }: { entry: LiveEntry }) {
                           <span className="tstep-fn mono">{s.step}</span>
                           <span className="tstep-arrow">
                             {s.summary}
-                            {s.status === "running" ? " …" : ""}
+                            {s.status === "running" && !/[.…]\s*$/.test(s.summary ?? "")
+                              ? " …"
+                              : ""}
                           </span>
                         </div>
                       </div>

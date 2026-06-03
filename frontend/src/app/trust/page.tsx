@@ -46,6 +46,9 @@ export default function TrustPage() {
           <div className="brand">
             <Sparkle size={15} fill="var(--accent)" color="var(--accent)" />
             <span className="brand-name">trust</span>
+            <Link href="/accuracy" className="hdr-link mono">
+              accuracy
+            </Link>
           </div>
         </header>
 

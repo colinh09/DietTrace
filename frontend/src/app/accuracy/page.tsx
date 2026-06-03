@@ -88,6 +88,9 @@ export default function AccuracyPage() {
           <div className="brand">
             <Sparkle size={15} fill="var(--accent)" color="var(--accent)" />
             <span className="brand-name">accuracy</span>
+            <Link href="/trust" className="hdr-link mono">
+              trust
+            </Link>
           </div>
         </header>
 
