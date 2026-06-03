@@ -174,6 +174,24 @@ _VOUCHED_QUALITY = {"confidence": 1.0, "flags": [], "reasons": ["recalled from y
 _NO_REVIEW = {"needs_review": False, "review_reason": None}
 
 
+def _meal_detail(
+    per_item: list[dict[str, Any]],
+    trace: list[dict[str, Any]],
+    quality: dict[str, Any],
+    review: dict[str, Any],
+) -> dict[str, Any]:
+    """The per-meal breakdown persisted with a logged meal so /history can rebuild
+    its per-item table + trace + quality eval after a reload or navigation."""
+    return {
+        "per_item": per_item,
+        "trace": trace,
+        "confidence": quality["confidence"],
+        "reasons": quality["reasons"],
+        "needs_review": review["needs_review"],
+        "review_reason": review["review_reason"],
+    }
+
+
 def _rescale_item(item: CorrectionItem) -> dict[str, Any]:
     """A corrected item: its panel rescaled from the logged to the corrected grams."""
     factor = item.corrected_grams / item.original_grams if item.original_grams else 0.0
@@ -363,8 +381,12 @@ def create_app(
         recalled = learning.recall(user, req.text)
         if recalled is not None:
             per_item, totals = recalled["per_item"], recalled["totals"]
-            entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
             quality, review = dict(_VOUCHED_QUALITY), dict(_NO_REVIEW)
+            trace = [_recall_step()] + _build_trace(per_item, totals)
+            entry_id = log_store.add(
+                req.text, totals, date=req.date, user_id=user,
+                detail=_meal_detail(per_item, trace, quality, review),
+            )
             _record_trust(per_item, quality, review, user, req.text)
             return {
                 "id": entry_id,
@@ -375,14 +397,18 @@ def create_app(
                 "reasons": quality["reasons"],
                 "safety": safety,
                 **review,
-                "trace": [_recall_step()] + _build_trace(per_item, totals),
+                "trace": trace,
             }
         result = logger_fn(req.text, examples=learning.examples(user))
         totals = result.get("totals", [])
         per_item = result.get("per_item", [])
-        entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
         quality = evaluate_log(req.text, per_item, totals)
         review = review_flag(quality)
+        trace = _build_trace(per_item, totals)
+        entry_id = log_store.add(
+            req.text, totals, date=req.date, user_id=user,
+            detail=_meal_detail(per_item, trace, quality, review),
+        )
         _record_trust(per_item, quality, review, user, req.text)
         return {
             "id": entry_id,
@@ -391,7 +417,7 @@ def create_app(
             "reasons": quality["reasons"],
             "safety": safety,
             **review,
-            "trace": _build_trace(per_item, totals),
+            "trace": trace,
         }
 
     @app.post("/log/stream")
@@ -415,8 +441,12 @@ def create_app(
             # A meal the user already corrected — recall it instead of re-running.
             per_item, totals = recalled["per_item"], recalled["totals"]
             yield f"data: {json.dumps(_recall_step())}\n\n"
-            entry_id = log_store.add(req.text, totals, date=req.date, user_id=user)
             quality, review = dict(_VOUCHED_QUALITY), dict(_NO_REVIEW)
+            full_trace = [_recall_step()] + _build_trace(per_item, totals)
+            entry_id = log_store.add(
+                req.text, totals, date=req.date, user_id=user,
+                detail=_meal_detail(per_item, full_trace, quality, review),
+            )
             _record_trust(per_item, quality, review, user, req.text)
             result = {
                 "type": "result",
@@ -435,12 +465,16 @@ def create_app(
         def events() -> Iterator[str]:
             for event in streamer_fn(req.text, examples=learning.examples(user)):
                 if event.get("type") == "result":
-                    event["id"] = log_store.add(
-                        req.text, event.get("totals", []), date=req.date, user_id=user
-                    )
                     per_item = event.get("per_item", [])
-                    quality = evaluate_log(req.text, per_item, event.get("totals", []))
+                    totals = event.get("totals", [])
+                    quality = evaluate_log(req.text, per_item, totals)
                     review = review_flag(quality)
+                    trace = _build_trace(per_item, totals)
+                    event["trace"] = trace
+                    event["id"] = log_store.add(
+                        req.text, totals, date=req.date, user_id=user,
+                        detail=_meal_detail(per_item, trace, quality, review),
+                    )
                     event["confidence"] = quality["confidence"]
                     event["reasons"] = quality["reasons"]
                     event["safety"] = safety

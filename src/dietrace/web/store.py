@@ -24,9 +24,15 @@ CREATE TABLE IF NOT EXISTS meals (
     created_at  TEXT NOT NULL,
     date        TEXT NOT NULL,
     text        TEXT NOT NULL,
-    totals_json TEXT NOT NULL
+    totals_json TEXT NOT NULL,
+    detail_json TEXT
 )
 """
+
+# The per-meal breakdown fields persisted alongside totals so /history can
+# rebuild the per-item table + trace + quality eval for a meal logged earlier
+# (so navigating away and back keeps the breakdown, not just the totals).
+_DETAIL_KEYS = ("per_item", "trace", "confidence", "reasons", "needs_review", "review_reason")
 
 
 class MealLogStore:
@@ -40,6 +46,7 @@ class MealLogStore:
         with self._connect() as conn:
             conn.execute(_SCHEMA)
             _ensure_user_column(conn, "meals")
+            _ensure_column(conn, "meals", "detail_json", "TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path)
@@ -53,6 +60,7 @@ class MealLogStore:
         created_at: datetime.datetime | None = None,
         date: str | None = None,
         user_id: str = DEMO_USER,
+        detail: dict[str, Any] | None = None,
     ) -> int:
         """Persist a logged meal for *user_id* and return its new row id.
 
@@ -63,11 +71,12 @@ class MealLogStore:
         """
         when = created_at or datetime.datetime.now(tz=datetime.UTC)
         day = date or when.date().isoformat()
+        detail_json = json.dumps(detail) if detail else None
         with self._connect() as conn:
             cursor = conn.execute(
-                "INSERT INTO meals (user_id, created_at, date, text, totals_json) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (user_id, when.isoformat(), day, text, json.dumps(totals)),
+                "INSERT INTO meals (user_id, created_at, date, text, totals_json, detail_json) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, when.isoformat(), day, text, json.dumps(totals), detail_json),
             )
             return int(cursor.lastrowid)
 
@@ -90,7 +99,10 @@ class MealLogStore:
         ``date`` is a ``YYYY-MM-DD`` calendar day; when omitted, all days are
         returned (up to ``limit``).
         """
-        query = "SELECT id, created_at, date, text, totals_json FROM meals WHERE user_id = ?"
+        query = (
+            "SELECT id, created_at, date, text, totals_json, detail_json "
+            "FROM meals WHERE user_id = ?"
+        )
         params: list[Any] = [user_id]
         if date is not None:
             query += " AND date = ?"
@@ -99,16 +111,24 @@ class MealLogStore:
         params.append(limit)
         with self._connect() as conn:
             rows = conn.execute(query, params).fetchall()
-        return [
-            {
-                "id": row["id"],
-                "created_at": row["created_at"],
-                "date": row["date"],
-                "text": row["text"],
-                "totals": json.loads(row["totals_json"]),
-            }
-            for row in rows
-        ]
+        return [_meal_dict(dict(row)) for row in rows]
+
+
+def _meal_dict(row: dict[str, Any]) -> dict[str, Any]:
+    """Shape a meals row into the API payload, merging the persisted breakdown
+    (per_item, trace, quality eval) when present so /history rebuilds it."""
+    meal = {
+        "id": row["id"],
+        "created_at": row["created_at"],
+        "date": row["date"],
+        "text": row["text"],
+        "totals": json.loads(row["totals_json"]),
+    }
+    detail_json = row.get("detail_json")
+    if detail_json:
+        detail = json.loads(detail_json)
+        meal.update({k: detail[k] for k in _DETAIL_KEYS if k in detail})
+    return meal
 
 
 def _ensure_user_column(conn: sqlite3.Connection, table: str) -> None:
@@ -118,3 +138,10 @@ def _ensure_user_column(conn: sqlite3.Connection, table: str) -> None:
         conn.execute(
             f"ALTER TABLE {table} ADD COLUMN user_id TEXT NOT NULL DEFAULT '{DEMO_USER}'"
         )
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, name: str, decl: str) -> None:
+    """Add a nullable column to *table* if an older DB predates it (migration)."""
+    cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if name not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")

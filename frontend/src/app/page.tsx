@@ -76,7 +76,27 @@ export default function Home() {
   // navigating days updates both the meals and the consumed/remaining totals.
   const loadHistory = useCallback(() => {
     getHistory(toISODate(date))
-      .then((res) => setMeals(res.meals))
+      .then((res) => {
+        setMeals(res.meals);
+        // Rebuild the per-meal breakdown from the persisted fields so the table +
+        // trace survive a reload / navigation; don't clobber richer session detail.
+        setDetails((current) => {
+          const next = { ...current };
+          for (const m of res.meals) {
+            if (m.per_item && next[m.id] == null) {
+              next[m.id] = {
+                trace: m.trace ?? [],
+                perItem: m.per_item,
+                confidence: m.confidence,
+                reasons: m.reasons,
+                needsReview: m.needs_review,
+                reviewReason: m.review_reason ?? null,
+              };
+            }
+          }
+          return next;
+        });
+      })
       .catch(() => {});
   }, [date]);
 

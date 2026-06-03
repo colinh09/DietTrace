@@ -25,6 +25,10 @@ _MEALS = "meals"
 _CORRECTIONS = "corrections"
 _TRUST = "trust_logs"
 
+# The per-meal breakdown fields persisted with a meal so /history can rebuild the
+# per-item table + trace + quality eval (the breakdown survives navigation).
+_MEAL_DETAIL_KEYS = ("per_item", "trace", "confidence", "reasons", "needs_review", "review_reason")
+
 # How many recent flagged logs the /trust dashboard shows.
 _RECENT_LIMIT = 5
 
@@ -55,20 +59,22 @@ class FirestoreMealStore:
         created_at: datetime.datetime | None = None,
         date: str | None = None,
         user_id: str = DEMO_USER,
+        detail: dict[str, Any] | None = None,
     ) -> int:
         when = created_at or datetime.datetime.now(tz=datetime.UTC)
         day = date or when.date().isoformat()
         meal_id = int(time.time() * 1_000_000)
-        self._db.collection(_MEALS).document(str(meal_id)).set(
-            {
-                "id": meal_id,
-                "user_id": user_id,
-                "created_at": when.isoformat(),
-                "date": day,
-                "text": text,
-                "totals": totals,
-            }
-        )
+        doc = {
+            "id": meal_id,
+            "user_id": user_id,
+            "created_at": when.isoformat(),
+            "date": day,
+            "text": text,
+            "totals": totals,
+        }
+        if detail:
+            doc["detail"] = detail
+        self._db.collection(_MEALS).document(str(meal_id)).set(doc)
         return meal_id
 
     def delete(self, meal_id: int, user_id: str = DEMO_USER) -> bool:
@@ -87,16 +93,22 @@ class FirestoreMealStore:
         if date is not None:
             meals = [m for m in meals if m.get("date") == date]
         meals.sort(key=lambda m: m.get("id", 0), reverse=True)
-        return [
-            {
+        out = []
+        for m in meals[:limit]:
+            meal = {
                 "id": m["id"],
                 "created_at": m["created_at"],
                 "date": m["date"],
                 "text": m["text"],
                 "totals": m["totals"],
             }
-            for m in meals[:limit]
-        ]
+            detail = m.get("detail")
+            if detail:
+                meal.update(
+                    {k: detail[k] for k in _MEAL_DETAIL_KEYS if k in detail}
+                )
+            out.append(meal)
+        return out
 
 
 class FirestoreFeedbackStore:

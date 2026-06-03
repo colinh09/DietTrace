@@ -85,13 +85,21 @@ export interface LogResponse {
   safety: Safety;
 }
 
-// A persisted meal as stored by `dietrace.web.store.MealLogStore`.
+// A persisted meal as stored by `dietrace.web.store.MealLogStore`. The breakdown
+// fields (per_item, trace, the quality eval) are persisted with the meal so the
+// per-item table survives a reload or navigating away and back.
 export interface Meal {
   id: number;
   created_at: string;
   date: string;
   text: string;
   totals: Nutrient[];
+  per_item?: LoggedItem[];
+  trace?: TraceStep[];
+  confidence?: number;
+  reasons?: string[];
+  needs_review?: boolean;
+  review_reason?: string | null;
 }
 
 // `GET /history?date=` — one calendar day's meals (default: today).
