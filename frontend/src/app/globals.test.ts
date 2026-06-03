@@ -32,13 +32,16 @@ describe("globals.css responsive layout", () => {
   it("runs ~full-width on mobile by tightening the page padding", () => {
     expect(css).toMatch(/@media\s*\(max-width:\s*640px\)/);
 
-    // Every `.page` padding declaration (base + breakpoints); the desktop value
-    // is generous (24px) and at least one mobile override drops it to <=16px so
-    // content runs essentially edge-to-edge.
-    const pads = [
+    // The base `.page` horizontal padding floors at a generous 24px (the min of
+    // a clamp that grows on wide screens), and at least one mobile override drops
+    // it to <=16px so content runs essentially edge-to-edge.
+    const baseClamp = css.match(/\.page\s*\{[^}]*padding:[^;]*clamp\(\s*(\d+)px/);
+    expect(baseClamp).not.toBeNull();
+    expect(Number(baseClamp![1])).toBe(24);
+
+    const mobilePads = [
       ...css.matchAll(/\.page\s*\{[^}]*padding:\s*\d+px\s+(\d+)px/g),
     ].map((m) => Number(m[1]));
-    expect(pads).toContain(24);
-    expect(Math.min(...pads)).toBeLessThanOrEqual(16);
+    expect(Math.min(...mobilePads)).toBeLessThanOrEqual(16);
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-// The accountability dashboard — the right rail beside the day's logging. It
+// The observability dashboard — the right rail beside the day's logging. It
 // makes DietTrace's self-supervision loop visible at a glance: how many
 // corrections you've banked (your personal ground truth), that count climbing
 // over time, the on-demand re-tune that scores base-vs-your-corrections, the
@@ -87,9 +87,9 @@ export function Dashboard({
   latestTrace: LatestTrace | null;
 }) {
   return (
-    <aside className="dash" aria-label="Accountability dashboard">
+    <aside className="dash" aria-label="Observability dashboard">
       <div className="dash-head">
-        <span className="dash-title mono">accountability</span>
+        <span className="dash-title mono">observability</span>
         <Link href="/accuracy" className="dash-link mono">
           accuracy ›
         </Link>

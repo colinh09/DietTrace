@@ -398,29 +398,29 @@ body {
    fluidly and only centers (with framing padding) on very wide screens, so it
    doesn't sit as a narrow strip on a large/ultrawide monitor. */
 .wrap-wide { max-width: 1520px; }
-.layout { display: grid; grid-template-columns: minmax(0, 1.62fr) minmax(308px, 392px); gap: clamp(36px, 3.6vw, 60px); align-items: start; padding-top: 6px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.42fr) minmax(344px, 452px); gap: clamp(36px, 3.6vw, 60px); align-items: start; padding-top: 6px; }
 .col-log { min-width: 0; }
 
 /* Big screens: give the wrap and the dashboard rail a bit more room so the extra
    width is shared, not dumped into one stretched column. */
 @media (min-width: 1700px) {
-  .wrap-wide { max-width: 1680px; }
-  .layout { grid-template-columns: minmax(0, 1.66fr) minmax(340px, 432px); }
+  .wrap-wide { max-width: 1720px; }
+  .layout { grid-template-columns: minmax(0, 1.46fr) minmax(388px, 520px); }
 }
 
-.dash { position: sticky; top: 26px; display: flex; flex-direction: column; gap: 13px; }
-.dash-head { display: flex; align-items: baseline; justify-content: space-between; padding: 2px 2px 2px; }
-.dash-title { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); }
-.dash-link { font-size: 11px; color: var(--accent-ink); text-decoration: none; }
+.dash { position: sticky; top: 26px; display: flex; flex-direction: column; gap: 15px; }
+.dash-head { display: flex; align-items: baseline; justify-content: space-between; padding: 2px 2px 4px; }
+.dash-title { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.dash-link { font-size: 11.5px; color: var(--accent-ink); text-decoration: none; }
 .dash-link:hover { color: var(--accent); }
 
-.dash-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--bg); }
-.dash-card-head { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
+.dash-card { border: 1px solid var(--line); border-radius: 13px; padding: 16px 18px; background: var(--bg); }
+.dash-card-head { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 9px; }
 
-.dash-stat-card { display: flex; align-items: center; gap: 15px; background: var(--accent-softer); }
-.dash-stat-num { font-size: 35px; font-weight: 600; line-height: 1; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
-.dash-stat-label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted-ink); }
-.dash-stat-sub { font-size: 11px; color: var(--faint); margin-top: 2px; }
+.dash-stat-card { display: flex; align-items: center; gap: 17px; background: var(--accent-softer); padding: 18px 20px; }
+.dash-stat-num { font-size: 42px; font-weight: 600; line-height: 1; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.dash-stat-label { display: flex; flex-direction: column; font-size: 13.5px; color: var(--muted-ink); }
+.dash-stat-sub { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
 
 .dash-spark-svg { display: block; width: 100%; height: auto; }
 .dash-spark-fill { fill: var(--accent-soft); stroke: none; }
