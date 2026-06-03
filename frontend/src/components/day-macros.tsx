@@ -1,12 +1,10 @@
-// The day-macros band: calories consumed/target as a big number, then protein,
-// carb, and fat consumed-vs-target — each under a slim sage progress bar. Wired
-// to /analysis (consumed + target) with /goals as the initial-target fallback
-//; layout follows  (`.daymacros`).
+// The day-macros band: calories as a big ring (consumed vs target with the number
+// in the center), then protein, carb, and fat each as a smaller ring. Wired to
+// /analysis (consumed + target) with /goals as the initial-target fallback
+//.
 import type { GoalProgress } from "@/lib/api";
 
 // USDA number codes for the four tracked macros.
-// `key` is the one-letter glyph shown in the band; `label` is the spoken name
-// for the bar's aria-label (clearer than the verbose USDA names).
 const CALORIES = "208";
 const MACRO_ORDER: { code: string; key: string; label: string }[] = [
   { code: "203", key: "P", label: "protein" },
@@ -16,26 +14,66 @@ const MACRO_ORDER: { code: string; key: string; label: string }[] = [
 
 const fmt = new Intl.NumberFormat("en-US");
 
-// Fraction of the target met, clamped to 0–100% (an over-target macro fills
-// the bar but never overflows it).
-function fillPct(consumed: number, target: number): number {
+// Fraction of the target met, clamped to 0–1 (an over-target value fills the ring
+// but never wraps past full).
+function frac(consumed: number, target: number): number {
   if (target <= 0) return 0;
-  return Math.max(0, Math.min(100, (consumed / target) * 100));
+  return Math.max(0, Math.min(1, consumed / target));
 }
 
-// A slim sage bar whose fill width is the consumed fraction of the target.
-function Bar({ consumed, target, label }: { consumed: number; target: number; label: string }) {
+// A circular progress ring: a faint full track plus a sage arc for the filled
+// fraction, swept clockwise from the top. The center is filled by `children`.
+function Ring({
+  consumed,
+  target,
+  size,
+  stroke,
+  label,
+  children,
+}: {
+  consumed: number;
+  target: number;
+  size: number;
+  stroke: number;
+  label: string;
+  children: React.ReactNode;
+}) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const filled = frac(consumed, target);
+  const mid = size / 2;
   return (
-    <div className="bar">
-      <div
-        className="bar-fill"
-        role="progressbar"
-        aria-label={label}
-        aria-valuenow={Math.round(consumed)}
-        aria-valuemin={0}
-        aria-valuemax={Math.round(target)}
-        style={{ width: `${fillPct(consumed, target)}%` }}
-      />
+    <div className="ring-wrap" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="ring"
+        role="img"
+        aria-label={`${label}: ${Math.round(consumed)} of ${Math.round(target)}`}
+      >
+        <circle
+          className="ring-track"
+          cx={mid}
+          cy={mid}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+        />
+        <circle
+          className="ring-fill"
+          cx={mid}
+          cy={mid}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={circ * (1 - filled)}
+          transform={`rotate(-90 ${mid} ${mid})`}
+        />
+      </svg>
+      <div className="ring-center">{children}</div>
     </div>
   );
 }
@@ -49,12 +87,11 @@ export function DayMacros({ goals }: { goals: GoalProgress[] }) {
   return (
     <section className="daymacros">
       <div className="dm-cal">
-        <div className="dm-cal-label">calories</div>
-        <div className="dm-cal-val mono tnum">
-          {fmt.format(Math.round(calConsumed))}
-          <span className="dm-cal-goal"> / {fmt.format(Math.round(calTarget))}</span>
-        </div>
-        <Bar consumed={calConsumed} target={calTarget} label="calories" />
+        <Ring consumed={calConsumed} target={calTarget} size={132} stroke={11} label="calories">
+          <span className="dm-cal-val tnum">{fmt.format(Math.round(calConsumed))}</span>
+          <span className="dm-cal-goal tnum">/ {fmt.format(Math.round(calTarget))}</span>
+          <span className="dm-cal-label">calories</span>
+        </Ring>
       </div>
       <div className="dm-macros">
         {MACRO_ORDER.map(({ code, key, label }) => {
@@ -63,12 +100,13 @@ export function DayMacros({ goals }: { goals: GoalProgress[] }) {
           const target = goal?.target ?? 0;
           return (
             <div className="dm-macro" key={key}>
-              <div className="dm-macro-val mono tnum">
-                <b>{key}</b>
-                {Math.round(consumed)}
-                <span className="dm-macro-goal"> / {Math.round(target)} g</span>
+              <Ring consumed={consumed} target={target} size={84} stroke={8} label={label}>
+                <span className="dm-macro-key">{key}</span>
+                <span className="dm-macro-val tnum">{Math.round(consumed)}</span>
+              </Ring>
+              <div className="dm-macro-goal tnum">
+                {Math.round(consumed)} / {Math.round(target)} g
               </div>
-              <Bar consumed={consumed} target={target} label={label} />
             </div>
           );
         })}

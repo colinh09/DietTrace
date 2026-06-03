@@ -41,9 +41,11 @@ const ok = {
 };
 
 describe("MealTrace", () => {
-  it("labels the section as the agent's work and lists each step", () => {
+  it("keeps the agent's work behind a toggle, revealing each step on open", () => {
     render(<MealTrace trace={trace} perItem={perItem} />);
-    expect(screen.getByText(/the agent's work/i)).toBeInTheDocument();
+    // The breakdown table is always shown; the trace steps are tucked away.
+    expect(screen.queryByText(/Parsed 2 foods/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /the agent's work/i }));
     expect(screen.getByText(/Parsed 2 foods/)).toBeInTheDocument();
     expect(screen.getByText(/Logged 2 items/)).toBeInTheDocument();
   });

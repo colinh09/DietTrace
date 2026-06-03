@@ -1,16 +1,15 @@
 "use client";
 
-// The agent's-work trace + the meal-correction editor behind a meal's expand
-//. Two calm parts:
-//   1. the agent's ordered steps — parse → search/web → portion → log (or a
-//      single `recall` step when the meal was served from the user's memory) —
-//      one quiet line each, read straight from the `/log` trace; and
-//   2. the per-item table. "Something's off?" opens an editor: drop a wrongly
-//      added item (the double-count case), nudge a portion, and Save — which
-//      teaches the agent (it recalls this meal next time, learns similar ones)
-//      and pushes the corrected meal to Arize as ground truth.
+// A logged meal's breakdown + correction editor. The per-item
+// table is the heart of it and is always shown — getting the agent better at the
+// user's portions is the whole point, so "something's off?" is the primary call
+// to action: drop a wrongly added item (the double-count case), nudge a portion,
+// and Save — which teaches the agent (it recalls this meal next time, learns
+// similar ones) and pushes the corrected meal to Arize as ground truth. The
+// agent's ordered steps (parse → search/web → portion → log) sit behind a quiet
+// "agent's work" toggle for anyone who wants to see how the number was reached.
 import { useState } from "react";
-import { Check, Globe, History, Sparkle, X } from "lucide-react";
+import { Check, Globe, History, X } from "lucide-react";
 import {
   correctMeal,
   type CorrectionResult,
@@ -20,11 +19,11 @@ import {
 import { macrosOf } from "@/lib/meal";
 
 // Each step's rail glyph: a globe for the web fallback, a history mark for a
-// recall from memory, the ✦ sparkle otherwise.
+// recall from memory, and a quiet dot for the ordinary deterministic steps.
 export function StepGlyph({ step }: { step?: string }) {
   if (step === "web_search") return <Globe size={11} color="var(--accent)" />;
   if (step === "recall") return <History size={11} color="var(--accent)" />;
-  return <Sparkle size={11} fill="var(--accent)" color="var(--accent)" />;
+  return <span className="step-dot" aria-hidden="true" />;
 }
 
 function StepLine({ step, isLast }: { step: TraceStep; isLast: boolean }) {
@@ -128,6 +127,7 @@ export function MealTrace({
   onCorrected?: () => void;
 }) {
   const [editing, setEditing] = useState(startEditing && Boolean(mealText));
+  const [showTrace, setShowTrace] = useState(false);
   const [items, setItems] = useState<EditItem[]>(() =>
     perItem.map((it) => ({ ...it, grams_edit: it.grams, removed: false })),
   );
@@ -165,111 +165,125 @@ export function MealTrace({
 
   return (
     <div className="mealtrace">
-      <div className="mealtrace-head mono">the agent&apos;s work</div>
-      <ol className="trace-list">
-        {trace.map((step, i) => (
-          <StepLine key={i} step={step} isLast={i === trace.length - 1} />
-        ))}
-      </ol>
+      {/* The per-item breakdown — always shown; the correction surface. */}
+      <div className="item-grid item-head">
+        <div>Item</div>
+        <div className="num">grams</div>
+        <div className="num">kcal</div>
+        <div className="num">P</div>
+        <div className="num">C</div>
+        <div className="num">F</div>
+      </div>
+      {items.map((item, i) => (
+        <ItemRow
+          key={`${item.fdc_id}-${i}`}
+          item={item}
+          editing={editing}
+          onGrams={(g) => setGrams(i, g)}
+          onToggle={() => toggle(i)}
+        />
+      ))}
 
-      {reasons && reasons.length > 0 && (
-        <div className="conf-reasons">
-          <div className="conf-reasons-head mono">why this confidence</div>
-          <ul className="conf-reasons-list">
-            {reasons.map((reason, i) => (
-              <li key={i} className="conf-reason">
-                {reason}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="exp-pad">
-        <div className="item-grid item-head">
-          <div>Item</div>
-          <div className="num">grams</div>
-          <div className="num">kcal</div>
-          <div className="num">P</div>
-          <div className="num">C</div>
-          <div className="num">F</div>
-        </div>
-        {items.map((item, i) => (
-          <ItemRow
-            key={`${item.fdc_id}-${i}`}
-            item={item}
-            editing={editing}
-            onGrams={(g) => setGrams(i, g)}
-            onToggle={() => toggle(i)}
-          />
-        ))}
-
-        {status === "saved" && result ? (
-          <div className="correct-saved">
-            <div className="correct-bar saved">
-              <Check size={12} color="var(--accent)" />
-              <span className="correct-hint">
-                Learned — log this meal again and it&apos;ll come back right.
-              </span>
-            </div>
-            <div className="arize-card">
-              <span className="arize-card-head mono">
-                added to your arize eval set · ground truth ({result.corrections} case
-                {result.corrections === 1 ? "" : "s"})
-              </span>
-              <div className="arize-card-body">
-                <span className="arize-truth">{mealText}</span>
-                <span className="arize-macros mono tnum">
-                  {Math.round(macrosOf(result.totals).kcal)} kcal · P{" "}
-                  {Math.round(macrosOf(result.totals).protein)} · C{" "}
-                  {Math.round(macrosOf(result.totals).carb)} · F{" "}
-                  {Math.round(macrosOf(result.totals).fat)}
-                </span>
-              </div>
-              <span className="arize-card-foot">
-                The next re-test scores the agent against this.
-              </span>
-            </div>
-          </div>
-        ) : editing ? (
-          <div className="correct-bar">
+      {status === "saved" && result ? (
+        <div className="correct-saved">
+          <div className="correct-bar saved">
+            <Check size={12} color="var(--accent)" />
             <span className="correct-hint">
-              Remove anything wrong (e.g. a double-counted dish) or fix a portion,
-              then teach it.
+              Learned — log this meal again and it&apos;ll come back right.
+            </span>
+          </div>
+          <div className="arize-card">
+            <span className="arize-card-head mono">
+              added to your arize eval set · ground truth ({result.corrections} case
+              {result.corrections === 1 ? "" : "s"})
+            </span>
+            <div className="arize-card-body">
+              <span className="arize-truth">{mealText}</span>
+              <span className="arize-macros mono tnum">
+                {Math.round(macrosOf(result.totals).kcal)} kcal · P{" "}
+                {Math.round(macrosOf(result.totals).protein)} · C{" "}
+                {Math.round(macrosOf(result.totals).carb)} · F{" "}
+                {Math.round(macrosOf(result.totals).fat)}
+              </span>
+            </div>
+            <span className="arize-card-foot">
+              The next re-test scores the agent against this.
+            </span>
+          </div>
+        </div>
+      ) : editing ? (
+        <div className="correct-bar editing">
+          <span className="correct-hint">
+            Remove anything wrong (e.g. a double-counted dish) or fix a portion,
+            then teach it.
+          </span>
+          <button
+            type="button"
+            className="correct-btn primary mono"
+            onClick={save}
+            disabled={status === "saving"}
+          >
+            {status === "saving" ? "teaching…" : "save correction"}
+          </button>
+          <button
+            type="button"
+            className="correct-cancel mono"
+            onClick={() => setEditing(false)}
+          >
+            cancel
+          </button>
+          {status === "error" && (
+            <span className="correct-err">couldn&apos;t save — try again</span>
+          )}
+        </div>
+      ) : (
+        canEdit && (
+          <div className="correct-cta">
+            <span className="correct-cta-hint">
+              Portion or item look wrong? Fix it once — DietTrace learns your
+              style and logs it right next time.
             </span>
             <button
               type="button"
-              className="correct-btn mono"
-              onClick={save}
-              disabled={status === "saving"}
+              className="correct-btn primary mono"
+              onClick={() => setEditing(true)}
             >
-              {status === "saving" ? "teaching…" : "save correction"}
+              something&apos;s off?
             </button>
-            <button
-              type="button"
-              className="correct-cancel mono"
-              onClick={() => setEditing(false)}
-            >
-              cancel
-            </button>
-            {status === "error" && (
-              <span className="correct-err">couldn&apos;t save — try again</span>
-            )}
           </div>
-        ) : (
-          canEdit && (
-            <div className="correct-bar">
-              <button
-                type="button"
-                className="correct-btn mono"
-                onClick={() => setEditing(true)}
-              >
-                something&apos;s off?
-              </button>
+        )
+      )}
+
+      {/* The agent's work — secondary, behind a quiet toggle. */}
+      <button
+        type="button"
+        className="trace-toggle mono"
+        aria-expanded={showTrace}
+        onClick={() => setShowTrace((s) => !s)}
+      >
+        {showTrace ? "hide" : "show"} the agent&apos;s work
+      </button>
+      {showTrace && (
+        <div className="trace-detail">
+          <ol className="trace-list">
+            {trace.map((step, i) => (
+              <StepLine key={i} step={step} isLast={i === trace.length - 1} />
+            ))}
+          </ol>
+          {reasons && reasons.length > 0 && (
+            <div className="conf-reasons">
+              <div className="conf-reasons-head mono">why this confidence</div>
+              <ul className="conf-reasons-list">
+                {reasons.map((reason, i) => (
+                  <li key={i} className="conf-reason">
+                    {reason}
+                  </li>
+                ))}
+              </ul>
             </div>
-          )
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

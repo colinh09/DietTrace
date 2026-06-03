@@ -7,7 +7,6 @@
 // ordered steps plus the per-item editable table — from that meal's `/log`
 // detail when we have it.
 import { useState } from "react";
-import { ChevronDown, Sparkle } from "lucide-react";
 import type { LoggedItem, Meal, TraceStep } from "@/lib/api";
 import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
@@ -44,9 +43,8 @@ function MealRow({
   onEdit?: (meal: Meal) => void;
   onCorrected?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  // Set when the user taps "review?": it opens the row straight into the
-  // correction editor (vs. the chevron, which opens to the read-only trace).
+  // Set when the user taps "review?": it opens the editor straight into edit
+  // mode (vs. the always-shown read-only breakdown).
   const [reviewMode, setReviewMode] = useState(false);
   const macros = macrosOf(meal.totals);
   // Prefer the backend's real online-eval confidence when we have it (a freshly
@@ -60,18 +58,18 @@ function MealRow({
   // A low-confidence log the backend flagged: offer a calm review affordance
   // that drops the user into the correction editor.
   const needsReview = detail?.needsReview ?? false;
-
-  const openForReview = () => {
-    setReviewMode(true);
-    setOpen(true);
-  };
+  // The confidence chip is an automatic quality check, NOT a correctness
+  // guarantee — a clean resolution can still carry a guessed portion. The
+  // tooltip says so and points at the fix.
+  const confTitle =
+    `${conf.level} confidence (${conf.pct}%) — DietTrace's automatic quality check: ` +
+    "how cleanly it resolved each food, the source, and calorie sanity. It does " +
+    "not verify the portion, so if a gram weight looks off, tap “something's off?” " +
+    "to correct it.";
 
   return (
     <li className="meal">
       <div className="meal-head">
-        <span className="meal-bullet" aria-hidden="true">
-          <Sparkle size={11} fill="var(--accent)" color="var(--accent)" />
-        </span>
         <span className="meal-main">
           <span className="meal-text">{meal.text}</span>
           <span className="meal-time mono">{formatTime(meal.created_at)}</span>
@@ -86,7 +84,7 @@ function MealRow({
             <span className="mm-sep">·</span>
             <span className="mm-part">F {Math.round(macros.fat)}</span>
           </span>
-          <span className={"conf-chip " + chip}>
+          <span className={"conf-chip " + chip} title={confTitle}>
             <span className="conf-dot" aria-hidden="true" />
             <span className="conf-label">{conf.level}</span>
             <span className="conf-pct tnum"> · {conf.pct}%</span>
@@ -96,7 +94,7 @@ function MealRow({
               type="button"
               className="meal-review"
               title={detail?.reviewReason ?? undefined}
-              onClick={openForReview}
+              onClick={() => setReviewMode(true)}
             >
               review?
             </button>
@@ -109,36 +107,26 @@ function MealRow({
           >
             remove
           </button>
-          <button
-            type="button"
-            className="meal-chev"
-            aria-label="expand meal details"
-            aria-expanded={open}
-            onClick={() => setOpen((o) => !o)}
-            data-open={open ? "true" : "false"}
-          >
-            <ChevronDown size={16} />
-          </button>
         </span>
       </div>
-      <div className="meal-exp" data-open={open ? "true" : "false"}>
-        <div className="meal-exp-inner">
-          {open &&
-            (detail ? (
-              <MealTrace
-                trace={detail.trace}
-                perItem={detail.perItem}
-                reasons={detail.reasons}
-                mealText={meal.text}
-                startEditing={reviewMode}
-                onCorrected={onCorrected}
-              />
-            ) : (
-              <div className="meal-exp-empty">
-                No agent trace for this meal — log it again to see the agent&apos;s work.
-              </div>
-            ))}
-        </div>
+      <div className="meal-detail">
+        {detail ? (
+          <MealTrace
+            // Remount into edit mode when the user taps "review?" — the breakdown
+            // is always mounted, so flipping the key is what re-reads startEditing.
+            key={reviewMode ? "edit" : "view"}
+            trace={detail.trace}
+            perItem={detail.perItem}
+            reasons={detail.reasons}
+            mealText={meal.text}
+            startEditing={reviewMode}
+            onCorrected={onCorrected}
+          />
+        ) : (
+          <div className="meal-detail-empty">
+            No breakdown for this meal — log it again to see the per-item table.
+          </div>
+        )}
       </div>
     </li>
   );

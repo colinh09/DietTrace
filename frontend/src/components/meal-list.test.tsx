@@ -69,21 +69,14 @@ describe("MealList", () => {
     expect(within(loose).getByText(/Medium/)).toBeInTheDocument();
   });
 
-  it("offers a remove affordance and an expand chevron per row", () => {
+  it("offers a remove affordance per row and no separate expander", () => {
     render(<MealList meals={meals} />);
     const row = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
     expect(within(row).getByRole("button", { name: /remove/i })).toBeInTheDocument();
-    // The row head is itself the expand toggle, collapsed by default.
-    const head = within(row).getByRole("button", { name: /expand/i });
-    expect(head).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("toggles the row open when the chevron head is clicked", () => {
-    render(<MealList meals={meals} />);
-    const row = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
-    const head = within(row).getByRole("button", { name: /expand/i });
-    fireEvent.click(head);
-    expect(head).toHaveAttribute("aria-expanded", "true");
+    // The breakdown is always shown now, so there is no chevron/expand control.
+    expect(
+      within(row).queryByRole("button", { name: /expand/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a calm empty state when nothing is logged", () => {
@@ -92,7 +85,7 @@ describe("MealList", () => {
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
   });
 
-  it("reveals the agent's-work trace from the /log detail when a row is expanded", () => {
+  it("always shows the breakdown from the /log detail, with the trace behind a toggle", () => {
     const perItem: LoggedItem[] = [
       {
         fdc_id: 171477,
@@ -106,18 +99,17 @@ describe("MealList", () => {
       { step: "log_entry", summary: "Logged 1 item(s) into 1 nutrient total(s)", totals: perItem[0].nutrients },
     ];
     render(<MealList meals={meals} detailsById={{ 2: { trace, perItem } }} />);
-    // Collapsed by default: the trace is not in the DOM.
-    expect(screen.queryByText(/the agent's work/i)).not.toBeInTheDocument();
 
     const row = screen.getByText("grilled chicken salad with olive oil").closest("li") as HTMLElement;
-    fireEvent.click(within(row).getByRole("button", { name: /expand/i }));
-    expect(within(row).getByText(/the agent's work/i)).toBeInTheDocument();
-    expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
-    // The portion shows read-only; correcting it is one click away.
+    // The breakdown shows straight away — portion read-only, correction one click away.
     expect(within(row).getByText("140 g")).toBeInTheDocument();
     expect(
       within(row).getByRole("button", { name: /something's off/i }),
     ).toBeInTheDocument();
+    // The trace steps sit behind the "agent's work" toggle.
+    expect(within(row).queryByText(/Parsed 1 food/)).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: /the agent's work/i }));
+    expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
   });
 
   it("uses the backend confidence from the meal's detail over the macro heuristic", () => {
@@ -137,7 +129,7 @@ describe("MealList", () => {
     expect(within(clean).getByText(/42%/)).toBeInTheDocument();
   });
 
-  it("shows the confidence reasons when a row with a backend score is expanded", () => {
+  it("shows the confidence reasons inside the agent's-work toggle", () => {
     const detail: MealDetail = {
       trace: [
         { step: "parse_meal", summary: "Parsed 1 food(s): chicken", foods: ["chicken"] },
@@ -150,9 +142,9 @@ describe("MealList", () => {
     const row = screen
       .getByText("grilled chicken salad with olive oil")
       .closest("li") as HTMLElement;
-    // Collapsed: the reasons aren't in the DOM yet.
+    // Tucked away until the trace is opened.
     expect(screen.queryByText(/lower-trust source/)).not.toBeInTheDocument();
-    fireEvent.click(within(row).getByRole("button", { name: /expand/i }));
+    fireEvent.click(within(row).getByRole("button", { name: /the agent's work/i }));
     expect(within(row).getByText(/lower-trust source/)).toBeInTheDocument();
     expect(within(row).getByText(/macros total zero energy/)).toBeInTheDocument();
   });
@@ -204,24 +196,23 @@ describe("MealList", () => {
       .getByText("grilled chicken salad with olive oil")
       .closest("li") as HTMLElement;
 
-    // Collapsed: the editor isn't mounted yet.
+    // The breakdown is shown read-only — no editor until "review?" is tapped.
     expect(
       within(row).queryByRole("button", { name: /save correction/i }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(within(row).getByRole("button", { name: /review/i }));
 
-    // The row expands straight into the existing correction editor.
-    expect(within(row).getByText(/the agent's work/i)).toBeInTheDocument();
+    // The breakdown flips into the existing correction editor.
     expect(
       within(row).getByRole("button", { name: /save correction/i }),
     ).toBeInTheDocument();
   });
 
-  it("shows a calm note when an expanded row has no trace detail", () => {
+  it("shows a calm note when a row has no breakdown detail", () => {
     render(<MealList meals={meals} />);
     const row = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
-    fireEvent.click(within(row).getByRole("button", { name: /expand/i }));
-    expect(within(row).getByText(/no agent trace/i)).toBeInTheDocument();
+    // No /log detail captured for this history row → a calm note, always shown.
+    expect(within(row).getByText(/no breakdown/i)).toBeInTheDocument();
   });
 });

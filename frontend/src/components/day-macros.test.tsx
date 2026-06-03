@@ -25,36 +25,31 @@ describe("DayMacros", () => {
     expect(screen.getByText("P")).toBeInTheDocument();
     expect(screen.getByText("C")).toBeInTheDocument();
     expect(screen.getByText("F")).toBeInTheDocument();
-    expect(screen.getByText("/ 150 g")).toBeInTheDocument();
-    expect(screen.getByText("/ 200 g")).toBeInTheDocument();
-    expect(screen.getByText("/ 65 g")).toBeInTheDocument();
+    expect(screen.getByText("180 / 150 g")).toBeInTheDocument();
+    expect(screen.getByText("50 / 200 g")).toBeInTheDocument();
+    expect(screen.getByText("13 / 65 g")).toBeInTheDocument();
   });
 
-  it("renders a sage progress bar per macro, clamped to 0–100%", () => {
+  it("renders a progress ring for calories and each macro", () => {
     render(<DayMacros goals={goals} />);
-    const bars = screen.getAllByRole("progressbar");
-    // calories + P + C + F.
-    expect(bars).toHaveLength(4);
+    // calories + P + C + F = four rings, each an accessible <svg role="img">.
+    const rings = screen.getAllByRole("img");
+    expect(rings).toHaveLength(4);
 
-    const cal = screen.getByRole("progressbar", { name: /calories/i });
-    expect(cal).toHaveStyle({ width: "50%" });
-
-    // Protein is over target → the fill clamps at 100%, not 120%.
-    const protein = screen.getByRole("progressbar", { name: /protein/i });
-    expect(protein).toHaveStyle({ width: "100%" });
-
-    const carb = screen.getByRole("progressbar", { name: /carbohydrate/i });
-    expect(carb).toHaveStyle({ width: "25%" });
+    // Each ring's label encodes consumed-of-target; an over-target macro still
+    // reports its true numbers (the fill clamps, the label doesn't lie).
+    expect(
+      screen.getByRole("img", { name: /calories: 1000 of 2000/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /protein: 180 of 150/i }),
+    ).toBeInTheDocument();
   });
 
   it("falls back to zeros when a macro is missing", () => {
     render(<DayMacros goals={[]} />);
-    // Calories + P + C + F all read zero.
+    // The calorie ring center + the three macro ring centers all read zero.
     expect(screen.getAllByText("0")).toHaveLength(4);
-    const bars = screen.getAllByRole("progressbar");
-    for (const bar of bars) {
-      expect(bar).toHaveStyle({ width: "0%" });
-    }
   });
 
   it("rounds fractional amounts for display", () => {
