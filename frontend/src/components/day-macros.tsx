@@ -48,7 +48,7 @@ function Ring({
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
-        className="ring"
+        className="dm-ring"
         role="img"
         aria-label={`${label}: ${Math.round(consumed)} of ${Math.round(target)}`}
       >
