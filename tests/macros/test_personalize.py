@@ -357,3 +357,62 @@ class TestFencedResponse:
         """A plain ``` ... ``` fence (no language tag) is also stripped correctly."""
         plan = personalize_plan(_profile(), _base_targets(), self._fenced_client(""))
         assert plan.source == "ai"
+
+
+# ---------------------------------------------------------------------------
+# Carb-goes-negative guard (personalize_plan lines 232–240)
+#
+# When protein + fat together exceed kcal after clamping, the remainder for
+# carbohydrate is negative. The guard reduces fat until carb can be 0.0 g
+# and records "fat" in clamped — guaranteeing 4P + 4C + 9F = kcal exactly.
+#
+# Triggered by: very heavy person (weight_kg=200) on a 1800 kcal cut plan
+# with Gemini requesting +10 pp protein and +10 pp fat from a 55/35/10 split.
+# After deltas: protein_raw=292.5 g (in protein bounds, not clamped),
+# fat_raw=90 g (> fat_max=80, clamped to 80) → carb_kcal = 1800−1170−720 = −90.
+# ---------------------------------------------------------------------------
+
+
+class TestCarbNegativeGuard:
+    def _setup(self):
+        """Profile + base targets + mock client that trigger the carb<0 path."""
+        profile = MacroProfile(
+            age=40, sex="male", height_cm=190.0, weight_kg=200.0,
+            activity="moderate", goal="cut",
+        )
+        # Consistent 55/10/35 split (Atwater = 1800.0, no drift).
+        base = {
+            "208": 1800.0,
+            "203": round(1800.0 * 0.55 / 4.0, 1),  # 247.5 g protein
+            "205": round(1800.0 * 0.10 / 4.0, 1),  # 45.0 g carb
+            "204": round(1800.0 * 0.35 / 9.0, 1),  # 70.0 g fat
+        }
+        response = MagicMock()
+        response.text = (
+            '{"rationale": "athlete needs high protein and fat",'
+            ' "protein_pct_delta": 10.0, "fat_pct_delta": 10.0}'
+        )
+        client = MagicMock()
+        client.models.generate_content.return_value = response
+        return profile, base, client
+
+    def test_carb_is_non_negative_when_guard_fires(self):
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        assert plan.targets["205"] >= 0.0
+
+    def test_atwater_holds_when_carb_zeroed(self):
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        p, c, f = plan.targets["203"], plan.targets["205"], plan.targets["204"]
+        assert abs(4.0 * p + 4.0 * c + 9.0 * f - 1800.0) <= 5.0
+
+    def test_fat_in_clamped_when_guard_fires(self):
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        assert "fat" in plan.clamped
+
+    def test_kcal_unchanged_when_guard_fires(self):
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        assert plan.targets["208"] == 1800.0
