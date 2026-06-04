@@ -340,6 +340,35 @@ def test_zero_kcal_plan_does_not_crash() -> None:
     assert isinstance(result["score"], float)
 
 
+def test_zero_kcal_nonzero_atwater_flags_consistency() -> None:
+    """kcal=0 but macros give a nonzero Atwater estimate: pins the
+    _consistency branch that returns score=0.0 + flag (lines 60-64 of eval.py).
+    test_zero_kcal_plan_does_not_crash only exercises the all-zero path."""
+    profile = _profile(weight_kg=80.0)
+    # atwater = 4*50 + 4*100 + 9*0 = 600 > 0, but kcal = 0
+    plan = _plan(kcal=0.0, protein=50.0, carb=100.0, fat=0.0)
+    result = evaluate_macro_plan(profile, plan)
+    assert "atwater_inconsistent" in result["flags"]
+    assert result["consistency"]["score"] == 0.0
+    assert any("0 kcal" in r.lower() or "target is 0" in r.lower() for r in result["reasons"])
+    assert result["pass"] is False
+
+
+def test_zero_kcal_nonzero_fat_flags_safety() -> None:
+    """kcal=0 but fat>0: pins the _safety branch that emits fat_out_of_bounds
+    with 'kcal target is 0' reason (lines 122-125 of eval.py).
+    The fat-fraction check skips to the gram-level guard when kcal is zero."""
+    profile = MacroProfile(
+        age=30, sex="male", height_cm=175.0, weight_kg=0.0,
+        activity="moderate", goal="maintain",
+    )
+    # weight_kg=0 skips the protein axis; fat=30g with kcal=0 must fire fat_out_of_bounds
+    plan = _plan(kcal=0.0, protein=0.0, carb=0.0, fat=30.0)
+    result = evaluate_macro_plan(profile, plan)
+    assert "fat_out_of_bounds" in result["flags"]
+    assert any("kcal" in r.lower() and "0" in r for r in result["reasons"])
+
+
 def test_zero_weight_protein_axis_skipped() -> None:
     """A zero-weight profile cannot compute g/kg — protein axis is skipped, not flagged."""
     profile = MacroProfile(
