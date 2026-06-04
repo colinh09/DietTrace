@@ -438,3 +438,110 @@ export async function logMealStream(
     }
   }
 }
+
+// ── Macros: AI-assisted planning + per-user targets ───────────────────────
+// The nutritionist's macro side. `/macros/plan` computes a plan (deterministic
+// calories + a clamped/guarded AI split, scored by an online eval, biased toward
+// the user's saved preference); `/macros/save` persists the (possibly edited)
+// targets and remembers the split; `/macros/retune` reports the alignment lift.
+
+// Daily targets keyed by USDA code: "208" kcal · "203" protein · "205" carb · "204" fat.
+export type MacroTargets = Record<string, number>;
+
+export type MacroSex = "male" | "female";
+export type MacroActivity =
+  | "sedentary"
+  | "light"
+  | "moderate"
+  | "active"
+  | "very_active";
+export type MacroGoal = "cut" | "maintain" | "bulk";
+
+// POST /macros/plan body — EITHER a preset key (no-profile path) OR a full profile.
+export interface MacroPlanRequest {
+  preset?: string | null;
+  age?: number;
+  sex?: MacroSex;
+  height_cm?: number;
+  weight_kg?: number;
+  activity?: MacroActivity;
+  goal?: MacroGoal;
+  preference?: string | null;
+  ai_help?: boolean;
+}
+
+// The macro-plan online eval verdict (deterministic consistency + safety check).
+export interface MacroEval {
+  score: number;
+  pass: boolean;
+  consistency: { score: number; flag?: string; reason?: string };
+  safety: { score: number; flags?: string[]; reasons?: string[] };
+  flags: string[];
+  reasons: string[];
+}
+
+// How closely the served split matches the user's saved preference (Phase 2).
+export interface MacroAdherence {
+  score: number;
+  protein_delta: number;
+  fat_delta: number;
+}
+
+// POST /macros/plan response — the plan plus its accountability surface.
+export interface MacroPlan {
+  targets: MacroTargets;
+  rationale: string;
+  source: "formula" | "ai" | "preset";
+  steps: Record<string, unknown>[];
+  clamped: string[];
+  eval: MacroEval | null;
+  // True when the split was biased toward the user's remembered preference.
+  personalized: boolean;
+  adherence: MacroAdherence | null;
+}
+
+// Compute a macro plan (does NOT persist). Pass a profile or `{ preset }`.
+export async function postMacrosPlan(body: MacroPlanRequest): Promise<MacroPlan> {
+  return request<MacroPlan>("/macros/plan", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// The result of saving targets: the agent now remembers this user's split.
+export interface MacroSaveResult {
+  ok: boolean;
+  user: string;
+  targets: MacroTargets;
+  // True when the preference was banked to Arize Phoenix as ground truth.
+  banked: boolean;
+}
+
+// Persist the (possibly edited) targets for the calling user.
+export async function postMacrosSave(
+  targets: MacroTargets,
+  rationale?: string | null,
+  source?: string | null,
+): Promise<MacroSaveResult> {
+  return request<MacroSaveResult>("/macros/save", {
+    method: "POST",
+    body: JSON.stringify({ targets, rationale, source }),
+  });
+}
+
+// POST /macros/retune — the alignment lift from the user's saved preference
+// (generic-default plan → personalized plan), the "it adapts to you" signal.
+export interface MacroRetune {
+  cases: number;
+  before: number | null;
+  after: number | null;
+  improved: boolean;
+  protein_shift?: number;
+}
+
+export async function postMacrosRetune(body: MacroPlanRequest): Promise<MacroRetune> {
+  return request<MacroRetune>("/macros/retune", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
