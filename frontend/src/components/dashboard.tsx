@@ -6,7 +6,6 @@
 // over time, the on-demand re-tune that scores base-vs-your-corrections, the
 // portions you've taught, and the latest meal's agent trace. Data comes from
 // /memory, /feedback/recent (with timestamps), /retune, and the last /log.
-import Link from "next/link";
 import { RetunePanel } from "@/components/retune-panel";
 import { TaughtPanel } from "@/components/taught-panel";
 import { StepGlyph } from "@/components/meal-trace";
@@ -81,18 +80,24 @@ export function Dashboard({
   corrections,
   taught,
   latestTrace,
+  onOpenObs,
 }: {
   corrections: number;
   taught: RecentCorrection[];
   latestTrace: LatestTrace | null;
+  onOpenObs?: (tab: "accuracy" | "trust") => void;
 }) {
   return (
     <aside className="dash" aria-label="Observability dashboard">
       <div className="dash-head">
         <span className="dash-title mono">observability</span>
-        <Link href="/accuracy" className="dash-link mono">
+        <button
+          type="button"
+          className="dash-link mono"
+          onClick={() => onOpenObs?.("accuracy")}
+        >
           accuracy ›
-        </Link>
+        </button>
       </div>
 
       <section className="dash-card dash-stat-card">

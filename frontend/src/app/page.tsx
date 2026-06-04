@@ -13,6 +13,7 @@ import { LiveMeal, type LiveEntry } from "@/components/live-meal";
 import { MealList, type MealDetail } from "@/components/meal-list";
 import { SafetyNotice } from "@/components/safety-notice";
 import { Dashboard, type LatestTrace } from "@/components/dashboard";
+import { ObservabilityModal, type ObsTab } from "@/components/observability-modal";
 import {
   deleteMeal,
   getAnalysis,
@@ -44,6 +45,8 @@ export default function Home() {
   // The safety guardrail result from the most recent log, or null when clear —
   // surfaces a calm supportive notice above the meals.
   const [safety, setSafety] = useState<Safety | null>(null);
+  // Which observability tab is open as a popup over the page (null = closed).
+  const [obs, setObs] = useState<ObsTab | null>(null);
 
   const loadMemory = useCallback(() => {
     getMemory()
@@ -192,6 +195,7 @@ export default function Home() {
           date={date}
           onShift={(days) => setDate((d) => shiftDate(d, days))}
           onPickDate={setDate}
+          onOpenObs={setObs}
         />
         <div className="layout">
           <div className="col-log">
@@ -211,9 +215,11 @@ export default function Home() {
             corrections={corrections}
             taught={taught}
             latestTrace={latestTrace}
+            onOpenObs={setObs}
           />
         </div>
       </main>
+      {obs && <ObservabilityModal initialTab={obs} onClose={() => setObs(null)} />}
     </div>
   );
 }

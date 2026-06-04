@@ -4,7 +4,6 @@
 // right — ‹ prev · date · next › plus a calendar affordance that drops a
 // month-grid popover. Layout follows .
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Sparkle } from "lucide-react";
 import { formatHeaderDate, isSameDay } from "@/lib/date";
 
@@ -12,6 +11,8 @@ interface HeaderProps {
   date: Date;
   onShift: (days: number) => void;
   onPickDate: (date: Date) => void;
+  // Open the accuracy/trust observability popup over the page (no route change).
+  onOpenObs?: (tab: "accuracy" | "trust") => void;
 }
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
@@ -84,7 +85,7 @@ function CalendarPopover({ date, onPick }: { date: Date; onPick: (d: Date) => vo
   );
 }
 
-export function Header({ date, onShift, onPickDate }: HeaderProps) {
+export function Header({ date, onShift, onPickDate, onOpenObs }: HeaderProps) {
   const [calOpen, setCalOpen] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -105,12 +106,20 @@ export function Header({ date, onShift, onPickDate }: HeaderProps) {
       <div className="brand">
         <Sparkle size={15} fill="var(--accent)" color="var(--accent)" />
         <span className="brand-name">DietTrace</span>
-        <Link href="/accuracy" className="hdr-link mono">
+        <button
+          type="button"
+          className="hdr-link mono"
+          onClick={() => onOpenObs?.("accuracy")}
+        >
           accuracy
-        </Link>
-        <Link href="/trust" className="hdr-link mono">
+        </button>
+        <button
+          type="button"
+          className="hdr-link mono"
+          onClick={() => onOpenObs?.("trust")}
+        >
           trust
-        </Link>
+        </button>
       </div>
       <div className="datenav" ref={navRef}>
         <button

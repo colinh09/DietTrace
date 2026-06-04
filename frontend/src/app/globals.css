@@ -472,3 +472,27 @@ body {
 
 /* The confidence chip carries a tooltip now, so hint it's hoverable. */
 .conf-chip[title] { cursor: help; }
+
+/* ── Observability popup (Accuracy / Trust as a modal over the main page) ── */
+.modal-scrim { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 20px 40px; background: rgba(27, 26, 22, 0.34); backdrop-filter: blur(2px); overflow-y: auto; animation: modal-fade .16s ease; }
+.modal-card { position: relative; width: 100%; max-width: 680px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 24px 64px -20px rgba(27,26,22,0.40); padding: 30px 32px 28px; animation: modal-rise .18s cubic-bezier(.22,.61,.36,1); }
+.modal-close { position: absolute; top: 16px; right: 16px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: none; background: none; color: var(--faint); border-radius: 8px; cursor: pointer; transition: background .14s ease, color .14s ease; }
+.modal-close:hover { background: var(--accent-softer); color: var(--ink); }
+@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.obs-tabs { display: flex; gap: 4px; margin: 2px 0 18px; border-bottom: 1px solid var(--line); }
+.obs-tab { background: none; border: none; cursor: pointer; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); padding: 6px 10px 10px; margin-bottom: -1px; border-bottom: 2px solid transparent; transition: color .14s ease, border-color .14s ease; }
+.obs-tab:hover { color: var(--muted-ink); }
+.obs-tab.on { color: var(--accent-ink); border-bottom-color: var(--accent); }
+.obs-body .acc-hero { margin-top: 2px; }
+
+/* loading skeleton so the (slow) live Phoenix read never looks frozen */
+.obs-skel { display: flex; flex-direction: column; gap: 16px; }
+.obs-skel-title, .obs-skel-row, .obs-skel-stat, .obs-skel-block { background: linear-gradient(90deg, var(--line) 25%, var(--line-strong) 37%, var(--line) 63%); background-size: 400% 100%; border-radius: 8px; animation: obs-shimmer 1.3s ease-in-out infinite; }
+.obs-skel-title { height: 26px; width: 60%; }
+.obs-skel-row { height: 14px; width: 85%; }
+.obs-skel-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.obs-skel-stat { height: 78px; }
+.obs-skel-block { height: 120px; }
+@keyframes obs-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
