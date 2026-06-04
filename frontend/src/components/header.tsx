@@ -13,6 +13,8 @@ interface HeaderProps {
   onPickDate: (date: Date) => void;
   // Open the accuracy/trust observability popup over the page (no route change).
   onOpenObs?: (tab: "accuracy" | "trust") => void;
+  // Open the macro editor ("Set your targets") modal.
+  onOpenMacros?: () => void;
 }
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
@@ -85,7 +87,7 @@ function CalendarPopover({ date, onPick }: { date: Date; onPick: (d: Date) => vo
   );
 }
 
-export function Header({ date, onShift, onPickDate, onOpenObs }: HeaderProps) {
+export function Header({ date, onShift, onPickDate, onOpenObs, onOpenMacros }: HeaderProps) {
   const [calOpen, setCalOpen] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -106,21 +108,30 @@ export function Header({ date, onShift, onPickDate, onOpenObs }: HeaderProps) {
       <div className="brand">
         <Sparkle size={15} fill="var(--accent)" color="var(--accent)" />
         <span className="brand-name">DietTrace</span>
+      </div>
+      <nav className="hdr-nav" aria-label="Primary">
+        <button type="button" className="nav-item active">
+          Today
+        </button>
+        <button type="button" className="nav-item" onClick={() => onOpenMacros?.()}>
+          Macros
+        </button>
+        <span className="nav-sep" aria-hidden="true" />
         <button
           type="button"
-          className="hdr-link mono"
+          className="nav-item"
           onClick={() => onOpenObs?.("accuracy")}
         >
-          accuracy
+          Accuracy
         </button>
         <button
           type="button"
-          className="hdr-link mono"
+          className="nav-item"
           onClick={() => onOpenObs?.("trust")}
         >
-          trust
+          Trust
         </button>
-      </div>
+      </nav>
       <div className="datenav" ref={navRef}>
         <button
           type="button"

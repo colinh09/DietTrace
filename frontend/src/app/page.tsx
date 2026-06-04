@@ -14,6 +14,7 @@ import { MealList, type MealDetail } from "@/components/meal-list";
 import { SafetyNotice } from "@/components/safety-notice";
 import { Dashboard, type LatestTrace } from "@/components/dashboard";
 import { ObservabilityModal, type ObsTab } from "@/components/observability-modal";
+import { MacroModal } from "@/components/macro-modal";
 import {
   deleteMeal,
   getAnalysis,
@@ -47,6 +48,8 @@ export default function Home() {
   const [safety, setSafety] = useState<Safety | null>(null);
   // Which observability tab is open as a popup over the page (null = closed).
   const [obs, setObs] = useState<ObsTab | null>(null);
+  // Whether the macro editor ("Set your targets") modal is open.
+  const [macroOpen, setMacroOpen] = useState(false);
 
   const loadMemory = useCallback(() => {
     getMemory()
@@ -196,6 +199,7 @@ export default function Home() {
           onShift={(days) => setDate((d) => shiftDate(d, days))}
           onPickDate={setDate}
           onOpenObs={setObs}
+          onOpenMacros={() => setMacroOpen(true)}
         />
         <div className="layout">
           <div className="col-log">
@@ -220,6 +224,15 @@ export default function Home() {
         </div>
       </main>
       {obs && <ObservabilityModal initialTab={obs} onClose={() => setObs(null)} />}
+      {macroOpen && (
+        <MacroModal
+          onClose={() => setMacroOpen(false)}
+          onSaved={() => {
+            // Saved targets become the user's per-user goals; refresh the band.
+            loadAnalysis();
+          }}
+        />
+      )}
     </div>
   );
 }
