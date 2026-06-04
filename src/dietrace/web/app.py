@@ -44,6 +44,7 @@ from dietrace.web.feedback import (
 from dietrace.web.goals import load_goals, targets_to_goals
 from dietrace.web.identity import current_user
 from dietrace.web.memory import build_memory, calories_of, sum_totals
+from dietrace.web.micros import micro_progress
 from dietrace.web.store import MealLogStore
 from dietrace.web.stores import build_stores
 from dietrace.web.trust import TrustStore
@@ -778,6 +779,7 @@ def create_app(
             "meal_count": len(meals),
             "totals": totals,
             "goals": _goals_progress(totals, active_goals),
+            "micros": micro_progress(totals),
             "traces_buffered": get_buffer().trace_count(),
         }
 
