@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dietrace.web.memory import SqliteMemory, normalize, sum_totals
+from dietrace.web.memory import SqliteMemory, calories_of, normalize, sum_totals
 
 
 def _items() -> list[dict]:
@@ -76,3 +76,74 @@ def test_examples_render_as_few_shot_food_lists(tmp_path) -> None:
         "Chipotle Chicken",
         "Chipotle White Rice",
     ]
+
+
+# ---------------------------------------------------------------------------
+# calories_of — the energy extractor used in app.py:274 (_case_score) and in
+# _eval_case (memory.py:60). Two branches: 208 present → the amount; absent →
+# 0.0. Never directly exercised in this file despite being imported in app.py.
+# ---------------------------------------------------------------------------
+
+
+def test_calories_of_returns_energy_when_208_present() -> None:
+    totals = [
+        {"code": "203", "name": "Protein", "amount": 20.0, "unit": "g"},
+        {"code": "208", "name": "Energy", "amount": 350.0, "unit": "kcal"},
+    ]
+    assert calories_of(totals) == 350.0
+
+
+def test_calories_of_returns_zero_when_208_absent() -> None:
+    totals = [{"code": "203", "name": "Protein", "amount": 20.0, "unit": "g"}]
+    assert calories_of(totals) == 0.0
+
+
+def test_calories_of_returns_zero_for_empty_list() -> None:
+    assert calories_of([]) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# eval_cases — the SqliteMemory method called by /retune and /retune/stream
+# (app.py:714, 731). Returns {"text": ..., "calories": ...} pairs derived from
+# stored totals via _eval_case → calories_of. Untested in this file.
+# ---------------------------------------------------------------------------
+
+
+def test_eval_cases_returns_text_and_calories(tmp_path) -> None:
+    mem = SqliteMemory(tmp_path / "mem.sqlite")
+    totals = sum_totals(_items())
+    mem.remember("alice", "chipotle bowl", _items(), totals)
+
+    cases = mem.eval_cases("alice")
+    assert len(cases) == 1
+    assert cases[0]["text"] == "chipotle bowl"
+    assert cases[0]["calories"] == 390.0  # 180 + 210 from _items()
+
+
+def test_eval_cases_is_scoped_per_user(tmp_path) -> None:
+    mem = SqliteMemory(tmp_path / "mem.sqlite")
+    totals = sum_totals(_items())
+    mem.remember("alice", "chipotle bowl", _items(), totals)
+
+    assert mem.eval_cases("bob") == []
+
+
+# ---------------------------------------------------------------------------
+# count — the SqliteMemory method checked indirectly in the overwrite test but
+# never at zero. A fresh store must return 0, not raise.
+# ---------------------------------------------------------------------------
+
+
+def test_count_is_zero_on_empty_store(tmp_path) -> None:
+    mem = SqliteMemory(tmp_path / "mem.sqlite")
+    assert mem.count("alice") == 0
+
+
+# ---------------------------------------------------------------------------
+# sum_totals — the empty-input branch ([] items → [] totals) is not covered by
+# the existing test, which passes a two-item list.
+# ---------------------------------------------------------------------------
+
+
+def test_sum_totals_empty_items_returns_empty_list() -> None:
+    assert sum_totals([]) == []
