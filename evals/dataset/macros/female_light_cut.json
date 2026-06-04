@@ -1,0 +1,24 @@
+{
+  "input": {
+    "age": 25,
+    "sex": "female",
+    "height_cm": 160.0,
+    "weight_kg": 60.0,
+    "activity": "light",
+    "goal": "cut"
+  },
+  "expected": {
+    "kcal_min": 1111.0,
+    "kcal_max": 1503.0,
+    "protein_g_min": 97.0,
+    "protein_g_max": 132.0,
+    "fat_g_min": 37.0,
+    "fat_g_max": 50.0,
+    "carb_g_min": 97.0,
+    "carb_g_max": 132.0
+  },
+  "metadata": {
+    "source": "Mifflin–St Jeor + light activity (1.375) + cut (−500 kcal); ±15% ranges",
+    "notes": "BMR≈1314 kcal, TDEE≈1807 kcal, cut target≈1307 kcal. Split: 35% protein / 35% carb / 30% fat."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "input": {
+    "age": 50,
+    "sex": "female",
+    "height_cm": 165.0,
+    "weight_kg": 70.0,
+    "activity": "sedentary",
+    "goal": "maintain"
+  },
+  "expected": {
+    "kcal_min": 1347.0,
+    "kcal_max": 1822.0,
+    "protein_g_min": 101.0,
+    "protein_g_max": 137.0,
+    "fat_g_min": 45.0,
+    "fat_g_max": 61.0,
+    "carb_g_min": 135.0,
+    "carb_g_max": 182.0
+  },
+  "metadata": {
+    "source": "Mifflin–St Jeor + sedentary (1.2) + maintain; ±15% ranges",
+    "notes": "BMR≈1320 kcal, TDEE≈1584 kcal. Split: 30% protein / 40% carb / 30% fat."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "input": {
+    "age": 40,
+    "sex": "male",
+    "height_cm": 180.0,
+    "weight_kg": 90.0,
+    "activity": "active",
+    "goal": "bulk"
+  },
+  "expected": {
+    "kcal_min": 2938.0,
+    "kcal_max": 3975.0,
+    "protein_g_min": 184.0,
+    "protein_g_max": 249.0,
+    "fat_g_min": 98.0,
+    "fat_g_max": 133.0,
+    "carb_g_min": 331.0,
+    "carb_g_max": 448.0
+  },
+  "metadata": {
+    "source": "Mifflin–St Jeor + active (1.725) + bulk (+300 kcal); ±15% ranges",
+    "notes": "BMR≈1830 kcal, TDEE≈3157 kcal, bulk target≈3457 kcal. Split: 25% protein / 45% carb / 30% fat."
+  }
+}

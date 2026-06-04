@@ -21,6 +21,12 @@ DATASET_DESCRIPTION = (
     "micros) for natural-language meals."
 )
 
+MACRO_DATASET_NAME = "dietrace-macros-v1"
+MACRO_DATASET_DESCRIPTION = (
+    "DietTrace macro-plan accuracy cases: Mifflin–St Jeor derived targets "
+    "scored against physiologically valid ranges."
+)
+
 
 def load_cases(directory: str | Path) -> list[EvalCase]:
     """Load and validate every ``*.json`` eval case under *directory*, sorted."""

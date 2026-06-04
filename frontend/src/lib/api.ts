@@ -315,6 +315,13 @@ export interface AccuracyReport {
   experiments: number | null;
   // Each experiment's scores (oldest → newest) — the accuracy trend over time.
   trend: { calorie: number; macro: number; within_tolerance: number; portion: number }[];
+  // Macro-plan evaluator surface.
+  macros: {
+    headline: { pass_rate: number; mean_score: number };
+    experiments: number | null;
+    trend: { pass_rate: number; mean_score: number }[];
+    dataset: { cases: number };
+  };
 }
 
 // Read the accuracy / Arize-observability report.

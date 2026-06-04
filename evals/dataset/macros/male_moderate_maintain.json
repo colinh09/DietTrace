@@ -1,0 +1,24 @@
+{
+  "input": {
+    "age": 30,
+    "sex": "male",
+    "height_cm": 175.0,
+    "weight_kg": 75.0,
+    "activity": "moderate",
+    "goal": "maintain"
+  },
+  "expected": {
+    "kcal_min": 2238.0,
+    "kcal_max": 3028.0,
+    "protein_g_min": 168.0,
+    "protein_g_max": 227.0,
+    "fat_g_min": 75.0,
+    "fat_g_max": 101.0,
+    "carb_g_min": 224.0,
+    "carb_g_max": 303.0
+  },
+  "metadata": {
+    "source": "Mifflin–St Jeor + moderate activity (1.55) + maintain; ±15% ranges",
+    "notes": "BMR≈1699 kcal, TDEE≈2633 kcal. Formula split: 30% protein / 40% carb / 30% fat."
+  }
+}

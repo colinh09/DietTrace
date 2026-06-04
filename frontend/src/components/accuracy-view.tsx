@@ -24,8 +24,21 @@ const _LINES = [
   { key: "portion", label: "portion", color: "var(--faint)" },
 ] as const;
 
-// The accuracy trend across Phoenix experiments (oldest → newest).
-function TrendChart({ trend }: { trend: AccuracyReport["trend"] }) {
+const _MACRO_LINES = [
+  { key: "pass_rate", label: "within range", color: "var(--accent)" },
+  { key: "mean_score", label: "consistency", color: "var(--accent-ink)" },
+] as const;
+
+// Generic trend chart for any series of score points.
+function TrendChartGeneric<T extends Record<string, number>>({
+  trend,
+  lines,
+  ariaLabel,
+}: {
+  trend: T[];
+  lines: readonly { key: keyof T & string; label: string; color: string }[];
+  ariaLabel: string;
+}) {
   if (trend.length < 2) return null;
   const W = 360;
   const H = 132;
@@ -37,23 +50,23 @@ function TrendChart({ trend }: { trend: AccuracyReport["trend"] }) {
   return (
     <div className="acc-trend">
       <svg viewBox={`0 0 ${W} ${H}`} className="acc-trend-svg" role="img"
-           aria-label="accuracy across experiments">
+           aria-label={ariaLabel}>
         {[0, 0.5, 1].map((g) => (
           <line key={g} className="acc-trend-grid" x1={px} x2={W - px} y1={y(g)} y2={y(g)} />
         ))}
-        {_LINES.map((l) => (
+        {lines.map((l) => (
           <polyline key={l.key} className="acc-trend-line" style={{ stroke: l.color }}
-                    points={trend.map((t, i) => `${x(i)},${y(t[l.key])}`).join(" ")} />
+                    points={trend.map((t, i) => `${x(i)},${y(t[l.key] as number)}`).join(" ")} />
         ))}
-        {_LINES.flatMap((l) =>
+        {lines.flatMap((l) =>
           trend.map((t, i) => (
-            <circle key={`${l.key}-${i}`} cx={x(i)} cy={y(t[l.key])} r={2.4}
+            <circle key={`${l.key}-${i}`} cx={x(i)} cy={y(t[l.key] as number)} r={2.4}
                     style={{ fill: l.color }} />
           )),
         )}
       </svg>
       <div className="acc-trend-legend">
-        {_LINES.map((l) => (
+        {lines.map((l) => (
           <span key={l.key} className="acc-trend-key">
             <span className="acc-trend-dot" style={{ background: l.color }} />
             {l.label}
@@ -62,6 +75,17 @@ function TrendChart({ trend }: { trend: AccuracyReport["trend"] }) {
         <span className="acc-trend-x mono">experiment 1 → {n}</span>
       </div>
     </div>
+  );
+}
+
+// The accuracy trend across Phoenix experiments (oldest → newest).
+function TrendChart({ trend }: { trend: AccuracyReport["trend"] }) {
+  return (
+    <TrendChartGeneric
+      trend={trend}
+      lines={_LINES}
+      ariaLabel="nutrition accuracy across experiments"
+    />
   );
 }
 
@@ -137,6 +161,46 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
           ))}
         </ol>
       </section>
+
+      {report.macros && (
+        <section className="acc-block">
+          <div className="acc-block-head mono">
+            macro planner · {report.macros.dataset.cases} cases
+            {report.macros.experiments != null
+              ? ` · ${report.macros.experiments} experiment${report.macros.experiments === 1 ? "" : "s"}`
+              : ""}
+          </div>
+          <div className="acc-bars">
+            <div className="acc-bar-row">
+              <span className="acc-bar-label">Within target range</span>
+              <span className="acc-bar-track">
+                <span className="acc-bar-cur"
+                      style={{ width: pct(report.macros.headline.pass_rate) }} />
+              </span>
+              <span className="acc-bar-nums mono tnum">
+                <b>{pct(report.macros.headline.pass_rate)}</b>
+              </span>
+            </div>
+            <div className="acc-bar-row">
+              <span className="acc-bar-label">Atwater consistency</span>
+              <span className="acc-bar-track">
+                <span className="acc-bar-cur"
+                      style={{ width: pct(report.macros.headline.mean_score) }} />
+              </span>
+              <span className="acc-bar-nums mono tnum">
+                <b>{pct(report.macros.headline.mean_score)}</b>
+              </span>
+            </div>
+          </div>
+          {report.macros.trend.length >= 2 && (
+            <TrendChartGeneric
+              trend={report.macros.trend}
+              lines={_MACRO_LINES}
+              ariaLabel="macro planner accuracy across experiments"
+            />
+          )}
+        </section>
+      )}
 
       <section className="acc-foot">
         <span>

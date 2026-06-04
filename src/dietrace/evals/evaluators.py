@@ -397,3 +397,146 @@ def _as_phoenix_evaluator(fn: Callable[..., EvalResult]) -> Callable[..., tuple]
 PHOENIX_EVALUATORS: list[Callable[..., tuple]] = [
     _as_phoenix_evaluator(fn) for fn in _NUMERIC_EVALUATORS
 ]
+
+
+# ---------------------------------------------------------------------------
+# Macro-plan offline evaluators
+# ---------------------------------------------------------------------------
+
+# USDA codes for the macro targets the plan carries.
+_PLAN_ENERGY = "208"
+_PLAN_PROTEIN = "203"
+_PLAN_FAT = "204"
+_PLAN_CARB = "205"
+
+# Standard Atwater factors — replicated here to avoid circular imports with
+# macros/eval.py (which imports from evals/span_eval.py).
+_AW_P = 4.0
+_AW_C = 4.0
+_AW_F = 9.0
+
+# Fraction of kcal by which the Atwater estimate may drift before the plan
+# is considered internally inconsistent (mirrors macros/eval.py).
+_MACRO_ATWATER_TOL = 0.05
+
+
+def _plan_targets(output: Any) -> dict[str, float]:
+    """Extract ``targets`` mapping from a MacroPlan dict-or-model."""
+    targets = output["targets"] if isinstance(output, dict) else output.targets
+    return {str(k): float(v) for k, v in targets.items()}
+
+
+def macro_plan_within_range(
+    output: Any,
+    expected: Any,
+    metadata: dict[str, Any] | None = None,  # accepted for uniform API
+) -> EvalResult:
+    """Check whether a plan's computed targets fall within expected ranges.
+
+    Scores the fraction of the four macro targets (kcal/protein/fat/carb) that
+    land within the inclusive [min, max] bands defined in *expected*
+    (``MacroExpectedTargets`` shape). A fully in-range plan scores 1.0 and
+    labels ``"pass"``; a partially or fully out-of-range plan scores the
+    fraction of in-range targets and labels ``"fail"``. The failing targets are
+    named in ``metadata`` for the supervisor.
+    """
+    targets = _plan_targets(output)
+    exp = expected if isinstance(expected, dict) else expected.model_dump()
+
+    checks: dict[str, tuple[float, float, float]] = {
+        "kcal":      (targets.get(_PLAN_ENERGY, 0.0),  exp["kcal_min"],      exp["kcal_max"]),
+        "protein_g": (targets.get(_PLAN_PROTEIN, 0.0), exp["protein_g_min"], exp["protein_g_max"]),
+        "fat_g":     (targets.get(_PLAN_FAT, 0.0),     exp["fat_g_min"],     exp["fat_g_max"]),
+        "carb_g":    (targets.get(_PLAN_CARB, 0.0),    exp["carb_g_min"],    exp["carb_g_max"]),
+    }
+
+    passing = [key for key, (val, lo, hi) in checks.items() if lo <= val <= hi]
+    failing = [key for key, (val, lo, hi) in checks.items() if not (lo <= val <= hi)]
+
+    score = len(passing) / len(checks)
+    label = "pass" if not failing else "fail"
+
+    detail = ", ".join(
+        f"{key} {checks[key][0]:.1f} not in [{checks[key][1]:.1f}, {checks[key][2]:.1f}]"
+        for key in failing
+    )
+    explanation = (
+        "all macro targets within expected ranges" if not failing else f"out of range: {detail}"
+    )
+
+    return EvalResult(
+        score=score,
+        label=label,
+        explanation=explanation,
+        metadata={"passing": passing, "failing": failing},
+    )
+
+
+def macro_plan_consistency_eval(
+    output: Any,
+    expected: Any = None,  # unused — present for uniform (output, expected, metadata) API
+    metadata: dict[str, Any] | None = None,
+) -> EvalResult:
+    """Atwater consistency check for a macro plan.
+
+    The Atwater identity 4·P + 4·C + 9·F should match the plan's kcal target
+    within ±5% (the same tolerance ``compute_targets`` and ``personalize_plan``
+    enforce). Drift beyond that means the plan's internal numbers disagree.
+    Score is 1.0 when consistent, degraded when inconsistent, 0.0 at extreme
+    drift. A plan with all-zero targets passes (consistent degenerate case).
+    """
+    targets = _plan_targets(output)
+    kcal = targets.get(_PLAN_ENERGY, 0.0)
+    protein = targets.get(_PLAN_PROTEIN, 0.0)
+    fat = targets.get(_PLAN_FAT, 0.0)
+    carb = targets.get(_PLAN_CARB, 0.0)
+
+    atwater = _AW_P * protein + _AW_C * carb + _AW_F * fat
+
+    if kcal == 0.0 and atwater == 0.0:
+        return EvalResult(
+            score=1.0,
+            label="pass",
+            explanation="all-zero plan: Atwater consistent",
+        )
+
+    if kcal == 0.0:
+        return EvalResult(
+            score=0.0,
+            label="fail",
+            explanation=f"atwater estimate {atwater:.0f} kcal but plan kcal target is 0",
+            metadata={"atwater": atwater, "kcal": kcal},
+        )
+
+    rel_err = abs(atwater - kcal) / kcal
+    if rel_err <= _MACRO_ATWATER_TOL:
+        return EvalResult(
+            score=1.0,
+            label="pass",
+            explanation=(
+                f"atwater {atwater:.0f} kcal vs {kcal:.0f} kcal "
+                f"({rel_err:.1%} drift — consistent)"
+            ),
+        )
+
+    score = max(0.0, 1.0 - rel_err)
+    return EvalResult(
+        score=score,
+        label="fail",
+        explanation=(
+            f"atwater inconsistent: {atwater:.0f} kcal vs {kcal:.0f} kcal "
+            f"({rel_err:.0%} drift — threshold {_MACRO_ATWATER_TOL:.0%})"
+        ),
+        metadata={"atwater": atwater, "kcal": kcal, "rel_err": rel_err},
+    )
+
+
+_MACRO_NUMERIC_EVALUATORS: list[Callable[..., EvalResult]] = [
+    macro_plan_within_range,
+    macro_plan_consistency_eval,
+]
+
+# Drop-in evaluator list for the macro-plan Phoenix experiment.
+MACRO_PHOENIX_EVALUATORS: list[Callable[..., tuple]] = [
+    _as_phoenix_evaluator(fn) for fn in _MACRO_NUMERIC_EVALUATORS
+]
