@@ -30,6 +30,14 @@ BENIGN = [
     "I'm allergic to peanuts, so I had a turkey sandwich instead",
     "skipped the cheese since I'm watching sodium",
     "need to purge the old leftovers from the fridge",
+    # allergen-free compound words (hyphenated and space-separated) must not
+    # trigger a conflict — the allergen appears in a "X-free" product name,
+    # not as an eaten ingredient.
+    "I'm allergic to eggs and had egg-free pasta for dinner",
+    "I have a gluten allergy so I always choose gluten-free bread",
+    "I'm allergic to dairy and I have dairy-free milk in my coffee",
+    "allergic to peanuts, bought some peanut-free candy at the store",
+    "I'm allergic to eggs and had egg free pasta for dinner",
 ]
 
 DISORDERED_EATING = [

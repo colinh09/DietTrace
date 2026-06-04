@@ -143,7 +143,10 @@ def _has_allergen_conflict(text: str) -> bool:
     # A genuine conflict repeats the allergen: once declaring it, once eating it.
     for allergen in _ALLERGENS:
         stem = re.escape(allergen)
-        if len(re.findall(rf"\b{stem}s?\b", text)) >= 2:
+        # Exclude matches immediately followed by "-free" or " free" (e.g.
+        # "egg-free", "gluten free") — safe compound product names, not the
+        # allergen itself, and would otherwise produce false positives.
+        if len(re.findall(rf"\b{stem}s?(?![\s-]free)\b", text)) >= 2:
             return True
     return False
 
