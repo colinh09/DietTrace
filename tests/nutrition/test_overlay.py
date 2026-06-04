@@ -43,3 +43,26 @@ def test_overlay_lookup_hits_on_either_number() -> None:
 
 def test_overlay_miss_returns_none() -> None:
     assert overlay_fdc_id("rutabaga", {"almond": 111}) is None
+
+
+def test_normalize_singularizes_ches_ending() -> None:
+    """'peaches' → 'peach' via the -ches suffix branch so a curated 'peach' pin hits."""
+    assert normalize("peaches") == "peach"
+    assert normalize("peaches") == normalize("peach")
+
+
+def test_normalize_singularizes_shes_ending() -> None:
+    """'radishes' → 'radish' and 'squashes' → 'squash' via the -shes suffix branch."""
+    assert normalize("radishes") == "radish"
+    assert normalize("radishes") == normalize("radish")
+    assert normalize("squashes") == "squash"
+    assert normalize("squashes") == normalize("squash")
+
+
+def test_overlay_lookup_hits_ches_and_shes_plurals() -> None:
+    """A 'peaches' or 'radishes' query resolves to the singularized overlay pin."""
+    table = {"peach": 300, "radish": 400}
+    assert overlay_fdc_id("peaches", table) == 300
+    assert overlay_fdc_id("radishes", table) == 400
+    assert overlay_fdc_id("peach", table) == 300
+    assert overlay_fdc_id("radish", table) == 400
