@@ -156,6 +156,18 @@ class NutritionAgent:
     Construction is offline-safe — the ADK ``Agent``/``Runner`` take the model as
     a plain string and build no client until a turn is run — so the assembly can
     be exercised in tests with a mocked Gemini client.
+
+    The agent exposes two capability surfaces:
+
+    * **Meal-logging tools** (``self.tools``) — the five ADK ``FunctionTool``s the
+      LLM calls through the runner: ``parse_meal`` → ``search_nutrition`` →
+      ``estimate_portion`` → ``log_entry`` → ``check_against_goals``.
+
+    * **Macro planning** (``self.plan_macros``) — a direct Python method that
+      wraps the macro-planning service under the same agent identity, sharing the
+      Phoenix tracing spine that ``build_nutrition_agent`` initialises (,
+      ).  It is not an ADK FunctionTool so the runner's tool
+      contract (five tools, pipeline order) is unchanged.
     """
 
     def __init__(
@@ -180,6 +192,98 @@ class NutritionAgent:
             agent=self.agent,
             session_service=self.session_service,
         )
+
+    def plan_macros(
+        self,
+        *,
+        preset: str | None = None,
+        age: int | None = None,
+        sex: str | None = None,
+        height_cm: float | None = None,
+        weight_kg: float | None = None,
+        activity: str | None = None,
+        goal: str | None = None,
+        preference: str | None = None,
+        ai_help: bool = False,
+        macro_client: Any | None = None,
+    ) -> dict:
+        """Plan daily macros under the nutritionist-agent identity.
+
+        Accepts either a *preset* key (the privacy-friendly no-profile path) or a
+        full profile (the formula/AI-personalised path).  Shares the Phoenix
+        tracing spine initialised by :func:`build_nutrition_agent` — any Gemini
+        call made via *macro_client* is instrumented by the same provider as the
+        meal-logging tools.
+
+        Does not persist anything; callers save the result via the GoalStore.
+
+        Args:
+            preset: One of ``"cut"``, ``"maintain"``, ``"bulk"`` for a
+                preset plan.  Mutually exclusive with profile fields.
+            age: Years of age (profile path).
+            sex: ``"male"`` or ``"female"`` (profile path).
+            height_cm: Height in centimetres (profile path).
+            weight_kg: Body weight in kilograms (profile path).
+            activity: Activity level key (profile path).
+            goal: ``"cut"``, ``"maintain"``, or ``"bulk"`` (profile path).
+            preference: Optional dietary preference hint (profile path).
+            ai_help: When ``True``, personalise via Gemini after the formula
+                baseline (profile path only).
+            macro_client: Injectable Gemini client for *ai_help*; built lazily
+                when omitted.
+
+        Returns:
+            A ``MacroPlan.model_dump()`` dict with ``targets``, ``rationale``,
+            ``source``, ``steps``, ``clamped``, and ``eval`` keys.
+
+        Raises:
+            KeyError: When *preset* is not a recognised key.
+            pydantic.ValidationError: When required profile fields are missing.
+        """
+        from dietrace.macros.compute import compute_targets
+        from dietrace.macros.eval import evaluate_macro_plan
+        from dietrace.macros.models import MacroPlan, MacroProfile
+        from dietrace.macros.personalize import personalize_plan
+        from dietrace.macros.presets import preset_plan
+
+        # Sentinel profile for evaluate_macro_plan on the preset path: weight_kg=0
+        # causes the protein g/kg safety axis to be skipped (no profile submitted).
+        _sentinel = MacroProfile(
+            age=25,
+            sex="male",
+            height_cm=170.0,
+            weight_kg=0.0,
+            activity="moderate",
+            goal="maintain",
+        )
+
+        if preset is not None:
+            plan = preset_plan(preset)  # raises KeyError on unknown preset
+            eval_result = evaluate_macro_plan(_sentinel, plan)
+        else:
+            profile = MacroProfile(
+                age=age,
+                sex=sex,
+                height_cm=height_cm,
+                weight_kg=weight_kg,
+                activity=activity,
+                goal=goal,
+                preference=preference,
+                ai_help=ai_help,
+            )
+            plan = compute_targets(profile)
+            if ai_help:
+                plan = personalize_plan(profile, plan.targets, client=macro_client)
+            eval_result = evaluate_macro_plan(profile, plan)
+
+        return MacroPlan(
+            targets=plan.targets,
+            rationale=plan.rationale,
+            source=plan.source,
+            steps=plan.steps,
+            clamped=plan.clamped,
+            eval=eval_result,
+        ).model_dump()
 
 
 def build_nutrition_agent(
