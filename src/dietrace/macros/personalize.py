@@ -149,7 +149,16 @@ def personalize_plan(
     and a templated rationale.
     """
     if client is None:
-        client = _default_client()
+        try:
+            client = _default_client()
+        except Exception:
+            return MacroPlan(
+                targets=dict(base_targets),
+                rationale=_fallback_rationale(profile),
+                source="formula",
+                steps=[],
+                clamped=[],
+            )
 
     kcal = base_targets.get(_ENERGY, 0.0)
     base_protein_g = base_targets.get(_PROTEIN, 0.0)

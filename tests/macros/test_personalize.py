@@ -295,6 +295,43 @@ class TestSoftFallback:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Credential-init failure — _default_client() raises before the try/except
+# ---------------------------------------------------------------------------
+
+
+class TestCredentialInitFailure:
+    def test_credential_init_failure_falls_back_to_formula(self, monkeypatch):
+        """If _default_client() raises (bad creds, missing package), personalize_plan
+        must return the formula plan rather than propagating the exception — the same
+        fail-soft guarantee the inner try/except gives for Gemini call failures."""
+        from dietrace.macros import personalize as _mod
+
+        def _bad_client():
+            raise RuntimeError("vertex credentials unavailable")
+
+        monkeypatch.setattr(_mod, "_default_client", _bad_client)
+
+        profile = _profile()
+        base = _base_targets()
+        # No client injected — triggers _default_client() which now raises.
+        plan = personalize_plan(profile, base)
+        assert plan.source == "formula"
+        assert plan.targets == base
+
+    def test_credential_init_failure_rationale_non_empty(self, monkeypatch):
+        """The fallback rationale must be a non-empty templated string."""
+        from dietrace.macros import personalize as _mod
+
+        def _import_error():
+            raise ImportError("google.genai not installed")
+
+        monkeypatch.setattr(_mod, "_default_client", _import_error)
+
+        plan = personalize_plan(_profile(age=28, sex="female"), _base_targets())
+        assert plan.rationale.strip()
+
+
 class TestFencedResponse:
     def _fenced_client(self, fence_tag: str = "json") -> MagicMock:
         payload = (
