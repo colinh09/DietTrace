@@ -416,3 +416,79 @@ class TestCarbNegativeGuard:
         profile, base, client = self._setup()
         plan = personalize_plan(profile, base, client)
         assert plan.targets["208"] == 1800.0
+
+    def test_fat_not_added_twice_when_already_clamped_before_guard(self):
+        """The guard's 'if fat not in clamped' branch is False here — fat was already
+        clamped by the fat-bounds check (90g → 80g) before the guard fires, so the
+        guard must not append it a second time, leaving exactly one 'fat' entry."""
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        # fat was clamped by the fat-bounds step, then the guard fires but skips append
+        assert plan.clamped.count("fat") == 1
+
+
+# ---------------------------------------------------------------------------
+# Carb-goes-negative guard: fat appended FRESH by the guard (not pre-clamped)
+#
+# The True arm of  `if "fat" not in clamped: clamped.append("fat")`  is never
+# exercised by TestCarbNegativeGuard because in that setup fat is clamped by the
+# fat-bounds check BEFORE the guard fires.  Here fat stays within bounds — it is
+# protein that is clamped up by the protein-bounds check, and the resulting
+# 360 g × 4 kcal/g + 60 g × 9 kcal/g = 1980 > 1800 kcal drives carb negative.
+# The guard then reduces fat and, since "fat" is not yet in clamped, appends it.
+#
+# Setup: weight_kg=300 → protein_lo=360 g (80 % of 1800 kcal).
+# Base 10 % / 60 % / 30 % protein/carb/fat split is Atwater-consistent.
+# Gemini returns +10 pp protein → protein_raw=90 g < 360 → clamped to 360.
+# fat_raw=60 g sits in [30, 80] → not clamped.  carb_kcal = 1800−1440−540 = −180.
+# Guard fires, reduces fat to 40 g, appends "fat" to clamped for the first time.
+# ---------------------------------------------------------------------------
+
+
+class TestCarbNegativeGuardFatAddedFresh:
+    def _setup(self):
+        profile = MacroProfile(
+            age=40, sex="male", height_cm=190.0, weight_kg=300.0,
+            activity="sedentary", goal="cut",
+        )
+        # Atwater-consistent 10 / 60 / 30 split at 1800 kcal (no drift).
+        base = {
+            "208": 1800.0,
+            "203": round(1800.0 * 0.10 / 4.0, 1),   # 45.0 g protein
+            "205": round(1800.0 * 0.60 / 4.0, 1),   # 270.0 g carb
+            "204": round(1800.0 * 0.30 / 9.0, 1),   # 60.0 g fat
+        }
+        # +10 pp protein pushes protein_raw to 90 g (< protein_lo=360) → clamped.
+        # 0 pp fat leaves fat at 60 g (within [30, 80]) → NOT clamped before guard.
+        response = MagicMock()
+        response.text = (
+            '{"rationale": "high protein athlete",'
+            ' "protein_pct_delta": 10.0, "fat_pct_delta": 0.0}'
+        )
+        client = MagicMock()
+        client.models.generate_content.return_value = response
+        return profile, base, client
+
+    def test_fat_appended_fresh_by_guard(self):
+        """The guard's True arm fires: 'fat' is not in clamped when the guard runs,
+        so the guard appends it — producing exactly one 'fat' entry in clamped."""
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        assert "fat" in plan.clamped
+        assert plan.clamped.count("fat") == 1
+
+    def test_carb_non_negative_when_fat_added_fresh(self):
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        assert plan.targets["205"] >= 0.0
+
+    def test_atwater_holds_when_fat_added_fresh(self):
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        p, c, f = plan.targets["203"], plan.targets["205"], plan.targets["204"]
+        assert abs(4.0 * p + 4.0 * c + 9.0 * f - 1800.0) <= 5.0
+
+    def test_kcal_unchanged_when_fat_added_fresh(self):
+        profile, base, client = self._setup()
+        plan = personalize_plan(profile, base, client)
+        assert plan.targets["208"] == 1800.0
