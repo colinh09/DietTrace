@@ -15,7 +15,7 @@ the pipeline hands the web layer dicts but tools return models.
 """
 
 from dietrace.agents.nutrition.log_entry import LoggedItem
-from dietrace.evals.online import REVIEW_THRESHOLD, evaluate_log, review_flag
+from dietrace.evals.online import REVIEW_THRESHOLD, evaluate_log, review_flag, sources_of
 from dietrace.nutrition.models import Nutrient
 
 
@@ -228,3 +228,66 @@ def test_review_flag_over_a_real_low_confidence_log() -> None:
     flag = review_flag(result)
     assert flag["needs_review"] is True
     assert flag["review_reason"]  # a human-readable reason is carried
+
+
+# --- _calorie_plausibility: zero-atwater + nonzero-energy branch ---
+# Pins the untested path where energy is reported but all macro codes (203/204/205)
+# are absent, so the Atwater estimate is zero while energy is positive — the
+# maximum-penalty case (score = 0.0). A partial totals dict (e.g. from a food
+# record with only calorie data) can reach this branch in production.
+
+
+def test_energy_only_totals_flagged_as_calorie_mismatch() -> None:
+    """Totals with energy (208) but no macro codes cannot be Atwater-verified."""
+    totals_energy_only = [{"code": "208", "name": "Energy", "amount": 400, "unit": "kcal"}]
+    result = evaluate_log("a snack bar", [_item(1, 45)], totals_energy_only)
+    assert "calorie_mismatch" in result["flags"]
+    assert result["confidence"] < 0.9
+    assert any("zero" in r.lower() for r in result["reasons"])
+
+
+def test_zero_energy_with_zero_macros_is_not_a_mismatch() -> None:
+    """Energy = 0 with no macros is consistent (both sides are zero), not flagged."""
+    totals_all_zero = [{"code": "208", "name": "Energy", "amount": 0, "unit": "kcal"}]
+    result = evaluate_log("water", [_item(1, 240)], totals_all_zero)
+    assert "calorie_mismatch" not in result["flags"]
+
+
+# --- sources_of: the public trust-store accessor ---
+# sources_of() is imported and called in app.py (POST /log trust record) but was
+# never directly tested; the sub-score tests only exercised it indirectly through
+# evaluate_log. These tests pin the public contract so renames or logic changes
+# are caught without having to reason about the full evaluate_log call chain.
+
+
+def test_sources_of_explicit_source_hint() -> None:
+    """An explicit source hint is returned verbatim (lowercased)."""
+    items = [_item(fdc_id=50, grams=100, source="usda")]
+    assert sources_of(items) == ["usda"]
+
+
+def test_sources_of_infers_web_when_fdc_id_zero() -> None:
+    """No hint + fdc_id=0 (synthetic web food) infers 'web'."""
+    items = [_item(fdc_id=0, grams=100)]
+    assert sources_of(items) == ["web"]
+
+
+def test_sources_of_infers_usda_when_fdc_id_nonzero() -> None:
+    """No hint + real fdc_id infers 'usda' (reproducible USDA record)."""
+    items = [_item(fdc_id=170379, grams=100)]
+    assert sources_of(items) == ["usda"]
+
+
+def test_sources_of_mixed_list() -> None:
+    """A mixed list preserves per-item order."""
+    items = [
+        _item(fdc_id=50, grams=100, source="usda"),
+        _item(fdc_id=0, grams=80),  # no hint → web
+    ]
+    assert sources_of(items) == ["usda", "web"]
+
+
+def test_sources_of_empty_and_none() -> None:
+    """Empty list and None both return an empty list without raising."""
+    assert sources_of([]) == []
+    assert sources_of(None) == []  # type: ignore[arg-type]
