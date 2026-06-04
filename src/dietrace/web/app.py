@@ -17,13 +17,18 @@ from collections.abc import Callable, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
+from dietrace.macros.compute import compute_targets
+from dietrace.macros.eval import evaluate_macro_plan
+from dietrace.macros.models import MacroPlan, MacroProfile
+from dietrace.macros.personalize import personalize_plan
+from dietrace.macros.presets import preset_plan
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
 from dietrace.web.accuracy import accuracy_report, phoenix_dashboard_url
@@ -36,7 +41,7 @@ from dietrace.web.feedback import (
     phoenix_push,
     to_example,
 )
-from dietrace.web.goals import load_goals
+from dietrace.web.goals import load_goals, targets_to_goals
 from dietrace.web.identity import current_user
 from dietrace.web.memory import build_memory, calories_of, sum_totals
 from dietrace.web.store import MealLogStore
@@ -95,6 +100,46 @@ class MealCorrection(BaseModel):
 
     meal_text: str
     items: list[CorrectionItem]
+
+
+class MacroPlanRequest(BaseModel):
+    """Request body for POST /macros/plan.
+
+    Either ``preset`` is set (the no-profile privacy-friendly path) or all
+    profile fields are provided (the formula/AI personalisation path).
+    """
+
+    preset: str | None = None
+    # MacroProfile fields — all optional here; validated in the endpoint.
+    age: int | None = None
+    sex: str | None = None
+    height_cm: float | None = None
+    weight_kg: float | None = None
+    activity: str | None = None
+    goal: str | None = None
+    preference: str | None = None
+    ai_help: bool = False
+
+
+class MacroSaveRequest(BaseModel):
+    """Request body for POST /macros/save — persists only the computed targets."""
+
+    targets: dict[str, float]
+    rationale: str | None = None
+    source: str | None = None
+
+
+# Sentinel profile used when running evaluate_macro_plan on a preset plan (no
+# profile was submitted).  weight_kg=0 causes the protein g/kg axis to be
+# skipped so the eval only checks Atwater consistency and the fat fraction.
+_PRESET_PROFILE = MacroProfile(
+    age=25,
+    sex="male",
+    height_cm=170.0,
+    weight_kg=0.0,
+    activity="moderate",
+    goal="maintain",
+)
 
 
 def default_meal_logger(
@@ -316,6 +361,7 @@ def create_app(
     feedback_pusher: FeedbackPusher = phoenix_push,
     tracer_init: Callable[[str], Any] = init_tracer,
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
+    macro_client: Any | None = None,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
@@ -326,7 +372,7 @@ def create_app(
         log_store = store or default_meals
         corrections = feedback_store or default_feedback
         trust = trust_store or default_trust
-        goals_db = goal_store or default_goals  # noqa: F841  (used in 13.6)
+        goals_db = goal_store or default_goals
     learning = memory or build_memory()
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
@@ -507,8 +553,71 @@ def create_app(
         return {"date": day, "meals": log_store.list(limit, date=day, user_id=user)}
 
     @app.get("/goals")
-    def goals() -> dict[str, Any]:
+    def goals(user: str = Depends(current_user)) -> dict[str, Any]:
+        if goals_db is not None:
+            saved = goals_db.get(user)
+            if saved is not None:
+                return {"goals": targets_to_goals(saved)}
         return {"goals": goals_loader()}
+
+    @app.post("/macros/plan")
+    def macros_plan(
+        req: MacroPlanRequest, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """Compute a macro plan — from a preset key or a full profile.
+
+        Does NOT persist anything: callers must POST /macros/save separately.
+        The profile fields are never stored; only the resulting targets travel
+        out of this endpoint (via the response and then /macros/save).
+        """
+        if req.preset is not None:
+            try:
+                plan = preset_plan(req.preset)
+            except KeyError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            eval_result = evaluate_macro_plan(_PRESET_PROFILE, plan)
+        else:
+            try:
+                profile = MacroProfile(
+                    age=req.age,
+                    sex=req.sex,
+                    height_cm=req.height_cm,
+                    weight_kg=req.weight_kg,
+                    activity=req.activity,
+                    goal=req.goal,
+                    preference=req.preference,
+                    ai_help=req.ai_help,
+                )
+            except ValidationError as exc:
+                raise HTTPException(status_code=422, detail=exc.errors()) from exc
+            plan = compute_targets(profile)
+            if req.ai_help:
+                plan = personalize_plan(profile, plan.targets, client=macro_client)
+            eval_result = evaluate_macro_plan(profile, plan)
+        plan = MacroPlan(
+            targets=plan.targets,
+            rationale=plan.rationale,
+            source=plan.source,
+            steps=plan.steps,
+            clamped=plan.clamped,
+            eval=eval_result,
+        )
+        return plan.model_dump()
+
+    @app.post("/macros/save")
+    def macros_save(
+        req: MacroSaveRequest, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """Persist only the targets from a computed macro plan.
+
+        Stores the targets dict keyed by USDA code, plus optional rationale and
+        source for display.  The MacroProfile that produced the targets is never
+        accepted here — callers must not send it and this endpoint will not store it.
+        """
+        if goals_db is None:
+            raise HTTPException(status_code=503, detail="Goal store not configured")
+        goals_db.save(user, req.targets, rationale=req.rationale, source=req.source)
+        return {"ok": True, "user": user, "targets": req.targets}
 
     @app.get("/accuracy")
     def accuracy_panel() -> dict[str, Any]:
@@ -659,11 +768,16 @@ def create_app(
         day = date or datetime.datetime.now(tz=datetime.UTC).date().isoformat()
         meals = log_store.list(1000, date=day, user_id=user)
         totals = _aggregate(meals)
+        saved_targets = goals_db.get(user) if goals_db is not None else None
+        if saved_targets is not None:
+            active_goals = targets_to_goals(saved_targets)
+        else:
+            active_goals = goals_loader()
         return {
             "date": day,
             "meal_count": len(meals),
             "totals": totals,
-            "goals": _goals_progress(totals, goals_loader()),
+            "goals": _goals_progress(totals, active_goals),
             "traces_buffered": get_buffer().trace_count(),
         }
 

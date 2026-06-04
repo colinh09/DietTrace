@@ -55,3 +55,17 @@ def load_goals() -> list[dict[str, Any]]:
         }
         for env_var, code, name, unit, default in _GOAL_DEFS
     ]
+
+
+def targets_to_goals(targets: dict[str, float]) -> list[dict[str, Any]]:
+    """Convert a saved targets dict {USDA code: amount} to the goals list format.
+
+    Preserves the canonical ordering from ``_GOAL_DEFS`` and carries over the
+    name and unit for each code.  Codes not in ``_GOAL_DEFS`` are ignored so
+    the output always matches what ``load_goals`` produces.
+    """
+    result = []
+    for _, code, name, unit, _ in _GOAL_DEFS:
+        if code in targets:
+            result.append({"code": code, "name": name, "target": targets[code], "unit": unit})
+    return result
