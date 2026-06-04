@@ -118,13 +118,22 @@ def test_annotate_log_eval_sets_explanation_with_reasons() -> None:
 
 
 def test_annotate_log_eval_sets_explanation_when_no_reasons() -> None:
-    """No reasons → explanation falls back to flags (or empty string)."""
+    """No reasons and no flags → explanation is the 'ok' sentinel."""
     tracer, exporter = _make_tracer()
     with tracer.start_as_current_span("meal-log"):
         annotate_log_eval(_log_result(confidence=0.85, flags=[], reasons=[]))
     attrs = dict(exporter.get_finished_spans()[0].attributes)
     assert "eval.meal_log.explanation" in attrs
-    assert isinstance(attrs["eval.meal_log.explanation"], str)
+    assert attrs["eval.meal_log.explanation"] == "ok"
+
+
+def test_annotate_log_eval_explanation_uses_flags_when_reasons_empty() -> None:
+    """No reasons but non-empty flags → explanation is built from the flags list."""
+    tracer, exporter = _make_tracer()
+    with tracer.start_as_current_span("meal-log"):
+        annotate_log_eval(_log_result(confidence=0.4, flags=["dropped_items"], reasons=[]))
+    attrs = dict(exporter.get_finished_spans()[0].attributes)
+    assert attrs["eval.meal_log.explanation"] == "dropped_items"
 
 
 def test_annotate_log_eval_no_op_when_no_active_span() -> None:
@@ -177,6 +186,20 @@ def test_annotate_macro_eval_sets_explanation_with_reasons() -> None:
     assert "eval.macro_plan.explanation" in attrs
     assert "atwater" in attrs["eval.macro_plan.explanation"].lower() or \
            "2200" in attrs["eval.macro_plan.explanation"]
+
+
+def test_annotate_macro_eval_explanation_uses_flags_when_reasons_empty() -> None:
+    """No reasons but non-empty flags → explanation is built from the flags list."""
+    tracer, exporter = _make_tracer()
+    with tracer.start_as_current_span("macro-plan"):
+        annotate_macro_eval(_macro_result(
+            score=0.5,
+            passed=False,
+            flags=["atwater_inconsistent"],
+            reasons=[],
+        ))
+    attrs = dict(exporter.get_finished_spans()[0].attributes)
+    assert attrs["eval.macro_plan.explanation"] == "atwater_inconsistent"
 
 
 def test_annotate_macro_eval_no_op_when_no_active_span() -> None:
