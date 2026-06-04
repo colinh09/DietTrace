@@ -110,3 +110,32 @@ def test_result_shape_and_case_insensitive():
 def test_empty_text_is_safe():
     result = safety_check("")
     assert result == {"flagged": False, "category": None, "message": ""}
+
+
+def test_high_calorie_per_day_does_not_flag():
+    # Pattern matches ("1200 calories a day") but 1200 > ceiling (800) → no flag.
+    # Exercises the int(match.group(1)) > _DEFICIT_CALORIE_CEILING fall-through branch.
+    result = safety_check("I'm aiming for 1200 calories a day to lose weight gradually")
+    assert result["flagged"] is False
+    assert result["category"] is None
+
+
+def test_exact_ceiling_calorie_per_day_flags():
+    # 800 kcal/day is at the inclusive ceiling (≤ not <) and must flag.
+    result = safety_check("I want to limit myself to 800 calories a day")
+    assert result["flagged"] is True
+    assert result["category"] == "extreme_deficit"
+
+
+def test_one_above_ceiling_does_not_flag():
+    # 801 kcal/day is just above the ceiling; the pattern matches but must not flag.
+    result = safety_check("eating 801 calories per day")
+    assert result["flagged"] is False
+
+
+def test_safe_result_is_fresh_copy():
+    # Mutating one safe result must not corrupt subsequent calls (dict(_SAFE) guard).
+    r1 = safety_check("chicken and rice")
+    r2 = safety_check("oatmeal with berries")
+    r1["flagged"] = True  # deliberately corrupt the first result
+    assert r2["flagged"] is False
