@@ -47,6 +47,12 @@ DISORDERED_EATING = [
     "got a pro ana meal plan I want to log",
     "I want to starve myself until the weekend",
     "should I take laxatives to lose weight faster",
+    # Pins patterns not exercised by the cases above (each one tests a distinct branch):
+    "how do I force myself to vomit",            # force\s+myself\s+to\s+(throw\s+up|vomit)
+    "vomiting after every meal to stay thin",    # vomit(ing)?\s+after
+    "binge and purge routine for weight control", # binge\s+and\s+purge
+    "pro-mia tips for beginners",                # pro[\s-]?mia\b
+    "how to make myself sick after eating too much", # make\s+myself\s+sick (the "sick" branch)
 ]
 
 EXTREME_DEFICIT = [

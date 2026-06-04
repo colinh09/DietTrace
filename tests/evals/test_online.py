@@ -291,3 +291,52 @@ def test_sources_of_empty_and_none() -> None:
     """Empty list and None both return an empty list without raising."""
     assert sources_of([]) == []
     assert sources_of(None) == []  # type: ignore[arg-type]
+
+
+# --- _source_of: data_type fallback ---
+# The pipeline can hand per_item entries that carry data_type rather than source
+# (the search layer uses data_type; the web adapter may omit the source rename).
+# The `or _field(item, "data_type")` branch in _source_of() was never exercised.
+
+
+def test_sources_of_falls_back_to_data_type_when_no_source() -> None:
+    """data_type is used when source is absent."""
+    item = {"fdc_id": 50, "description": "yogurt", "grams": 200, "data_type": "branded"}
+    assert sources_of([item]) == ["branded"]
+
+
+def test_sources_of_source_takes_precedence_over_data_type() -> None:
+    """Explicit source wins when both source and data_type are present."""
+    item = {
+        "fdc_id": 50,
+        "description": "yogurt",
+        "grams": 200,
+        "source": "usda",
+        "data_type": "branded",
+    }
+    assert sources_of([item]) == ["usda"]
+
+
+# --- _item_energy: null guards ---
+# Two defensive `or` guards in _item_energy() protect against None flowing in
+# from malformed pipeline output. Exercises the nutrients=None and amount=None
+# branches (`_field(...) or []` and `_field(...) or 0.0` respectively).
+
+
+def test_evaluate_log_with_nutrients_none_does_not_raise() -> None:
+    """An item whose nutrients field is explicitly None doesn't crash the eval."""
+    item = {"fdc_id": 1, "description": "mystery", "grams": 100, "nutrients": None}
+    result = evaluate_log("mystery", [item], [])
+    assert isinstance(result["confidence"], float)
+
+
+def test_evaluate_log_with_nutrient_amount_none_does_not_raise() -> None:
+    """A nutrient with amount=None is treated as zero, not a crash."""
+    item = {
+        "fdc_id": 1,
+        "description": "snack",
+        "grams": 50,
+        "nutrients": [{"code": "208", "name": "Energy", "amount": None, "unit": "kcal"}],
+    }
+    result = evaluate_log("a snack", [item], [])
+    assert isinstance(result["confidence"], float)
