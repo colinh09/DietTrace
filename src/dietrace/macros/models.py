@@ -11,16 +11,24 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MacroProfile(BaseModel):
-    """User inputs for macro target derivation (transient — never persisted)."""
+    """User inputs for macro target derivation (transient — never persisted).
 
-    age: int
+    Inputs are bounded to physically plausible ranges so a degenerate profile
+    (negative age, zero height, negative weight) can never flow through
+    ``compute_targets`` and yield negative or nonsensical targets. ``weight_kg``
+    permits 0 only because the preset-evaluation path passes a sentinel profile
+    with ``weight_kg=0`` to skip the protein g/kg axis; real submissions are
+    always positive.
+    """
+
+    age: int = Field(gt=0, le=120)
     sex: Literal["male", "female"]
-    height_cm: float
-    weight_kg: float
+    height_cm: float = Field(gt=0, le=275)
+    weight_kg: float = Field(ge=0, le=635)
     activity: Literal["sedentary", "light", "moderate", "active", "very_active"]
     goal: Literal["cut", "maintain", "bulk"]
     preference: str | None = None

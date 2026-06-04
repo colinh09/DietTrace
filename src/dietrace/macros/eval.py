@@ -43,6 +43,14 @@ _PROTEIN_MAX_PER_KG = 2.4
 _FAT_MIN_FRAC = 0.15
 _FAT_MAX_FRAC = 0.40
 
+# Rounding slack on the safety bounds. personalize_plan clamps to the exact bound
+# then stores grams rounded to 0.1 g, which can land a hair past it (e.g. fat
+# 88.9 g at 2000 kcal = 0.40005 > 0.40). These epsilons absorb that sub-0.1 g
+# rounding — far below any safety-relevant margin — so a correctly-clamped plan
+# never fails its own eval. (0.5 pp of kcal; 0.05 g/kg of protein.)
+_PROTEIN_EPS = 0.05
+_FAT_FRAC_EPS = 0.005
+
 
 def _consistency(plan: MacroPlan) -> dict:
     """Check that the Atwater identity holds within tolerance."""
@@ -97,7 +105,7 @@ def _safety(profile: MacroProfile, plan: MacroPlan) -> dict:
         protein_per_kg = protein / profile.weight_kg
         protein_lo = _PROTEIN_MIN_PER_KG
         protein_hi = _PROTEIN_MAX_PER_KG
-        if not (protein_lo <= protein_per_kg <= protein_hi):
+        if not (protein_lo - _PROTEIN_EPS <= protein_per_kg <= protein_hi + _PROTEIN_EPS):
             flags.append("protein_out_of_bounds")
             reasons.append(
                 f"protein {protein_per_kg:.2f} g/kg outside [{protein_lo}, {protein_hi}] g/kg "
@@ -110,7 +118,7 @@ def _safety(profile: MacroProfile, plan: MacroPlan) -> dict:
     # Fat fraction check.
     if kcal > 0.0:
         fat_frac = (fat * _ATWATER_F) / kcal
-        if not (_FAT_MIN_FRAC <= fat_frac <= _FAT_MAX_FRAC):
+        if not (_FAT_MIN_FRAC - _FAT_FRAC_EPS <= fat_frac <= _FAT_MAX_FRAC + _FAT_FRAC_EPS):
             flags.append("fat_out_of_bounds")
             reasons.append(
                 f"fat {fat_frac:.0%} of kcal outside [{_FAT_MIN_FRAC:.0%}, {_FAT_MAX_FRAC:.0%}] "

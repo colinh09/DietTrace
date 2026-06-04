@@ -42,10 +42,10 @@ def test_macros_trend_is_a_list() -> None:
     assert isinstance(report["macros"]["trend"], list)
 
 
-def test_macros_trend_has_at_least_two_points_on_fallback() -> None:
-    """Fallback trend should have baseline + current (≥2 points) for the chart."""
+def test_macros_trend_is_a_single_measured_point_on_fallback() -> None:
+    """No live experiment → one honest measured point (no fabricated baseline)."""
     report = accuracy_report(fetch=_no_live)
-    assert len(report["macros"]["trend"]) >= 2
+    assert len(report["macros"]["trend"]) == 1
 
 
 def test_macros_trend_points_have_expected_shape() -> None:

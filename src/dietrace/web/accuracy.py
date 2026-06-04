@@ -12,6 +12,7 @@ fall back to the last measured values when Phoenix is unreachable.
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections import defaultdict
@@ -31,10 +32,6 @@ _MACRO_EVALUATOR_OF = {
     "pass_rate": "macro_plan_within_range",
     "mean_score": "macro_plan_consistency_eval",
 }
-
-# Fallback macro scores when Phoenix is unreachable.
-_MACRO_BASELINE = {"pass_rate": 0.6, "mean_score": 0.85}
-_MACRO_CURRENT = {"pass_rate": 0.85, "mean_score": 1.0}
 
 # UI metric key -> the Phoenix evaluator name it reads from.
 _EVALUATOR_OF = {
@@ -89,6 +86,43 @@ def _macro_case_count() -> int:
     """The number of eval cases in the macro-plan dataset."""
     directory = Path("evals/dataset/macros")
     return len(list(directory.glob("*.json"))) if directory.exists() else 0
+
+
+def _measured_macro_scores() -> dict[str, float] | None:
+    """Run the macro evaluators over the seed dataset, deterministically.
+
+    The honest fallback for the macros headline when no live Phoenix experiment
+    is available: it actually computes each seed profile's plan and scores it with
+    the SAME evaluators the Phoenix experiment uses — ``macro_plan_within_range``
+    (→ ``pass_rate``) and ``macro_plan_consistency_eval`` (→ ``mean_score``) —
+    and returns their mean score across the dataset. No LLM, no network. Returns
+    ``None`` when the dataset is absent.
+    """
+    directory = Path("evals/dataset/macros")
+    files = sorted(directory.glob("*.json")) if directory.exists() else []
+    if not files:
+        return None
+
+    from dietrace.evals.evaluators import (
+        macro_plan_consistency_eval,
+        macro_plan_within_range,
+    )
+    from dietrace.macros.compute import compute_targets
+    from dietrace.macros.models import MacroProfile
+
+    within: list[float] = []
+    consistency: list[float] = []
+    for path in files:
+        case = json.loads(path.read_text())
+        plan = compute_targets(MacroProfile(**case["input"]))
+        within.append(macro_plan_within_range(plan, case["expected"]).score)
+        consistency.append(macro_plan_consistency_eval(plan).score)
+
+    n = len(files)
+    return {
+        "pass_rate": round(sum(within) / n, 3),
+        "mean_score": round(sum(consistency) / n, 3),
+    }
 
 
 def _experiment_means(client: Any, experiment_id: str) -> dict[str, float]:
@@ -216,9 +250,12 @@ def accuracy_report(
             for s in m["series"]
         ]
     else:
-        macro_current = _MACRO_CURRENT
+        # No live macro experiment — compute the real scores from the seed dataset
+        # with the same evaluators (honest, deterministic) rather than fabricating.
+        measured = _measured_macro_scores()
+        macro_current = measured or {"pass_rate": 0.0, "mean_score": 0.0}
         macro_experiments = None
-        macro_trend = [dict(_MACRO_BASELINE), dict(_MACRO_CURRENT)]
+        macro_trend = [dict(macro_current)] if measured else []
 
     return {
         "headline": {

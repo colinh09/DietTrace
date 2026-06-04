@@ -44,6 +44,12 @@ _GOAL_DELTA: dict[str, float] = {
     "bulk": 300.0,
 }
 
+# Minimum safe daily calorie target (kcal), sex-aware — the widely-cited clinical
+# floors (~1500 men / ~1200 women). An aggressive cut on a small/light person can
+# drive TDEE − 500 well below this; the floor guarantees the "AI nutritionist"
+# never recommends a dangerously low intake.
+_CALORIE_FLOOR: dict[str, float] = {"male": 1500.0, "female": 1200.0}
+
 # Macro split as (protein_pct, carb_pct, fat_pct) fractions of total kcal.
 # All three fractions sum to 1.0; converted to grams via Atwater factors.
 _GOAL_SPLIT: dict[str, tuple[float, float, float]] = {
@@ -78,7 +84,14 @@ def compute_targets(profile: MacroProfile) -> MacroPlan:
 
     # Round the calorie target once; use this value for all downstream math so
     # targets["208"] and the Atwater sum of the macro grams agree.
-    kcal = round(tdee + delta, 1)
+    raw_kcal = round(tdee + delta, 1)
+
+    # Enforce the sex-aware safe-minimum floor so an aggressive cut on a light
+    # person never drops below a clinically safe intake. Record it as a clamp.
+    floor = _CALORIE_FLOOR[profile.sex]
+    floored = raw_kcal < floor
+    kcal = floor if floored else raw_kcal
+    clamped = ["calorie_floor"] if floored else []
 
     protein_pct, carb_pct, fat_pct = _GOAL_SPLIT[profile.goal]
     protein_g = round(kcal * protein_pct / _ATWATER[_PROTEIN], 1)
@@ -103,6 +116,9 @@ def compute_targets(profile: MacroProfile) -> MacroPlan:
             "value": kcal,
             "goal": profile.goal,
             "delta": delta,
+            "raw": raw_kcal,
+            "floor": floor,
+            "floored": floored,
         },
         {
             "step": "split",
@@ -120,6 +136,8 @@ def compute_targets(profile: MacroProfile) -> MacroPlan:
         f" {profile.goal} goal ({delta:+.0f} kcal)"
         f" → {kcal:.0f} kcal target."
     )
+    if floored:
+        rationale += f" Raised to the {floor:.0f} kcal safe minimum."
 
     return MacroPlan(
         targets={
@@ -131,5 +149,5 @@ def compute_targets(profile: MacroProfile) -> MacroPlan:
         rationale=rationale,
         source="formula",
         steps=steps,
-        clamped=[],
+        clamped=clamped,
     )
