@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from dietrace.agents.nutrition.web_nutrition import web_nutrition
 
@@ -72,3 +72,47 @@ def test_missing_serving_weight_is_fail_soft_none() -> None:
 def test_empty_and_garbled_responses_degrade_to_none() -> None:
     assert web_nutrition("x", "y", client=_client(None)) is None
     assert web_nutrition("x", "y", client=_client("not json at all")) is None
+
+
+def test_retry_succeeds_on_second_attempt() -> None:
+    """When the first lookup returns no text, the second attempt is used."""
+    client = Mock()
+    client.models.generate_content.side_effect = [
+        SimpleNamespace(text=None),
+        SimpleNamespace(text=json.dumps(_FIVE_GUYS)),
+    ]
+    food = web_nutrition("bacon cheeseburger", "Five Guys", client=client, attempts=2)
+
+    assert food is not None
+    assert client.models.generate_content.call_count == 2
+
+
+def test_credential_failure_is_fail_soft_none() -> None:
+    """A credentials exception during client init degrades to None."""
+    with patch(
+        "dietrace.agents.nutrition.web_nutrition._default_client",
+        side_effect=RuntimeError("no credentials"),
+    ):
+        result = web_nutrition("burger", "McD")
+
+    assert result is None
+
+
+def test_negative_nutrient_value_is_dropped() -> None:
+    """A negative nutrient from corrupted LLM output is skipped; core nutrients survive."""
+    payload = dict(_FIVE_GUYS)
+    payload["fiber_g"] = -3
+    food = web_nutrition("bacon cheeseburger", "Five Guys", client=_client(json.dumps(payload)))
+
+    assert food is not None
+    assert food.nutrient("291") is None  # fiber dropped
+    assert food.nutrient("208") is not None  # energy intact
+
+
+def test_missing_description_falls_back_to_brand_food_label() -> None:
+    """When the LLM omits the description field, the label is built from brand + food."""
+    payload = {k: v for k, v in _FIVE_GUYS.items() if k != "description"}
+    food = web_nutrition("bacon cheeseburger", "Five Guys", client=_client(json.dumps(payload)))
+
+    assert food is not None
+    assert "Five Guys" in food.description or "bacon cheeseburger" in food.description
