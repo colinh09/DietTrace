@@ -1,19 +1,28 @@
-"""Attach eval verdicts to the active OpenTelemetry span.
+"""Attach eval verdicts to the active span — and, optionally, to Phoenix as a
+first-class CODE annotation.
 
-annotate_log_eval and annotate_macro_eval write the results from
-``evaluate_log`` / ``evaluate_macro_plan`` to the current active span as
-OpenInference eval annotation attributes (``eval.<name>.score``,
-``eval.<name>.label``, ``eval.<name>.explanation``), so every food log and
-macro plan carries its verdict next to its span in Phoenix.
+``annotate_log_eval`` / ``annotate_macro_eval`` take the result of ``evaluate_log``
+/ ``evaluate_macro_plan`` and surface the verdict on the current trace two ways,
+both fail-soft:
 
-Fail-soft: when no recording span is active (tracing disabled or called
-outside a span context), both functions are silent no-ops. Only the standard
-``opentelemetry-api`` is required at call time — no Phoenix or OpenInference
-imports.
+1. **Span attributes** — ``eval.<name>.{score,label,explanation}`` are set on the
+   active recording span, so the verdict rides the live trace and is visible in
+   the span's attribute panel in Phoenix. Always on when a span is recording.
+
+2. **Phoenix span annotation** — a first-class ``add_span_annotation`` call
+   (``annotator_kind="CODE"``) so the verdict can render as an eval/annotation on
+   the trace. Best-effort and OFF by default (it talks to Phoenix): enabled by
+   ``DIETRACE_PHOENIX_ANNOTATIONS=1``, or by injecting a client (tests). Any error
+   — missing creds, span-export timing, network — is swallowed.
+
+When no recording span is active (tracing disabled, or called outside a span),
+both are silent no-ops. Only ``opentelemetry-api`` is needed at import time; the
+Phoenix client is a lazy import behind the flag.
 """
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from opentelemetry import trace
@@ -21,54 +30,85 @@ from opentelemetry import trace
 from dietrace.evals.online import REVIEW_THRESHOLD as _LOG_PASS_THRESHOLD
 
 
-def _current_span():
+def _current_span() -> Any | None:
     """Return the active span if it is recording, else None."""
     span = trace.get_current_span()
     return span if span.is_recording() else None
 
 
-def annotate_log_eval(result: dict[str, Any]) -> None:
-    """Write ``evaluate_log`` verdict attributes onto the current active span.
+def _explanation(reasons: list[str], flags: list[str]) -> str:
+    """A short human verdict string: reasons, else flags, else 'ok'."""
+    if reasons:
+        return "; ".join(reasons)
+    if flags:
+        return "; ".join(flags)
+    return "ok"
 
-    Sets ``eval.meal_log.{score,label,explanation}`` so the verdict appears
-    as an eval annotation alongside the meal-logging span in Phoenix. No-op
-    when no recording span is active.
-    """
-    span = _current_span()
-    if span is None:
-        return
 
+def annotate_log_eval(result: dict[str, Any], client: Any | None = None) -> None:
+    """Surface an ``evaluate_log`` verdict on the current span as ``eval.meal_log.*``."""
     confidence: float = result.get("confidence", 0.0)
-    reasons: list[str] = result.get("reasons") or []
-    flags: list[str] = result.get("flags") or []
-
     label = "pass" if confidence >= _LOG_PASS_THRESHOLD else "fail"
-    explanation = "; ".join(reasons) if reasons else ("; ".join(flags) if flags else "ok")
-
-    span.set_attribute("eval.meal_log.score", confidence)
-    span.set_attribute("eval.meal_log.label", label)
-    span.set_attribute("eval.meal_log.explanation", explanation)
+    explanation = _explanation(result.get("reasons") or [], result.get("flags") or [])
+    _annotate("meal_log", confidence, label, explanation, client)
 
 
-def annotate_macro_eval(result: dict[str, Any]) -> None:
-    """Write ``evaluate_macro_plan`` verdict attributes onto the current active span.
+def annotate_macro_eval(result: dict[str, Any], client: Any | None = None) -> None:
+    """Surface an ``evaluate_macro_plan`` verdict on the current span as ``eval.macro_plan.*``."""
+    score: float = result.get("score", 0.0)
+    label = "pass" if result.get("pass", False) else "fail"
+    explanation = _explanation(result.get("reasons") or [], result.get("flags") or [])
+    _annotate("macro_plan", score, label, explanation, client)
 
-    Sets ``eval.macro_plan.{score,label,explanation}`` so the verdict appears
-    as an eval annotation alongside the macro-planning span in Phoenix. No-op
-    when no recording span is active.
-    """
+
+def _annotate(
+    name: str, score: float, label: str, explanation: str, client: Any | None
+) -> None:
     span = _current_span()
     if span is None:
         return
+    # 1) Always-on: the verdict rides the live span as attributes.
+    span.set_attribute(f"eval.{name}.score", score)
+    span.set_attribute(f"eval.{name}.label", label)
+    span.set_attribute(f"eval.{name}.explanation", explanation)
+    # 2) Best-effort: a first-class Phoenix CODE annotation.
+    _phoenix_annotation(span, name, score, label, explanation, client)
 
-    score: float = result.get("score", 0.0)
-    passed: bool = result.get("pass", False)
-    reasons: list[str] = result.get("reasons") or []
-    flags: list[str] = result.get("flags") or []
 
-    label = "pass" if passed else "fail"
-    explanation = "; ".join(reasons) if reasons else ("; ".join(flags) if flags else "ok")
+def _phoenix_annotation(
+    span: Any, name: str, score: float, label: str, explanation: str, client: Any | None
+) -> None:
+    """Best-effort first-class Phoenix annotation keyed by span id (fail-soft).
 
-    span.set_attribute("eval.macro_plan.score", score)
-    span.set_attribute("eval.macro_plan.label", label)
-    span.set_attribute("eval.macro_plan.explanation", explanation)
+    Off unless a *client* is injected (tests) or ``DIETRACE_PHOENIX_ANNOTATIONS=1``
+    — so production never adds a Phoenix round-trip per request unless asked. Any
+    failure (no creds, span not yet exported, network) is swallowed.
+    """
+    try:
+        if client is None:
+            if os.environ.get("DIETRACE_PHOENIX_ANNOTATIONS") != "1":
+                return
+            client = _phoenix_client()
+            if client is None:
+                return
+        span_id = format(span.get_span_context().span_id, "016x")
+        client.spans.add_span_annotation(
+            span_id=span_id,
+            annotation_name=name,
+            label=label,
+            score=score,
+            explanation=explanation,
+            annotator_kind="CODE",
+        )
+    except Exception:
+        return
+
+
+def _phoenix_client() -> Any | None:
+    """Lazily build a Phoenix client (reads creds from the env), or None on failure."""
+    try:
+        from phoenix.client import Client
+
+        return Client()
+    except Exception:
+        return None

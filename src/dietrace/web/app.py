@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from opentelemetry import trace as _otel_trace
 from pydantic import BaseModel, ValidationError
 
 from dietrace.agents.nutrition.safety import safety_check
@@ -50,6 +51,12 @@ from dietrace.web.stores import build_stores
 from dietrace.web.trust import TrustStore
 
 SERVICE_NAME = "dietrace-web"
+
+# A tracer for the web handlers so each /log and /macros/plan request opens a
+# recording span — without one, the online-eval verdicts have no span to ride and
+# never reach Phoenix. Resolves the global provider lazily, so
+# it's a no-op span when tracing is disabled.
+_TRACER = _otel_trace.get_tracer(SERVICE_NAME)
 
 # Where the Next frontend is served from; comma-separated origins, env-overridable
 # so deploys can add their real domain.
@@ -449,26 +456,30 @@ def create_app(
                 **review,
                 "trace": trace,
             }
-        result = logger_fn(req.text, examples=learning.examples(user))
-        totals = result.get("totals", [])
-        per_item = result.get("per_item", [])
-        quality = evaluate_log(req.text, per_item, totals)
-        review = review_flag(quality)
-        trace = _build_trace(per_item, totals)
-        entry_id = log_store.add(
-            req.text, totals, date=req.date, user_id=user,
-            detail=_meal_detail(per_item, trace, quality, review),
-        )
-        _record_trust(per_item, quality, review, user, req.text)
-        return {
-            "id": entry_id,
-            **result,
-            "confidence": quality["confidence"],
-            "reasons": quality["reasons"],
-            "safety": safety,
-            **review,
-            "trace": trace,
-        }
+        # A recording span so the online-eval verdict (set on the current span by
+        # evaluate_log) rides this trace into Phoenix. The Gemini
+        # parse inside logger_fn nests under it.
+        with _TRACER.start_as_current_span("meal_log"):
+            result = logger_fn(req.text, examples=learning.examples(user))
+            totals = result.get("totals", [])
+            per_item = result.get("per_item", [])
+            quality = evaluate_log(req.text, per_item, totals)
+            review = review_flag(quality)
+            trace = _build_trace(per_item, totals)
+            entry_id = log_store.add(
+                req.text, totals, date=req.date, user_id=user,
+                detail=_meal_detail(per_item, trace, quality, review),
+            )
+            _record_trust(per_item, quality, review, user, req.text)
+            return {
+                "id": entry_id,
+                **result,
+                "confidence": quality["confidence"],
+                "reasons": quality["reasons"],
+                "safety": safety,
+                **review,
+                "trace": trace,
+            }
 
     @app.post("/log/stream")
     def log_meal_stream(
@@ -571,30 +582,34 @@ def create_app(
         The profile fields are never stored; only the resulting targets travel
         out of this endpoint (via the response and then /macros/save).
         """
-        if req.preset is not None:
-            try:
-                plan = preset_plan(req.preset)
-            except KeyError as exc:
-                raise HTTPException(status_code=422, detail=str(exc)) from exc
-            eval_result = evaluate_macro_plan(_PRESET_PROFILE, plan)
-        else:
-            try:
-                profile = MacroProfile(
-                    age=req.age,
-                    sex=req.sex,
-                    height_cm=req.height_cm,
-                    weight_kg=req.weight_kg,
-                    activity=req.activity,
-                    goal=req.goal,
-                    preference=req.preference,
-                    ai_help=req.ai_help,
-                )
-            except ValidationError as exc:
-                raise HTTPException(status_code=422, detail=exc.errors()) from exc
-            plan = compute_targets(profile)
-            if req.ai_help:
-                plan = personalize_plan(profile, plan.targets, client=macro_client)
-            eval_result = evaluate_macro_plan(profile, plan)
+        # A recording span so the macro-plan eval verdict (set on the current span
+        # by evaluate_macro_plan) rides this trace into Phoenix;
+        # the personalize Gemini call nests under it.
+        with _TRACER.start_as_current_span("macro_plan"):
+            if req.preset is not None:
+                try:
+                    plan = preset_plan(req.preset)
+                except KeyError as exc:
+                    raise HTTPException(status_code=422, detail=str(exc)) from exc
+                eval_result = evaluate_macro_plan(_PRESET_PROFILE, plan)
+            else:
+                try:
+                    profile = MacroProfile(
+                        age=req.age,
+                        sex=req.sex,
+                        height_cm=req.height_cm,
+                        weight_kg=req.weight_kg,
+                        activity=req.activity,
+                        goal=req.goal,
+                        preference=req.preference,
+                        ai_help=req.ai_help,
+                    )
+                except ValidationError as exc:
+                    raise HTTPException(status_code=422, detail=exc.errors()) from exc
+                plan = compute_targets(profile)
+                if req.ai_help:
+                    plan = personalize_plan(profile, plan.targets, client=macro_client)
+                eval_result = evaluate_macro_plan(profile, plan)
         plan = MacroPlan(
             targets=plan.targets,
             rationale=plan.rationale,
