@@ -24,6 +24,7 @@ from dietrace.web.identity import DEMO_USER
 _MEALS = "meals"
 _CORRECTIONS = "corrections"
 _TRUST = "trust_logs"
+_GOALS = "goals"
 
 # The per-meal breakdown fields persisted with a meal so /history can rebuild the
 # per-item table + trace + quality eval (the breakdown survives navigation).
@@ -227,3 +228,41 @@ class FirestoreTrustStore:
                 for r in recent
             ],
         }
+
+
+class FirestoreGoalStore:
+    """Per-user macro target store on Firestore (interface mirrors GoalStore).
+
+    Stores ONLY the computed targets (+rationale/source) in the ``goals``
+    collection, keyed by user_id.  The MacroProfile is never persisted here.
+    """
+
+    def __init__(self, project: str | None = None) -> None:
+        self._db = _client(project)
+
+    def get(self, user: str = DEMO_USER) -> dict[str, float] | None:
+        """Return the saved targets for *user*, or None if not yet set."""
+        snap = self._db.collection(_GOALS).document(user).get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict()
+        return data.get("targets") if data else None
+
+    def save(
+        self,
+        user: str,
+        targets: dict[str, float],
+        rationale: str | None = None,
+        source: str | None = None,
+    ) -> None:
+        """Upsert *targets* for *user*.  Never accepts or stores profile fields."""
+        doc: dict[str, Any] = {
+            "user_id": user,
+            "targets": targets,
+            "updated_at": datetime.datetime.now(tz=datetime.UTC).isoformat(),
+        }
+        if rationale is not None:
+            doc["rationale"] = rationale
+        if source is not None:
+            doc["source"] = source
+        self._db.collection(_GOALS).document(user).set(doc)

@@ -311,6 +311,7 @@ def create_app(
     store: MealLogStore | None = None,
     feedback_store: FeedbackStore | None = None,
     trust_store: TrustStore | None = None,
+    goal_store: Any | None = None,
     memory: Any | None = None,
     feedback_pusher: FeedbackPusher = phoenix_push,
     tracer_init: Callable[[str], Any] = init_tracer,
@@ -319,11 +320,13 @@ def create_app(
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
         log_store, corrections, trust = store, feedback_store, trust_store
+        goals_db = goal_store
     else:
-        default_meals, default_feedback, default_trust = build_stores()
+        default_meals, default_feedback, default_trust, default_goals = build_stores()
         log_store = store or default_meals
         corrections = feedback_store or default_feedback
         trust = trust_store or default_trust
+        goals_db = goal_store or default_goals  # noqa: F841  (used in 13.6)
     learning = memory or build_memory()
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
