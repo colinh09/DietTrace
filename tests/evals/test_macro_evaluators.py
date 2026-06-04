@@ -156,10 +156,35 @@ def test_macro_plan_consistency_eval_fails_inconsistent() -> None:
 
 
 def test_macro_plan_consistency_eval_returns_eval_result() -> None:
-    """The evaluator always returns an EvalResult instance."""
+    """The evaluator always returns an EvalResult instance.
+
+    The all-zero plan hits the first kcal==0 branch (atwater==0 too): both
+    sides are zero, so the plan is considered consistent (score=1.0, pass).
+    """
     plan = _plan(kcal=0.0, protein_g=0.0, fat_g=0.0, carb_g=0.0)
     result = macro_plan_consistency_eval(plan)
     assert isinstance(result, EvalResult)
+    assert result.score == 1.0
+    assert result.label == "pass"
+
+
+def test_macro_plan_consistency_eval_zero_kcal_nonzero_atwater_fails() -> None:
+    """kcal=0 but macros give a nonzero Atwater estimate: pins the second
+    kcal==0 branch in macro_plan_consistency_eval (score=0.0, label='fail').
+
+    Without this branch the code would reach ``abs(atwater - kcal) / kcal``
+    and raise ZeroDivisionError. The existing all-zero test only exercises
+    branch 1 (atwater==0 too → pass); a partial plan (e.g. protein logged
+    against a 0-kcal target) reaches this branch in production.
+    """
+    # atwater = 4*100 + 4*0 + 9*0 = 400 kcal, but kcal target is 0
+    plan = _plan(kcal=0.0, protein_g=100.0, fat_g=0.0, carb_g=0.0)
+    result = macro_plan_consistency_eval(plan)
+    assert result.score == 0.0
+    assert result.label == "fail"
+    assert "0" in result.explanation
+    assert result.metadata["atwater"] == 400.0
+    assert result.metadata["kcal"] == 0.0
 
 
 # ---------------------------------------------------------------------------
