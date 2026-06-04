@@ -363,3 +363,53 @@ def test_counted_whole_fruit_prefers_whole_over_slice() -> None:
 
     assert est.grams == pytest.approx(150.0)
     assert est.source == "whole_item"
+
+
+# ---- _per_piece_serving NFS branch: an explicit "piece, NFS" beats a "medium piece".
+#
+# The NFS (Not Further Specified) branch fires between the whole-food-name check
+# (priority 1) and the medium/regular-size check (priority 3), so a serving whose
+# description or unit contains "nfs" is returned as the representative single piece
+# even when a larger "medium" variant is present. Without a direct test this priority
+# is invisible: the medium branch would silently win if the two loops were swapped
+# and all existing tests would still pass (none carry an NFS-tagged serving). ----
+
+
+def _grain_nfs() -> Food:
+    """A grain food whose serving units do NOT repeat the food name token "roll".
+
+    The medium piece is listed first so _best_unit_match would pick it if step 2
+    fired — but step 2 finds no match (neither serving's tokens include "roll"),
+    so the resolution falls to step 3 (whole-item count) and _per_piece_serving.
+    There, the NFS branch (priority 2) must fire before the medium branch (priority 3),
+    returning the 40 g NFS piece over the 55 g medium one.
+    """
+    return Food(
+        fdc_id=9999,
+        description="Grain roll, whole wheat",  # "roll" in food name → whole-item match
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(
+                amount=1.0, unit="medium", gram_weight=55.0,
+                description="1 medium",  # no "roll" in tokens → step 2 skips this
+            ),
+            ServingSize(
+                amount=1.0, unit="piece, NFS", gram_weight=40.0,
+                description="1 piece, NFS",  # "nfs" triggers the NFS branch
+            ),
+        ],
+    )
+
+
+def test_per_piece_nfs_preferred_over_medium_sized_variant() -> None:
+    """_per_piece_serving returns the NFS piece (40 g) ahead of the medium piece (55 g).
+
+    Step 2 finds no match (serving units lack "roll"), so resolution reaches step 3
+    and calls _per_piece_serving. The NFS branch (priority 2) fires before the
+    medium branch (priority 3), so 2 rolls → 80 g, not 110 g. Removing or swapping
+    those two loops would silently change logged portion weights.
+    """
+    est = estimate_portion(_grain_nfs(), 2.0, "roll")
+
+    assert est.grams == pytest.approx(80.0)  # 2 × 40 g (NFS), not 2 × 55 g (medium)
+    assert est.source == "whole_item"
