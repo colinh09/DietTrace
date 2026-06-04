@@ -219,7 +219,6 @@ export default function Home() {
             corrections={corrections}
             taught={taught}
             latestTrace={latestTrace}
-            onOpenObs={setObs}
           />
         </div>
       </main>

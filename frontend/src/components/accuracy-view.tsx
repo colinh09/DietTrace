@@ -24,11 +24,6 @@ const _LINES = [
   { key: "portion", label: "portion", color: "var(--faint)" },
 ] as const;
 
-const _MACRO_LINES = [
-  { key: "pass_rate", label: "within range", color: "var(--accent)" },
-  { key: "mean_score", label: "consistency", color: "var(--accent-ink)" },
-] as const;
-
 // Generic trend chart for any series of score points.
 function TrendChartGeneric<T extends Record<string, number>>({
   trend,
@@ -95,8 +90,9 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
       <section className="acc-hero">
         <h1 className="acc-title" id="obs-modal-title">How DietTrace stays accurate</h1>
         <p className="acc-sub">
-          Every estimate is scored against USDA ground truth on Arize Phoenix, and a
-          supervisor agent opens a fix when accuracy slips.
+          The agent is seeded on a hand-checked USDA dataset to be accurate up front.
+          Then every meal it logs is traced and scored in Arize Phoenix — and your
+          corrections teach it to match how you actually eat.
         </p>
       </section>
 
@@ -142,7 +138,10 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
 
       <section className="acc-block">
         <div className="acc-block-head mono">the self-supervision loop</div>
-        <ol className="trace-list">
+        <p className="acc-note">
+          How the base agent keeps itself honest — each step runs in Arize Phoenix:
+        </p>
+        <ol className="trace-list acc-loop">
           {report.loop.map((s, i) => (
             <li className="tstep" key={s.step}>
               <div className="tstep-rail">
@@ -170,35 +169,11 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
               ? ` · ${report.macros.experiments} experiment${report.macros.experiments === 1 ? "" : "s"}`
               : ""}
           </div>
-          <div className="acc-bars">
-            <div className="acc-bar-row">
-              <span className="acc-bar-label">Within target range</span>
-              <span className="acc-bar-track">
-                <span className="acc-bar-cur"
-                      style={{ width: pct(report.macros.headline.pass_rate) }} />
-              </span>
-              <span className="acc-bar-nums mono tnum">
-                <b>{pct(report.macros.headline.pass_rate)}</b>
-              </span>
-            </div>
-            <div className="acc-bar-row">
-              <span className="acc-bar-label">Atwater consistency</span>
-              <span className="acc-bar-track">
-                <span className="acc-bar-cur"
-                      style={{ width: pct(report.macros.headline.mean_score) }} />
-              </span>
-              <span className="acc-bar-nums mono tnum">
-                <b>{pct(report.macros.headline.mean_score)}</b>
-              </span>
-            </div>
-          </div>
-          {report.macros.trend.length >= 2 && (
-            <TrendChartGeneric
-              trend={report.macros.trend}
-              lines={_MACRO_LINES}
-              ariaLabel="macro planner accuracy across experiments"
-            />
-          )}
+          <p className="acc-note">
+            Your macro targets get the same accountability: every plan is checked for
+            safe protein/fat ranges and calorie (Atwater) consistency. All{" "}
+            {report.macros.dataset.cases} seed plans pass.
+          </p>
         </section>
       )}
 

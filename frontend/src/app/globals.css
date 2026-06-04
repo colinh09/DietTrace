@@ -580,3 +580,8 @@ body {
 .nav-item.active { color: var(--accent-ink); font-weight: 600; }
 .nav-sep { display: inline-block; width: 1px; height: 16px; background: var(--line-strong); margin: 0 6px; }
 @media (max-width: 720px) { .hdr-nav { gap: 0; } .nav-item { padding: 6px 8px; font-size: 13px; } .nav-sep { margin: 0 3px; } }
+
+/* ── Accuracy modal: wrap the self-supervision loop + quiet explainer notes ── */
+.acc-loop .tstep-line-btn { align-items: flex-start; }
+.acc-loop .tstep-arrow { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.45; }
+.acc-note { font-size: 13px; color: var(--muted-ink); line-height: 1.55; margin: 0 0 14px; max-width: 62ch; }

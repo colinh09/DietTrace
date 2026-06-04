@@ -261,7 +261,7 @@ export function MealTrace({
         aria-expanded={showTrace}
         onClick={() => setShowTrace((s) => !s)}
       >
-        {showTrace ? "hide" : "show"} the agent&apos;s work
+        {`${showTrace ? "hide" : "show"} the agent's work`}
       </button>
       {showTrace && (
         <div className="trace-detail">

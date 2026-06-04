@@ -80,24 +80,15 @@ export function Dashboard({
   corrections,
   taught,
   latestTrace,
-  onOpenObs,
 }: {
   corrections: number;
   taught: RecentCorrection[];
   latestTrace: LatestTrace | null;
-  onOpenObs?: (tab: "accuracy" | "trust") => void;
 }) {
   return (
     <aside className="dash" aria-label="Observability dashboard">
       <div className="dash-head">
         <span className="dash-title mono">observability</span>
-        <button
-          type="button"
-          className="dash-link mono"
-          onClick={() => onOpenObs?.("accuracy")}
-        >
-          accuracy ›
-        </button>
       </div>
 
       <section className="dash-card dash-stat-card">
