@@ -258,11 +258,16 @@ def evaluate_log(
     flags = [c["flag"] for c in applicable if "flag" in c]
     reasons = [c["reason"] for c in applicable if "reason" in c]
 
-    return {
+    result: dict[str, Any] = {
         "confidence": max(0.0, min(1.0, confidence)),
         "flags": flags,
         "reasons": reasons,
     }
+
+    from dietrace.evals.span_eval import annotate_log_eval  # local to avoid circular risk
+
+    annotate_log_eval(result)
+    return result
 
 
 def review_flag(result: dict[str, Any]) -> dict[str, Any]:

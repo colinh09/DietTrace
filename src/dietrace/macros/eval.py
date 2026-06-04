@@ -166,7 +166,7 @@ def evaluate_macro_plan(
     flags.extend(s.get("flags", []))
     reasons.extend(s.get("reasons", []))
 
-    return {
+    result = {
         "score": score,
         "pass": score == 1.0,
         "consistency": c,
@@ -174,3 +174,8 @@ def evaluate_macro_plan(
         "flags": flags,
         "reasons": reasons,
     }
+
+    from dietrace.evals.span_eval import annotate_macro_eval  # local to avoid circular risk
+
+    annotate_macro_eval(result)
+    return result
