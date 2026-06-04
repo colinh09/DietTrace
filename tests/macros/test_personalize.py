@@ -285,3 +285,38 @@ class TestSoftFallback:
         client.models.generate_content.side_effect = RuntimeError("fail")
         plan = personalize_plan(profile, base, client)
         assert plan.targets["208"] == 1800.0
+
+
+# ---------------------------------------------------------------------------
+# Fenced JSON response — mirrors parse_meal.py's test_strips_markdown_code_fences.
+# Gemini sometimes wraps its JSON in a markdown code block even with
+# response_mime_type="application/json"; _strip_fences must remove it before
+# json.loads so personalize_plan doesn't silently fall back.
+# ---------------------------------------------------------------------------
+
+
+class TestFencedResponse:
+    def _fenced_client(self, fence_tag: str = "json") -> MagicMock:
+        payload = (
+            '{"rationale": "more protein for muscle", '
+            '"protein_pct_delta": 3.0, "fat_pct_delta": 0.0}'
+        )
+        response = MagicMock()
+        response.text = f"```{fence_tag}\n{payload}\n```"
+        client = MagicMock()
+        client.models.generate_content.return_value = response
+        return client
+
+    def test_json_fenced_response_is_parsed_not_fallen_back(self):
+        """A ```json ... ``` wrapper is stripped and the plan uses source='ai', not 'formula'."""
+        plan = personalize_plan(_profile(), _base_targets(), self._fenced_client("json"))
+        assert plan.source == "ai"
+
+    def test_json_fenced_rationale_is_extracted(self):
+        plan = personalize_plan(_profile(), _base_targets(), self._fenced_client("json"))
+        assert "protein" in plan.rationale.lower()
+
+    def test_plain_fenced_response_is_also_parsed(self):
+        """A plain ``` ... ``` fence (no language tag) is also stripped correctly."""
+        plan = personalize_plan(_profile(), _base_targets(), self._fenced_client(""))
+        assert plan.source == "ai"
