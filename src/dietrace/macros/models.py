@@ -63,3 +63,6 @@ class MacroPlan(BaseModel):
     # True when the split was biased toward the user's remembered preference
     # (the macro-learning closure) — surfaced so the UI/trace can show it learned.
     personalized: bool = False
+    # The alignment of this plan to the user's saved split preference (Phase 2):
+    # ``{score, protein_delta, fat_delta}``; None when there's no preference.
+    adherence: dict[str, Any] | None = None

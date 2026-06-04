@@ -25,6 +25,7 @@ from pydantic import BaseModel, ValidationError
 
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
+from dietrace.macros.adherence import macro_adherence
 from dietrace.macros.compute import compute_targets
 from dietrace.macros.eval import evaluate_macro_plan
 from dietrace.macros.models import MacroPlan, MacroProfile
@@ -45,7 +46,7 @@ from dietrace.web.feedback import (
 )
 from dietrace.web.goals import load_goals, targets_to_goals
 from dietrace.web.identity import current_user
-from dietrace.web.macro_memory import build_macro_memory
+from dietrace.web.macro_memory import build_macro_memory, push_macro_preference, split_of
 from dietrace.web.memory import build_memory, calories_of, sum_totals
 from dietrace.web.micros import micro_progress
 from dietrace.web.store import MealLogStore
@@ -369,6 +370,7 @@ def create_app(
     goal_store: Any | None = None,
     memory: Any | None = None,
     macro_memory: Any | None = None,
+    macro_pref_pusher: Any = push_macro_preference,
     feedback_pusher: FeedbackPusher = phoenix_push,
     tracer_init: Callable[[str], Any] = init_tracer,
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
@@ -622,6 +624,9 @@ def create_app(
                 elif req.ai_help:
                     plan = personalize_plan(profile, plan.targets, client=macro_client)
                 eval_result = evaluate_macro_plan(profile, plan)
+        # When personalized, score how well the served split matches the saved
+        # preference (the "tuned to you" alignment signal, Phase 2 P2.1).
+        adherence = macro_adherence(plan, pref) if pref else None
         plan = MacroPlan(
             targets=plan.targets,
             rationale=plan.rationale,
@@ -630,6 +635,7 @@ def create_app(
             clamped=plan.clamped,
             eval=eval_result,
             personalized=plan.personalized,
+            adherence=adherence,
         )
         return plan.model_dump()
 
@@ -649,7 +655,59 @@ def create_app(
         # Remember the user's preferred split so the next plan biases toward it
         # (the macro-learning closure) — derived only from the targets, no profile.
         macro_learning.remember(user, req.targets)
-        return {"ok": True, "user": user, "targets": req.targets}
+        # Bank the preference in Phoenix as the user's macro ground truth (Phase 2
+        # P2.3) — fail-soft, profile-free, never blocks the save.
+        split = split_of(req.targets)
+        banked = bool(split and macro_pref_pusher(user, split))
+        return {"ok": True, "user": user, "targets": req.targets, "banked": banked}
+
+    @app.post("/macros/retune")
+    def macros_retune(
+        req: MacroPlanRequest, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """How much the user's saved preference tunes their plan (Phase 2 P2.2).
+
+        The macro analogue of /retune: compares the generic goal-default plan
+        (``before``) against the personalized plan (``after``) by adherence to the
+        user's saved split preference, so the UI can show "your nutritionist adapts
+        to you." This is an ALIGNMENT measure, not accuracy vs ground truth. Returns
+        zero cases when the user has no saved preference yet.
+        """
+        pref = macro_learning.recall(user)
+        if not pref:
+            return {"cases": 0, "before": None, "after": None, "improved": False}
+
+        if req.preset is not None:
+            try:
+                base = preset_plan(req.preset)
+            except KeyError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            weight = None
+        else:
+            try:
+                profile = MacroProfile(
+                    age=req.age, sex=req.sex, height_cm=req.height_cm,
+                    weight_kg=req.weight_kg, activity=req.activity, goal=req.goal,
+                )
+            except ValidationError as exc:
+                raise HTTPException(status_code=422, detail=exc.errors()) from exc
+            base = compute_targets(profile)
+            weight = profile.weight_kg
+
+        tuned = apply_preferred_split(base, pref, weight_kg=weight)
+        before = macro_adherence(base, pref)
+        after = macro_adherence(tuned, pref)
+        return {
+            "cases": 1,
+            "before": before["score"],
+            "after": after["score"],
+            "improved": after["score"] > before["score"],
+            "protein_shift": round(
+                4 * tuned.targets["203"] / tuned.targets["208"]
+                - 4 * base.targets["203"] / base.targets["208"],
+                4,
+            ),
+        }
 
     @app.get("/accuracy")
     def accuracy_panel() -> dict[str, Any]:

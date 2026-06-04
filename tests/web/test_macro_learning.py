@@ -35,6 +35,7 @@ def _client(tmp_path) -> TestClient:
         goal_store=GoalStore(tmp_path / "goals.sqlite"),
         memory=SqliteMemory(tmp_path / "mem.sqlite"),
         macro_memory=SqliteMacroMemory(tmp_path / "macro_mem.sqlite"),
+        macro_pref_pusher=lambda u, s: False,
         feedback_pusher=lambda *a: False,
         tracer_init=lambda name: None,
     )

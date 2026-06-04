@@ -28,6 +28,53 @@ _ENERGY, _PROTEIN, _FAT = "208", "203", "204"
 _ATWATER_P = 4.0
 _ATWATER_F = 9.0
 
+# The user's saved macro preferences accumulate in their own Phoenix dataset (the
+# macro counterpart of the food-correction feedback dataset) — versioned, real
+# ground truth the supervisor/eval story can fold in. Profile-free.
+MACRO_PREFS_DATASET = "dietrace-macro-prefs-v1"
+MACRO_PREFS_DESCRIPTION = (
+    "User macro split preferences from DietTrace — per-user ground truth (profile-free)."
+)
+
+# How a preference is pushed to Phoenix: (user, split) -> succeeded?
+MacroPrefPusher = Any
+
+
+def push_macro_preference(user: str, split: dict[str, float]) -> bool:
+    """Append a user's preferred split to the Phoenix macro-prefs dataset (fail-soft).
+
+    Creates the dataset on the first push. Lazy import + broad except + an early env
+    check so a missing key or unreachable Phoenix never breaks ``/macros/save`` and
+    no network is touched offline. The split is profile-free; the anonymous user id
+    rides in metadata only.
+    """
+    api_key = os.environ.get("PHOENIX_API_KEY")
+    base_url = os.environ.get("PHOENIX_BASE_URL")
+    if not api_key or not base_url:
+        return False
+    try:
+        from phoenix.client import Client
+
+        client = Client(base_url=base_url, api_key=api_key)
+        inp = {"split": "protein/fat fractions of kcal"}
+        out = {"protein_pct": split["protein_pct"], "fat_pct": split["fat_pct"]}
+        meta = {"source": "user_macro_pref", "user": user}
+        try:
+            client.datasets.add_examples_to_dataset(
+                dataset=MACRO_PREFS_DATASET, inputs=[inp], outputs=[out], metadata=[meta]
+            )
+        except Exception:
+            client.datasets.create_dataset(
+                name=MACRO_PREFS_DATASET,
+                dataset_description=MACRO_PREFS_DESCRIPTION,
+                inputs=[inp],
+                outputs=[out],
+                metadata=[meta],
+            )
+        return True
+    except Exception:
+        return False
+
 
 def split_of(targets: dict[str, float]) -> dict[str, float] | None:
     """The protein/fat split (fractions of kcal) implied by *targets*, or None.
