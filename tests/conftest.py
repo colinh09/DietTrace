@@ -23,3 +23,11 @@ def _guard_connect(self, address):  # noqa: ANN001
 def _no_network(monkeypatch):
     """Block outbound sockets to non-local hosts for every test."""
     monkeypatch.setattr(socket.socket, "connect", _guard_connect)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_macro_memory_db(tmp_path, monkeypatch):
+    """Point the default macro-memory store at a per-test temp file so a test that
+    doesn't inject its own store can't write to the repo's data/ dir or leak
+    preferences across tests."""
+    monkeypatch.setenv("DIETRACE_MACRO_MEMORY_DB", str(tmp_path / "macro_memory.sqlite"))

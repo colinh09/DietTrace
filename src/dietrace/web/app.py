@@ -29,6 +29,7 @@ from dietrace.macros.compute import compute_targets
 from dietrace.macros.eval import evaluate_macro_plan
 from dietrace.macros.models import MacroPlan, MacroProfile
 from dietrace.macros.personalize import personalize_plan
+from dietrace.macros.preference import apply_preferred_split
 from dietrace.macros.presets import preset_plan
 from dietrace.observability.phoenix import init_tracer
 from dietrace.observability.trace_buffer import get_buffer
@@ -44,6 +45,7 @@ from dietrace.web.feedback import (
 )
 from dietrace.web.goals import load_goals, targets_to_goals
 from dietrace.web.identity import current_user
+from dietrace.web.macro_memory import build_macro_memory
 from dietrace.web.memory import build_memory, calories_of, sum_totals
 from dietrace.web.micros import micro_progress
 from dietrace.web.store import MealLogStore
@@ -366,6 +368,7 @@ def create_app(
     trust_store: TrustStore | None = None,
     goal_store: Any | None = None,
     memory: Any | None = None,
+    macro_memory: Any | None = None,
     feedback_pusher: FeedbackPusher = phoenix_push,
     tracer_init: Callable[[str], Any] = init_tracer,
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
@@ -382,6 +385,7 @@ def create_app(
         trust = trust_store or default_trust
         goals_db = goal_store or default_goals
     learning = memory or build_memory()
+    macro_learning = macro_memory or build_macro_memory()
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
@@ -582,6 +586,10 @@ def create_app(
         The profile fields are never stored; only the resulting targets travel
         out of this endpoint (via the response and then /macros/save).
         """
+        # The user's remembered split preference, if any — it biases the plan
+        # toward what they've chosen before (the macro-learning closure), taking
+        # precedence over both the goal-default split and a fresh AI nudge.
+        pref = macro_learning.recall(user)
         # A recording span so the macro-plan eval verdict (set on the current span
         # by evaluate_macro_plan) rides this trace into Phoenix;
         # the personalize Gemini call nests under it.
@@ -591,6 +599,8 @@ def create_app(
                     plan = preset_plan(req.preset)
                 except KeyError as exc:
                     raise HTTPException(status_code=422, detail=str(exc)) from exc
+                if pref:
+                    plan = apply_preferred_split(plan, pref)
                 eval_result = evaluate_macro_plan(_PRESET_PROFILE, plan)
             else:
                 try:
@@ -607,7 +617,9 @@ def create_app(
                 except ValidationError as exc:
                     raise HTTPException(status_code=422, detail=exc.errors()) from exc
                 plan = compute_targets(profile)
-                if req.ai_help:
+                if pref:
+                    plan = apply_preferred_split(plan, pref, weight_kg=profile.weight_kg)
+                elif req.ai_help:
                     plan = personalize_plan(profile, plan.targets, client=macro_client)
                 eval_result = evaluate_macro_plan(profile, plan)
         plan = MacroPlan(
@@ -617,6 +629,7 @@ def create_app(
             steps=plan.steps,
             clamped=plan.clamped,
             eval=eval_result,
+            personalized=plan.personalized,
         )
         return plan.model_dump()
 
@@ -633,6 +646,9 @@ def create_app(
         if goals_db is None:
             raise HTTPException(status_code=503, detail="Goal store not configured")
         goals_db.save(user, req.targets, rationale=req.rationale, source=req.source)
+        # Remember the user's preferred split so the next plan biases toward it
+        # (the macro-learning closure) — derived only from the targets, no profile.
+        macro_learning.remember(user, req.targets)
         return {"ok": True, "user": user, "targets": req.targets}
 
     @app.get("/accuracy")

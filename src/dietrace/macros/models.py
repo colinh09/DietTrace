@@ -60,3 +60,6 @@ class MacroPlan(BaseModel):
     steps: list[dict[str, Any]]
     clamped: list[str]
     eval: dict[str, Any] | None = None
+    # True when the split was biased toward the user's remembered preference
+    # (the macro-learning closure) — surfaced so the UI/trace can show it learned.
+    personalized: bool = False
