@@ -169,9 +169,24 @@ def apply_feedback(
     return meal_items
 
 
-def _match(food_name: str, target: str) -> bool:
-    """True when *food_name* matches *target* (case-insensitive, substring)."""
-    return target.lower() in food_name.lower()
+# Sane caps so a degenerate / injected LLM number can't poison a meal's totals.
+_MAX_MULTIPLIER = 20.0
+_MAX_ADD_GRAMS = 5000.0
+
+
+def _target_indices(items: list[dict[str, Any]], target: str) -> set[int]:
+    """Indices of items matching *target*. Prefer exact (case-insensitive) matches;
+    fall back to substring ONLY when it matches exactly one item — so "rice" never
+    silently hits both "fried rice" and "brown rice cake" and corrupts the wrong food.
+    """
+    if not target:
+        return set()
+    t = target.strip().lower()
+    exact = {i for i, it in enumerate(items) if it.get("food", "").strip().lower() == t}
+    if exact:
+        return exact
+    subs = {i for i, it in enumerate(items) if t in it.get("food", "").lower()}
+    return subs if len(subs) == 1 else set()
 
 
 def _apply_portion_adjust(
@@ -179,10 +194,11 @@ def _apply_portion_adjust(
 ) -> list[dict[str, Any]]:
     if feedback.adjustment is None or not feedback.target_food:
         return items
-    multiplier = feedback.adjustment
+    multiplier = max(0.0, min(_MAX_MULTIPLIER, feedback.adjustment))
+    idxs = _target_indices(items, feedback.target_food)
     result = []
-    for item in items:
-        if _match(item.get("food", ""), feedback.target_food):
+    for i, item in enumerate(items):
+        if i in idxs:
             item = dict(item)
             item["grams"] = max(0.0, item.get("grams", 0.0) * multiplier)
         result.append(item)
@@ -194,11 +210,13 @@ def _apply_remove_item(
 ) -> list[dict[str, Any]]:
     if not feedback.target_food:
         return items
-    return [item for item in items if not _match(item.get("food", ""), feedback.target_food)]
+    idxs = _target_indices(items, feedback.target_food)
+    return [item for i, item in enumerate(items) if i not in idxs]
 
 
 def _apply_add_item(
     items: list[dict[str, Any]], feedback: StructuredFeedback
 ) -> list[dict[str, Any]]:
-    new_item = {"food": feedback.target_food, "grams": max(0.0, feedback.adjustment or 0.0)}
+    grams = max(0.0, min(_MAX_ADD_GRAMS, feedback.adjustment or 0.0))
+    new_item = {"food": feedback.target_food, "grams": grams}
     return list(items) + [new_item]

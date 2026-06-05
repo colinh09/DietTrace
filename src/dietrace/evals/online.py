@@ -272,7 +272,7 @@ def evaluate_log(
     rc_pass = (
         f"all {resolved_count} food(s) resolved" if named_count > 0 else "n/a"
     )
-    sq_pass = "high-trust sources" if per_item else "n/a"
+    sq_pass = "trusted sources" if per_item else "n/a"
     ps_pass = f"all {len(per_item)} portion(s) plausible" if per_item else "n/a"
     by_code = _totals_by_code(totals)
     cp_pass = (

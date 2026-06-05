@@ -518,6 +518,18 @@ def create_app(
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
+    def _user_context(user: str) -> list[dict[str, Any]]:
+        """This user's few-shot corrections PLUS their standing-rule preferences,
+        as a single examples list the parser injects into its prompt — so the
+        agent actually consults the rules a user has taught it (14.12 recall)."""
+        examples = list(learning.examples(user))
+        examples.extend(
+            {"rule": r["rationale"]}
+            for r in rules.recent(user)
+            if r.get("rationale")
+        )
+        return examples
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
@@ -596,7 +608,7 @@ def create_app(
         # evaluate_log) rides this trace into Phoenix. The Gemini
         # parse inside logger_fn nests under it.
         with _TRACER.start_as_current_span("meal_log"):
-            result = logger_fn(req.text, examples=learning.examples(user))
+            result = logger_fn(req.text, examples=_user_context(user))
             totals = result.get("totals", [])
             per_item = result.get("per_item", [])
             quality = evaluate_log(req.text, per_item, totals)
@@ -662,7 +674,7 @@ def create_app(
             yield f"data: {json.dumps(result)}\n\n"
 
         def events() -> Iterator[str]:
-            for event in streamer_fn(req.text, examples=learning.examples(user)):
+            for event in streamer_fn(req.text, examples=_user_context(user)):
                 if event.get("type") == "result":
                     per_item = event.get("per_item", [])
                     totals = event.get("totals", [])
@@ -1024,13 +1036,20 @@ def create_app(
         """
         corrected_items = [_rescale_item(item) for item in correction.items]
         totals = sum_totals(corrected_items)
-        if correction.meal_id is not None:
+        # Whether the logged meal's stored totals were rewritten (False = no meal_id
+        # given, or the id didn't match this user's meal — the correction is still
+        # banked, but the day band won't change).
+        updated = (
             log_store.update(correction.meal_id, corrected_items, totals, user_id=user)
+            if correction.meal_id is not None
+            else False
+        )
         learning.remember(user, correction.meal_text, corrected_items, totals)
         inp, out, meta = _meal_example(correction.meal_text, corrected_items, totals)
         added_to_arize = feedback_pusher(inp, out, meta)
         return {
             "ok": True,
+            "updated": updated,
             "added_to_arize": added_to_arize,
             "corrections": learning.count(user),
             "per_item": corrected_items,

@@ -44,17 +44,31 @@ def _prompt(text: str, examples: list[dict[str, Any]] | None = None) -> str:
 
 
 def _few_shot_block(examples: list[dict[str, Any]] | None) -> str:
-    """Render the user's corrections as a worked-examples preamble (empty if none)."""
+    """Render the user's corrections + standing rules as a preamble (empty if none).
+
+    Each entry is either a worked correction (``{text, foods:[{food, grams}]}``)
+    or a standing preference (``{rule: "..."}``) recalled from the user's free-form
+    feedback — so the model parses meals the way this user has taught it.
+    """
     if not examples:
         return ""
-    lines = [
-        "This user has corrected past meals. Match how they break meals into foods "
-        "(same items, no double-counting a dish and its components):",
-    ]
-    for example in examples:
-        foods = ", ".join(f.get("food", "") for f in example.get("foods", []))
-        lines.append(f'- "{example.get("text", "")}" → [{foods}]')
-    return "\n".join(lines) + "\n\n"
+    corrections = [e for e in examples if not e.get("rule")]
+    rules = [e["rule"] for e in examples if e.get("rule")]
+    blocks: list[str] = []
+    if corrections:
+        lines = [
+            "This user has corrected past meals. Match how they break meals into foods "
+            "(same items, no double-counting a dish and its components):",
+        ]
+        for example in corrections:
+            foods = ", ".join(f.get("food", "") for f in example.get("foods", []))
+            lines.append(f'- "{example.get("text", "")}" → [{foods}]')
+        blocks.append("\n".join(lines))
+    if rules:
+        lines = ["This user has standing preferences — honor them when relevant:"]
+        lines.extend(f"- {rule}" for rule in rules)
+        blocks.append("\n".join(lines))
+    return ("\n\n".join(blocks) + "\n\n") if blocks else ""
 
 
 class ParsedItem(BaseModel):

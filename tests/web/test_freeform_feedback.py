@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 from dietrace.web.app import create_app
 from dietrace.web.feedback import FeedbackStore
 from dietrace.web.memory import SqliteMemory
-from dietrace.web.standing_rules import SqliteStandingRuleStore
+from dietrace.web.standing_rules import SqliteStandingRuleStore, StandingRule
 from dietrace.web.store import MealLogStore
 from dietrace.web.trust import TrustStore
 
@@ -349,3 +349,55 @@ def test_interpret_failure_returns_graceful_error(tmp_path) -> None:
     body = resp.json()
     assert body["ok"] is False
     assert body["applied"] is False
+
+
+# ---------------------------------------------------------------------------
+# Recall round-trip: a stored standing rule reaches a FUTURE log (real adaptation)
+# ---------------------------------------------------------------------------
+
+
+def test_standing_rule_is_recalled_into_a_later_log(tmp_path):
+    """A stored standing rule is injected into the parse context on a later /log
+    for that user — proving the rule actually shapes future meals (not just stored)."""
+    captured: dict = {}
+
+    def capturing_logger(text, examples=None):
+        captured["examples"] = examples
+        return {"totals": _TOTALS, "per_item": [_FRIES_ITEM]}
+
+    rules = SqliteStandingRuleStore(tmp_path / "rules.sqlite")
+    rules.remember(
+        "alice",
+        StandingRule(
+            scope="meal_type",
+            target_food="preworkout",
+            adjustment=80.0,
+            rationale="preworkout meals aim for 80g carbs",
+        ),
+    )
+    app = create_app(
+        meal_logger=capturing_logger,
+        store=MealLogStore(tmp_path / "log.sqlite"),
+        feedback_store=FeedbackStore(tmp_path / "feedback.sqlite"),
+        trust_store=TrustStore(tmp_path / "trust.sqlite"),
+        memory=SqliteMemory(tmp_path / "memory.sqlite"),
+        standing_rule_store=rules,
+        feedback_pusher=lambda *a: False,
+        tracer_init=lambda name: None,
+    )
+    client = TestClient(app)
+
+    # alice (has a rule) → the rule rides her parse context.
+    resp = client.post(
+        "/log", json={"text": "a banana"}, headers={"X-DietTrace-User": "alice"}
+    )
+    assert resp.status_code == 200
+    assert any(
+        e.get("rule") == "preworkout meals aim for 80g carbs"
+        for e in captured["examples"]
+    ), captured["examples"]
+
+    # bob (no rules) → no rule context (per-user isolation).
+    captured.clear()
+    client.post("/log", json={"text": "a banana"}, headers={"X-DietTrace-User": "bob"})
+    assert not any(e.get("rule") for e in captured["examples"])

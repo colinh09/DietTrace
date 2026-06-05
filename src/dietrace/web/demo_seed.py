@@ -122,7 +122,7 @@ _MISMATCH_AXES: list[dict[str, Any]] = [
     {
         "name": "calorie_plausibility",
         "score": 0.55,
-        "note": "⚠ 588 kcal is high for a single snack",
+        "note": "⚠ the peanut butter alone is ~588 kcal — likely over-portioned",
     },
 ]
 

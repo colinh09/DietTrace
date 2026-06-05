@@ -220,6 +220,9 @@ def run_offline_demo(dataset_dir: Path | None = None) -> ABResult:
 
 def main() -> None:
     """Run the offline demo and print the A/B report."""
+    print("=== ILLUSTRATIVE MOCK — no Gemini call; not a measured eval ===")
+    print("(The outputs are pre-baked to show the delta shape. Run a live A/B to")
+    print(" compare the hardened vs soft prompt for real.)\n")
     result = run_offline_demo()
     print(result.report())
 
