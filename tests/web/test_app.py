@@ -938,3 +938,48 @@ def test_correction_without_meal_id_leaves_store_unchanged(tmp_path) -> None:
 
     history = client.get("/history").json()["meals"]
     assert {t["code"]: t["amount"] for t in history[0]["totals"]}["208"] == 105.0
+
+
+# ──  trace persisted + rebuilt by /history ────────────────────────
+
+def test_history_returns_persisted_trace_per_meal(tmp_path) -> None:
+    """POST /log persists the trace; GET /history returns it unchanged per meal."""
+    client, _ = _client(tmp_path, logger=_trace_logger)
+
+    log_resp = client.post("/log", json={"text": "rice and an egg"}).json()
+    logged_trace = log_resp["trace"]
+    assert logged_trace, "POST /log must return a non-empty trace"
+
+    meals = client.get("/history").json()["meals"]
+    assert len(meals) == 1
+    meal = meals[0]
+    assert "trace" in meal, "/history must return trace for each meal"
+    assert meal["trace"] == logged_trace, "history trace must match the trace from /log"
+    assert "per_item" in meal, "/history must also return per_item for each meal"
+
+
+def test_history_rebuilds_trace_for_meals_without_persisted_trace(tmp_path) -> None:
+    """If a stored meal has per_item but no trace, /history reconstructs the trace.
+
+    This covers meals logged before trace persistence was wired up: detail_json
+    carries per_item and totals but the 'trace' key is absent.  The history
+    endpoint must rebuild it so every meal can show the agent's-work panel.
+    """
+    store = MealLogStore(tmp_path / "log.sqlite")
+    per_item = [{"description": "banana", "fdc_id": 0, "grams": 118.0, "nutrients": []}]
+    totals = [{"code": "208", "name": "Energy", "amount": 89.0, "unit": "kcal"}]
+    # Persist without 'trace' in detail — simulates an older log row.
+    store.add("banana", totals, detail={"per_item": per_item, "confidence": 0.9, "reasons": []})
+
+    app_instance = create_app(store=store, tracer_init=lambda name: None)
+    client = TestClient(app_instance)
+
+    meals = client.get("/history").json()["meals"]
+    assert len(meals) == 1
+    meal = meals[0]
+    assert "trace" in meal, "/history must include trace even when not persisted"
+    trace = meal["trace"]
+    assert len(trace) > 0, "reconstructed trace must be non-empty"
+    steps = [s["step"] for s in trace]
+    assert steps[0] == "parse_meal", "first step must be parse_meal"
+    assert steps[-1] == "log_entry", "last step must be log_entry"

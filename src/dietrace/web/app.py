@@ -569,7 +569,11 @@ def create_app(
         date: str | None = None, limit: int = 50, user: str = Depends(current_user)
     ) -> dict[str, Any]:
         day = date or datetime.datetime.now(tz=datetime.UTC).date().isoformat()
-        return {"date": day, "meals": log_store.list(limit, date=day, user_id=user)}
+        meals = log_store.list(limit, date=day, user_id=user)
+        for meal in meals:
+            if meal.get("per_item") and not meal.get("trace"):
+                meal["trace"] = _build_trace(meal["per_item"], meal["totals"])
+        return {"date": day, "meals": meals}
 
     @app.get("/goals")
     def goals(user: str = Depends(current_user)) -> dict[str, Any]:

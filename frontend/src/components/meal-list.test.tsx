@@ -215,4 +215,57 @@ describe("MealList", () => {
     // No /log detail captured for this history row → a calm note, always shown.
     expect(within(row).getByText(/no breakdown/i)).toBeInTheDocument();
   });
+
+  it("renders trace steps for a history-loaded meal when the agent's work is expanded", () => {
+    // Simulate a meal as /history returns it — per_item + trace from the persisted
+    // detail (or rebuilt by the history endpoint for older logs).
+    const historyTrace: TraceStep[] = [
+      { step: "parse_meal", summary: "Parsed 1 food(s): banana", foods: ["banana"] },
+      { step: "web_search", summary: "Searched the web for 'banana' (not in USDA)", food: "banana", matched: "banana" },
+      { step: "estimate_portion", summary: "Estimated 118 g for 'banana'", food: "banana", grams: 118 },
+      { step: "log_entry", summary: "Logged 1 item(s) into 1 nutrient total(s)", totals: [] },
+    ];
+    const historyPerItem: LoggedItem[] = [
+      { fdc_id: 0, description: "banana", grams: 118, nutrients: [{ code: "208", name: "Energy", amount: 89, unit: "kcal" }] },
+    ];
+    const historyMeal: Meal = {
+      id: 55,
+      created_at: new Date(2026, 5, 4, 9, 0).toISOString(),
+      date: "2026-06-04",
+      text: "a banana for breakfast",
+      totals: [{ code: "208", name: "Energy", amount: 89, unit: "kcal" }],
+      per_item: historyPerItem,
+      trace: historyTrace,
+      confidence: 0.88,
+      reasons: [],
+    };
+
+    // Build detailsById exactly as loadHistory does in page.tsx: from per_item + trace
+    // on the history-response Meal, only when no session-level detail exists yet.
+    const detailsById: Record<number, MealDetail> = {};
+    if (historyMeal.per_item && detailsById[historyMeal.id] == null) {
+      detailsById[historyMeal.id] = {
+        trace: historyMeal.trace ?? [],
+        perItem: historyMeal.per_item,
+        confidence: historyMeal.confidence,
+        reasons: historyMeal.reasons,
+        needsReview: historyMeal.needs_review,
+        reviewReason: historyMeal.review_reason ?? null,
+      };
+    }
+
+    render(<MealList meals={[historyMeal]} detailsById={detailsById} />);
+    const row = screen.getByText("a banana for breakfast").closest("li") as HTMLElement;
+
+    // Trace steps are hidden before expansion.
+    expect(within(row).queryByText(/Parsed 1 food/)).not.toBeInTheDocument();
+
+    // Expanding reveals all four trace steps.
+    fireEvent.click(within(row).getByRole("button", { name: /the agent's work/i }));
+
+    expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
+    expect(within(row).getByText(/Searched the web for 'banana'/)).toBeInTheDocument();
+    expect(within(row).getByText(/Estimated 118 g/)).toBeInTheDocument();
+    expect(within(row).getByText(/Logged 1 item/)).toBeInTheDocument();
+  });
 });
