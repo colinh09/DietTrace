@@ -467,3 +467,74 @@ def test_unknown_basis_is_non_empty() -> None:
 
     assert est.source == "unknown"
     assert est.basis  # something is reported even when nothing matched
+
+
+# ── _best_unit_match priority paths ───────────────────────────────────────────
+# _best_unit_match has three priority levels:
+#   1. Exact unit match (serving.unit singularized == query key)
+#   2. Medium/regular size (when the food lists small/medium/large variants)
+#   3. Fallback: return matches[0] (the first listed matching serving)
+#
+# Path 2 (medium) is pinned by test_sized_piece_count_prefers_medium.
+# Paths 1 and 3 are pinned here. Without these, swapping or deleting either
+# loop in _best_unit_match silently changes logged portion weights with no
+# test failure — a food with two tablespoon servings would shift from 20g
+# to 10g per tablespoon, for example.
+
+
+def _multi_size_sauce() -> Food:
+    """A condiment with two tablespoon-sized servings; neither is an exact unit nor medium."""
+    return Food(
+        fdc_id=88888,
+        description="Hot sauce",
+        data_type="branded_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="large tablespoon",
+                        gram_weight=20.0, description="1 large tablespoon"),
+            ServingSize(amount=1.0, unit="small tablespoon",
+                        gram_weight=10.0, description="1 small tablespoon"),
+        ],
+    )
+
+
+def _exact_unit_sauce() -> Food:
+    """A condiment where one serving has the exact unit and one has a prefixed variant."""
+    return Food(
+        fdc_id=88889,
+        description="Soy sauce",
+        data_type="branded_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="large tablespoon",
+                        gram_weight=20.0, description="1 large tablespoon"),
+            ServingSize(amount=1.0, unit="tablespoon",
+                        gram_weight=16.0, description="1 tablespoon"),
+        ],
+    )
+
+
+def test_serving_match_falls_back_to_first_when_no_exact_or_medium() -> None:
+    """_best_unit_match returns matches[0] when no serving has the exact unit
+    and none is a medium/regular size (path 3 — the fallback branch).
+
+    Both "large tablespoon" and "small tablespoon" carry the "tablespoon" token,
+    so both are in matches. Neither has unit="tablespoon" exactly, and neither
+    contains "medium"/"regular". The first listed (large, 20 g) is returned.
+    Reordering the two loops in _best_unit_match would silently change this
+    result from 40 g to 20 g with no other test failure.
+    """
+    est = estimate_portion(_multi_size_sauce(), 2.0, "tablespoon")
+    assert est.grams == pytest.approx(40.0)  # 2 × 20 g (first listed)
+    assert est.source == "serving_size"
+
+
+def test_exact_unit_match_beats_first_listed_serving() -> None:
+    """_best_unit_match returns the exact-unit serving (path 1) even when it is
+    listed second, not the first-listed fallback (path 3).
+
+    "large tablespoon" (20 g) is listed first but lacks an exact unit match.
+    "tablespoon" (16 g) is listed second and singularizes to the query key.
+    Path 1 should win: 1 × 16 g, not 1 × 20 g.
+    """
+    est = estimate_portion(_exact_unit_sauce(), 1.0, "tablespoon")
+    assert est.grams == pytest.approx(16.0)  # exact-unit serving (second listed)
+    assert est.source == "serving_size"
