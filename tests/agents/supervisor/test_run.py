@@ -1,5 +1,7 @@
 """run_supervisor opens a PR for a regressing case, fully mocked (5.6)."""
 
+import asyncio
+
 from dietrace.agents.supervisor.pr import PRResult
 from dietrace.agents.supervisor.run import run_supervisor
 
@@ -51,6 +53,37 @@ def test_opens_one_pr_for_a_regression() -> None:
     assert run.regressions_found[0].example_id == "egg_large"
     assert len(run.prs_opened) == 1
     assert opened[0]["case_id"] == "egg_large"
+
+
+def test_run_coroutine_uses_thread_pool_when_loop_is_running() -> None:
+    """Branch 1 of _run_coroutine: an existing loop causes ThreadPoolExecutor use.
+
+    The supervisor can be called from within an async caller (e.g. a FastAPI
+    handler or an asyncio test).  When asyncio.get_running_loop() succeeds,
+    _run_coroutine must hand the coroutine off to a fresh thread via
+    ThreadPoolExecutor — calling asyncio.run() directly on the already-running
+    loop would raise a RuntimeError.  Removing this branch would break the
+    supervisor whenever it is invoked from an async context.
+    """
+    mcp = _FakeMCP([_raw_exp("e2", 0.4), _raw_exp("e1", 0.9)])
+
+    async def _from_async_ctx():
+        # run_supervisor is sync, but _run_coroutine will see the event loop
+        # started by asyncio.run() and take the ThreadPoolExecutor path.
+        return run_supervisor(
+            "ds1",
+            mcp_client=mcp,
+            _propose_fn=lambda **kwargs: "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-x\n+y\n",
+            _open_pr_fn=lambda **kwargs: PRResult(
+                pr_number=99, pr_url="https://x/pr/99",
+                branch="supervisor/x", dry_run=False,
+            ),
+        )
+
+    run = asyncio.run(_from_async_ctx())
+    assert run.experiments_read == 2
+    assert len(run.regressions_found) == 1
+    assert len(run.prs_opened) == 1
 
 
 def test_no_pr_when_improving() -> None:
