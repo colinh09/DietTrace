@@ -323,6 +323,35 @@ def test_apply_unknown_kind_no_change() -> None:
     assert result == _ITEMS
 
 
+def test_apply_portion_adjust_negative_multiplier_clamps_to_zero() -> None:
+    """A negative multiplier cannot produce negative grams (poisons nutrition totals)."""
+    fb = StructuredFeedback(
+        kind="portion_adjust",
+        target_food="fries",
+        adjustment=-0.5,
+        scope="this_food",
+        rationale="negative multiplier must not yield negative grams",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert result[0]["grams"] == pytest.approx(0.0)
+    assert result[1]["grams"] == pytest.approx(200.0)  # burger unchanged
+
+
+def test_apply_add_item_negative_adjustment_clamps_to_zero() -> None:
+    """A negative gram target cannot produce a new item with negative grams."""
+    fb = StructuredFeedback(
+        kind="add_item",
+        target_food="mystery food",
+        adjustment=-50.0,
+        scope="this_meal",
+        rationale="negative gram target must not yield negative grams",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert len(result) == 3
+    assert result[-1]["food"] == "mystery food"
+    assert result[-1]["grams"] == pytest.approx(0.0)
+
+
 # ---------------------------------------------------------------------------
 # _strip_fences — fenced JSON response path
 # Gemini sometimes wraps its JSON in a ```json … ``` or ``` … ``` code block.

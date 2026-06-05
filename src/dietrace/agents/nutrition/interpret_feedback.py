@@ -184,7 +184,7 @@ def _apply_portion_adjust(
     for item in items:
         if _match(item.get("food", ""), feedback.target_food):
             item = dict(item)
-            item["grams"] = item.get("grams", 0.0) * multiplier
+            item["grams"] = max(0.0, item.get("grams", 0.0) * multiplier)
         result.append(item)
     return result
 
@@ -200,5 +200,5 @@ def _apply_remove_item(
 def _apply_add_item(
     items: list[dict[str, Any]], feedback: StructuredFeedback
 ) -> list[dict[str, Any]]:
-    new_item = {"food": feedback.target_food, "grams": feedback.adjustment or 0.0}
+    new_item = {"food": feedback.target_food, "grams": max(0.0, feedback.adjustment or 0.0)}
     return list(items) + [new_item]
