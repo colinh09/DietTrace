@@ -95,6 +95,7 @@ export default function Home() {
                 perItem: m.per_item,
                 confidence: m.confidence,
                 reasons: m.reasons,
+                axes: m.axes,
                 needsReview: m.needs_review,
                 reviewReason: m.review_reason ?? null,
               };
@@ -168,6 +169,7 @@ export default function Home() {
             perItem: event.per_item ?? [],
             confidence: event.confidence,
             reasons: event.reasons,
+            axes: event.axes,
             needsReview: event.needs_review,
             reviewReason: event.review_reason,
           },

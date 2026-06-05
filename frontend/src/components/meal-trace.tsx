@@ -12,6 +12,7 @@ import { useState } from "react";
 import { Check, Globe, History, X } from "lucide-react";
 import {
   correctMeal,
+  type ConfidenceAxis,
   type CorrectionResult,
   type LoggedItem,
   type TraceStep,
@@ -113,6 +114,7 @@ export function MealTrace({
   trace,
   perItem,
   reasons,
+  axes,
   mealText,
   mealId,
   startEditing = false,
@@ -121,6 +123,9 @@ export function MealTrace({
   trace: TraceStep[];
   perItem: LoggedItem[];
   reasons?: string[];
+  // All four confidence sub-scores with ✓/⚠ notes. When present,
+  // the full per-axis breakdown replaces the legacy reasons-only list.
+  axes?: ConfidenceAxis[];
   mealText?: string;
   // The logged meal's store id — passed to /correct so the stored totals are
   // rewritten in-place and /history + /analysis reflect the correction.
@@ -274,7 +279,20 @@ export function MealTrace({
               <StepLine key={i} step={step} isLast={i === trace.length - 1} />
             ))}
           </ol>
-          {reasons && reasons.length > 0 && (
+          {axes && axes.length > 0 ? (
+            <div className="conf-axes">
+              <div className="conf-axes-head mono">why this confidence</div>
+              <ul className="conf-axes-list">
+                {axes.map((axis) => (
+                  <li key={axis.name} className={`conf-axis ${axis.note.startsWith("✓") ? "pass" : "fail"}`}>
+                    <span className="conf-axis-name">{axis.name.replace(/_/g, " ")}</span>
+                    <span className="conf-axis-score mono tnum">{Math.round(axis.score * 100)}%</span>
+                    <span className="conf-axis-note">{axis.note}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : reasons && reasons.length > 0 ? (
             <div className="conf-reasons">
               <div className="conf-reasons-head mono">why this confidence</div>
               <ul className="conf-reasons-list">
@@ -285,7 +303,7 @@ export function MealTrace({
                 ))}
               </ul>
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

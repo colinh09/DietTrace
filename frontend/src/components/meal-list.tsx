@@ -7,7 +7,7 @@
 // ordered steps plus the per-item editable table — from that meal's `/log`
 // detail when we have it.
 import { useState } from "react";
-import type { LoggedItem, Meal, TraceStep } from "@/lib/api";
+import type { ConfidenceAxis, LoggedItem, Meal, TraceStep } from "@/lib/api";
 import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
 import { MealTrace } from "@/components/meal-trace";
@@ -21,6 +21,8 @@ export interface MealDetail {
   perItem: LoggedItem[];
   confidence?: number;
   reasons?: string[];
+  // All four confidence sub-scores with ✓/⚠ notes.
+  axes?: ConfidenceAxis[];
   // Set when the backend's online-eval confidence fell below the review
   // threshold: the row offers a calm "review?" affordance into
   // the correction editor, with `reviewReason` the single top reason to glance at.
@@ -118,6 +120,7 @@ function MealRow({
             trace={detail.trace}
             perItem={detail.perItem}
             reasons={detail.reasons}
+            axes={detail.axes}
             mealText={meal.text}
             mealId={meal.id}
             startEditing={reviewMode}

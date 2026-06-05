@@ -68,6 +68,17 @@ export interface Safety {
   message: string;
 }
 
+// One confidence axis from the online quality eval. Each of the
+// four deterministic sub-scores — resolution completeness, source quality,
+// portion sanity, calorie plausibility — is reported with its 0–1 score and
+// a short ✓/⚠ note so the UI can render a full per-axis breakdown, not just
+// the failing reasons.
+export interface ConfidenceAxis {
+  name: string;
+  score: number;
+  note: string;
+}
+
 // `POST /log` — the logged meal plus the agent's-work trace. `confidence`
 // (0–1) and `reasons` come from the online quality eval.
 export interface LogResponse {
@@ -77,6 +88,8 @@ export interface LogResponse {
   trace: TraceStep[];
   confidence: number;
   reasons: string[];
+  // All four confidence sub-scores with ✓/⚠ notes.
+  axes?: ConfidenceAxis[];
   // Set when confidence < 0.6: the backend asks the user to glance, carrying the
   // top reason. `review_reason` is null when nothing to show.
   needs_review: boolean;
@@ -98,6 +111,7 @@ export interface Meal {
   trace?: TraceStep[];
   confidence?: number;
   reasons?: string[];
+  axes?: ConfidenceAxis[];
   needs_review?: boolean;
   review_reason?: string | null;
 }
@@ -400,6 +414,7 @@ export interface StreamEvent {
   // On the final `result` event: the online quality eval.
   confidence?: number;
   reasons?: string[];
+  axes?: ConfidenceAxis[];
   // The low-confidence review flag + its top reason.
   needs_review?: boolean;
   review_reason?: string | null;

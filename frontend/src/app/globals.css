@@ -239,6 +239,16 @@ body {
 .conf-reason { font-size: 12.5px; color: var(--muted-ink); padding-left: 12px; position: relative; }
 .conf-reason::before { content: "·"; position: absolute; left: 2px; color: var(--amber); }
 
+.conf-axes { margin: 2px 0 12px; }
+.conf-axes-head { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.conf-axes-list { display: flex; flex-direction: column; gap: 4px; list-style: none; margin: 0; padding: 0; }
+.conf-axis { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.conf-axis-name { color: var(--muted-ink); text-transform: capitalize; min-width: 0; }
+.conf-axis-score { color: var(--faint); font-size: 11px; flex-shrink: 0; }
+.conf-axis-note { color: var(--muted-ink); min-width: 0; }
+.conf-axis.pass .conf-axis-note { color: var(--accent); }
+.conf-axis.fail .conf-axis-note { color: var(--amber); }
+
 .exp-pad { background: var(--accent-softer); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 6px 0 var(--step-py); }
 .item-grid { display: grid; grid-template-columns: minmax(0,1fr) 82px 50px 44px 44px 44px; align-items: center; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .item-grid:last-child { border-bottom: none; }

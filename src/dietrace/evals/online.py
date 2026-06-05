@@ -231,6 +231,21 @@ def _calorie_plausibility(totals: Any) -> dict[str, Any] | None:
     }
 
 
+def _to_axis(name: str, component: dict[str, Any] | None, pass_note: str) -> dict[str, Any]:
+    """Convert a sub-score component to a named axis with a ✓/⚠ note.
+
+    When *component* is None (axis not applicable), reports score=1.0 and the
+    pass note.  When it carries a ``flag``, the note leads with ⚠ and the human
+    reason; otherwise it leads with ✓ and the pass note.
+    """
+    if component is None:
+        return {"name": name, "score": 1.0, "note": f"✓ {pass_note}"}
+    score = float(component["score"])
+    if "flag" in component:
+        return {"name": name, "score": score, "note": f"⚠ {component['reason']}"}
+    return {"name": name, "score": score, "note": f"✓ {pass_note}"}
+
+
 def evaluate_log(
     text: str,
     per_item: list[Any],
@@ -238,21 +253,43 @@ def evaluate_log(
 ) -> dict[str, Any]:
     """Score a single logged meal's quality from deterministic heuristics (§6).
 
-    Returns ``{"confidence": float in [0,1], "flags": [str], "reasons": [str]}``.
+    Returns ``{"confidence": float in [0,1], "flags": [str], "reasons": [str],
+    "axes": [{"name", "score", "note"}]}``.
     ``confidence`` is the mean of the applicable sub-scores (resolution
     completeness, source quality, portion sanity, calorie plausibility); each
-    axis that falls short contributes a machine ``flag`` and a human ``reason``.
-    No LLM, no network — only the structured pipeline output.
+    axis always appears in ``axes`` with a ✓/⚠ note — not only when failing
+   .  No LLM, no network — only the structured pipeline output.
     """
     per_item = list(per_item or [])
-    components = [
-        _resolution_completeness(text, per_item),
-        _source_quality(per_item),
-        _portion_sanity(per_item),
-        _calorie_plausibility(totals),
-    ]
-    applicable = [c for c in components if c is not None]
+    rc = _resolution_completeness(text, per_item)
+    sq = _source_quality(per_item)
+    ps = _portion_sanity(per_item)
+    cp = _calorie_plausibility(totals)
 
+    # Pass notes for each axis (only shown when the axis clears its threshold).
+    named_count = _count_named_foods(text)
+    resolved_count = len(per_item)
+    rc_pass = (
+        f"all {resolved_count} food(s) resolved" if named_count > 0 else "n/a"
+    )
+    sq_pass = "high-trust sources" if per_item else "n/a"
+    ps_pass = f"all {len(per_item)} portion(s) plausible" if per_item else "n/a"
+    by_code = _totals_by_code(totals)
+    cp_pass = (
+        f"{by_code[_ENERGY]:.0f} kcal ≈ Atwater estimate"
+        if _ENERGY in by_code
+        else "n/a"
+    )
+
+    axes = [
+        _to_axis("resolution_completeness", rc, rc_pass),
+        _to_axis("source_quality", sq, sq_pass),
+        _to_axis("portion_sanity", ps, ps_pass),
+        _to_axis("calorie_plausibility", cp, cp_pass),
+    ]
+
+    components = [rc, sq, ps, cp]
+    applicable = [c for c in components if c is not None]
     scores = [c["score"] for c in applicable]
     confidence = round(sum(scores) / len(scores), 3) if scores else 0.0
     flags = [c["flag"] for c in applicable if "flag" in c]
@@ -262,6 +299,7 @@ def evaluate_log(
         "confidence": max(0.0, min(1.0, confidence)),
         "flags": flags,
         "reasons": reasons,
+        "axes": axes,
     }
 
     from dietrace.evals.span_eval import annotate_log_eval  # local to avoid circular risk

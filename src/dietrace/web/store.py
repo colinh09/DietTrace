@@ -32,7 +32,9 @@ CREATE TABLE IF NOT EXISTS meals (
 # The per-meal breakdown fields persisted alongside totals so /history can
 # rebuild the per-item table + trace + quality eval for a meal logged earlier
 # (so navigating away and back keeps the breakdown, not just the totals).
-_DETAIL_KEYS = ("per_item", "trace", "confidence", "reasons", "needs_review", "review_reason")
+_DETAIL_KEYS = (
+    "per_item", "trace", "confidence", "reasons", "axes", "needs_review", "review_reason"
+)
 
 
 class MealLogStore:

@@ -227,7 +227,18 @@ def _recall_step() -> dict[str, Any]:
 # A recalled meal IS the user's own correction — already vouched for, so it's
 # full-confidence and never flagged for review (the quality eval would otherwise
 # read its sparse/synthetic panel as uncertain).
-_VOUCHED_QUALITY = {"confidence": 1.0, "flags": [], "reasons": ["recalled from your correction"]}
+_VOUCHED_AXES = [
+    {"name": "resolution_completeness", "score": 1.0, "note": "✓ recalled from your correction"},
+    {"name": "source_quality", "score": 1.0, "note": "✓ recalled from your correction"},
+    {"name": "portion_sanity", "score": 1.0, "note": "✓ recalled from your correction"},
+    {"name": "calorie_plausibility", "score": 1.0, "note": "✓ recalled from your correction"},
+]
+_VOUCHED_QUALITY = {
+    "confidence": 1.0,
+    "flags": [],
+    "reasons": ["recalled from your correction"],
+    "axes": _VOUCHED_AXES,
+}
 _NO_REVIEW = {"needs_review": False, "review_reason": None}
 
 
@@ -244,6 +255,7 @@ def _meal_detail(
         "trace": trace,
         "confidence": quality["confidence"],
         "reasons": quality["reasons"],
+        "axes": quality.get("axes", []),
         "needs_review": review["needs_review"],
         "review_reason": review["review_reason"],
     }
@@ -459,6 +471,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
+                "axes": quality.get("axes", []),
                 "safety": safety,
                 **review,
                 "trace": trace,
@@ -483,6 +496,7 @@ def create_app(
                 **result,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
+                "axes": quality.get("axes", []),
                 "safety": safety,
                 **review,
                 "trace": trace,
@@ -524,6 +538,7 @@ def create_app(
                 "recalled": True,
                 "confidence": quality["confidence"],
                 "reasons": quality["reasons"],
+                "axes": quality.get("axes", []),
                 "safety": safety,
                 **review,
                 "trace": [_recall_step()],
@@ -545,6 +560,7 @@ def create_app(
                     )
                     event["confidence"] = quality["confidence"]
                     event["reasons"] = quality["reasons"]
+                    event["axes"] = quality.get("axes", [])
                     event["safety"] = safety
                     event.update(review)
                     _record_trust(per_item, quality, review, user, req.text)

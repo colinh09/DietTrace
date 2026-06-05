@@ -39,7 +39,7 @@ def _item(fdc_id, grams, *, source=None):
 
 def test_returns_expected_shape() -> None:
     result = evaluate_log("an apple", [_item(1, 150)], _macros(78, 0.4, 0.2, 21))
-    assert set(result) == {"confidence", "flags", "reasons"}
+    assert {"confidence", "flags", "reasons", "axes"} <= set(result)
     assert isinstance(result["confidence"], float)
     assert 0.0 <= result["confidence"] <= 1.0
     assert isinstance(result["flags"], list)
@@ -340,3 +340,54 @@ def test_evaluate_log_with_nutrient_amount_none_does_not_raise() -> None:
     }
     result = evaluate_log("a snack", [item], [])
     assert isinstance(result["confidence"], float)
+
+
+# ──  all four confidence axes ──────────────────────────────────────
+
+
+def test_all_four_axes_present() -> None:
+    """evaluate_log always returns all 4 confidence axes, each with name/score/note."""
+    result = evaluate_log("an apple", [_item(1, 150)], _macros(88, 0.4, 0.2, 21))
+    axes = result["axes"]
+    assert len(axes) == 4
+    names = {a["name"] for a in axes}
+    assert names == {
+        "resolution_completeness",
+        "source_quality",
+        "portion_sanity",
+        "calorie_plausibility",
+    }
+    for axis in axes:
+        assert isinstance(axis["score"], float), f"{axis['name']} score not float"
+        assert isinstance(axis["note"], str) and axis["note"], f"{axis['name']} note empty"
+
+
+def test_passing_axes_have_check_note() -> None:
+    """A clean log's axes all carry ✓ notes."""
+    result = evaluate_log("an apple", [_item(1, 150)], _macros(88, 0.4, 0.2, 21))
+    for axis in result["axes"]:
+        assert axis["note"].startswith("✓"), f"{axis['name']}: {axis['note']!r}"
+
+
+def test_failing_axis_has_warn_note() -> None:
+    """A failing axis (e.g. dropped item) carries a ⚠ note."""
+    per_item = [_item(1, 100)]
+    result = evaluate_log(
+        "eggs, toast and orange juice", per_item, _macros(290, 20, 10, 30)
+    )
+    rc = next(a for a in result["axes"] if a["name"] == "resolution_completeness")
+    assert rc["note"].startswith("⚠"), f"Expected ⚠, got {rc['note']!r}"
+    assert rc["score"] < 1.0
+
+
+def test_all_axes_present_even_when_items_empty() -> None:
+    """All 4 axes are always returned, even when per_item is empty."""
+    result = evaluate_log("nothing to eat", [], [])
+    assert len(result["axes"]) == 4
+    names = {a["name"] for a in result["axes"]}
+    assert names == {
+        "resolution_completeness",
+        "source_quality",
+        "portion_sanity",
+        "calorie_plausibility",
+    }

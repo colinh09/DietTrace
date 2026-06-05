@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MealTrace } from "@/components/meal-trace";
-import { correctMeal, type LoggedItem, type TraceStep } from "@/lib/api";
+import { correctMeal, type ConfidenceAxis, type LoggedItem, type TraceStep } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({ correctMeal: vi.fn() }));
 
@@ -119,5 +119,36 @@ describe("MealTrace", () => {
     await waitFor(() => expect(correctMeal).toHaveBeenCalled());
     const [, , mealId] = vi.mocked(correctMeal).mock.calls[0];
     expect(mealId).toBe(42);
+  });
+
+  // ──  all four confidence axes ──────────────────────────────────
+
+  it("renders all four confidence axes when provided", () => {
+    const axes: ConfidenceAxis[] = [
+      { name: "resolution_completeness", score: 1.0, note: "✓ all 2 food(s) resolved" },
+      { name: "source_quality", score: 1.0, note: "✓ high-trust sources" },
+      { name: "portion_sanity", score: 1.0, note: "✓ all 2 portion(s) plausible" },
+      { name: "calorie_plausibility", score: 1.0, note: "✓ 896 kcal ≈ Atwater estimate" },
+    ];
+    render(<MealTrace trace={trace} perItem={perItem} axes={axes} />);
+    fireEvent.click(screen.getByRole("button", { name: /the agent's work/i }));
+    expect(screen.getByText(/resolution completeness/i)).toBeInTheDocument();
+    expect(screen.getByText(/source quality/i)).toBeInTheDocument();
+    expect(screen.getByText(/portion sanity/i)).toBeInTheDocument();
+    expect(screen.getByText(/calorie plausibility/i)).toBeInTheDocument();
+    expect(screen.getByText("✓ all 2 food(s) resolved")).toBeInTheDocument();
+  });
+
+  it("shows ⚠ for a failing axis and ✓ for a passing one", () => {
+    const axes: ConfidenceAxis[] = [
+      { name: "resolution_completeness", score: 0.5, note: "⚠ 1 of 2 food(s) dropped (1 logged)" },
+      { name: "source_quality", score: 1.0, note: "✓ high-trust sources" },
+      { name: "portion_sanity", score: 1.0, note: "✓ all 1 portion(s) plausible" },
+      { name: "calorie_plausibility", score: 1.0, note: "✓ 290 kcal ≈ Atwater estimate" },
+    ];
+    render(<MealTrace trace={trace} perItem={perItem} axes={axes} />);
+    fireEvent.click(screen.getByRole("button", { name: /the agent's work/i }));
+    expect(screen.getByText("⚠ 1 of 2 food(s) dropped (1 logged)")).toBeInTheDocument();
+    expect(screen.getByText("✓ high-trust sources")).toBeInTheDocument();
   });
 });

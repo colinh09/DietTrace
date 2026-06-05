@@ -983,3 +983,38 @@ def test_history_rebuilds_trace_for_meals_without_persisted_trace(tmp_path) -> N
     steps = [s["step"] for s in trace]
     assert steps[0] == "parse_meal", "first step must be parse_meal"
     assert steps[-1] == "log_entry", "last step must be log_entry"
+
+
+# ──  all four confidence axes in the /log response ─────────────────
+
+def test_log_response_carries_all_four_axes(tmp_path) -> None:
+    """POST /log response includes all 4 confidence axes with name/score/note."""
+    client, _ = _client(tmp_path, logger=_clean_logger)
+
+    body = client.post("/log", json={"text": "a chicken breast"}).json()
+
+    assert "axes" in body, "response must carry 'axes'"
+    axes = body["axes"]
+    assert len(axes) == 4
+    names = {a["name"] for a in axes}
+    assert names == {
+        "resolution_completeness",
+        "source_quality",
+        "portion_sanity",
+        "calorie_plausibility",
+    }
+    for axis in axes:
+        assert isinstance(axis["score"], (int, float))
+        assert isinstance(axis["note"], str) and axis["note"]
+
+
+def test_history_returns_axes_per_meal(tmp_path) -> None:
+    """GET /history returns the persisted axes so the frontend can render them."""
+    client, _ = _client(tmp_path, logger=_clean_logger)
+    client.post("/log", json={"text": "a chicken breast"})
+
+    meals = client.get("/history").json()["meals"]
+    assert len(meals) == 1
+    meal = meals[0]
+    assert "axes" in meal, "/history meal must carry 'axes'"
+    assert len(meal["axes"]) == 4
