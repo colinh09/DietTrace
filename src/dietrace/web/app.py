@@ -23,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from opentelemetry import trace as _otel_trace
 from pydantic import BaseModel, ValidationError
 
+from dietrace.agents.nutrition.interpret_feedback import apply_feedback, interpret_feedback
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
 from dietrace.macros.adherence import macro_adherence
@@ -49,6 +50,7 @@ from dietrace.web.identity import current_user
 from dietrace.web.macro_memory import build_macro_memory, push_macro_preference, split_of
 from dietrace.web.memory import build_memory, calories_of, sum_totals
 from dietrace.web.micros import micro_progress
+from dietrace.web.standing_rules import StandingRule, build_standing_rules
 from dietrace.web.store import MealLogStore
 from dietrace.web.stores import build_stores
 from dietrace.web.trust import TrustStore
@@ -141,6 +143,21 @@ class MacroSaveRequest(BaseModel):
     source: str | None = None
 
 
+class FreeformFeedbackRequest(BaseModel):
+    """Free-form feedback for a logged meal — natural language → structured adaptation (14.12).
+
+    ``meal_id`` is the stored meal to rewrite in-place (like /correct).
+    ``current_items`` is the meal's current per_item list — used to build the
+    LLM context and to apply the structured change deterministically without a
+    second DB read.
+    """
+
+    meal_id: int | None = None
+    meal_text: str = ""
+    feedback_text: str
+    current_items: list[Any] = []
+
+
 # Sentinel profile used when running evaluate_macro_plan on a preset plan (no
 # profile was submitted).  weight_kg=0 causes the protein g/kg axis to be
 # skipped so the eval only checks Atwater consistency and the fat fraction.
@@ -152,6 +169,50 @@ _PRESET_PROFILE = MacroProfile(
     activity="moderate",
     goal="maintain",
 )
+
+
+def _rescale_items(
+    original_items: list[dict[str, Any]],
+    updated_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Rescale nutrient panels for items whose grams changed after apply_feedback.
+
+    apply_feedback only updates ``grams``; the nutrient amounts still reflect the
+    original scale.  This completes the picture by rescaling each item's panel
+    proportionally so sum_totals yields correct new totals.  New items (from
+    add_item) that have no original pass through with empty nutrients.
+    """
+    orig_by_name: dict[str, dict[str, Any]] = {}
+    for it in original_items:
+        name = (it.get("description") or it.get("food") or "").lower()
+        orig_by_name[name] = it
+
+    result: list[dict[str, Any]] = []
+    for item in updated_items:
+        name = (item.get("description") or item.get("food") or "").lower()
+        orig = orig_by_name.get(name)
+        new_grams = float(item.get("grams", 0.0))
+        desc = item.get("description") or item.get("food") or name
+
+        if orig is None:
+            result.append(
+                {"description": desc, "grams": new_grams, "fdc_id": 0, "nutrients": []}
+            )
+            continue
+
+        orig_grams = float(orig.get("grams", 0.0))
+        if orig_grams and abs(new_grams - orig_grams) > 0.001:
+            factor = new_grams / orig_grams
+            nutrients = [
+                {**n, "amount": round(float(n.get("amount", 0.0)) * factor, 2)}
+                for n in orig.get("nutrients", [])
+            ]
+        else:
+            nutrients = list(orig.get("nutrients", []))
+
+        result.append({**item, "description": desc, "grams": new_grams, "nutrients": nutrients})
+
+    return result
 
 
 def default_meal_logger(
@@ -438,6 +499,8 @@ def create_app(
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
     macro_client: Any | None = None,
     usda_case_loader: Callable[[], list[dict[str, Any]]] = _load_usda_eval_cases,
+    standing_rule_store: Any | None = None,
+    freeform_client: Any | None = None,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
@@ -451,6 +514,7 @@ def create_app(
         goals_db = goal_store or default_goals
     learning = memory or build_memory()
     macro_learning = macro_memory or build_macro_memory()
+    rules = standing_rule_store or build_standing_rules()
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
@@ -825,6 +889,127 @@ def create_app(
         /§7 — the self-supervision loop, made visible in-app).
         """
         return {"corrections": corrections.recent(user_id=user)}
+
+    @app.post("/feedback/freeform")
+    def freeform_feedback_endpoint(
+        req: FreeformFeedbackRequest, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """Interpret free-form feedback, apply it to the meal, and surface the adaptation (14.12).
+
+        ``interpret_feedback`` converts the user's comment into a StructuredFeedback;
+        ``apply_feedback`` then applies it deterministically (portion_adjust /
+        remove_item / add_item / standing_rule).  Non-standing-rule feedback rewrites
+        the stored meal in place (like /correct); standing_rule feedback is persisted
+        as a per-user preference so future meal recall can apply it.
+
+        The response always includes the structured interpretation so the adaptation is
+        VISIBLE: the UI shows "DietTrace learned: [what changed and why]" immediately.
+        Fail-soft on any LLM or store error so the user's correction is never silently
+        lost.
+        """
+        items_for_context = [
+            {
+                "food": it.get("description") or it.get("food") or "",
+                "grams": float(it.get("grams", 0.0)),
+            }
+            for it in req.current_items
+        ]
+        meal_context = {"items": items_for_context}
+
+        structured = interpret_feedback(meal_context, req.feedback_text, client=freeform_client)
+        if structured is None:
+            return {
+                "ok": False,
+                "applied": False,
+                "error": "could not interpret feedback",
+                "kind": None,
+                "target_food": "",
+                "adjustment": None,
+                "rationale": "",
+                "scope": "",
+                "stored_as_preference": False,
+                "per_item": list(req.current_items),
+                "totals": [],
+                "added_to_arize": False,
+                "phoenix_url": phoenix_dashboard_url(),
+            }
+
+        applied = False
+        stored_as_preference = False
+        updated_items: list[dict[str, Any]] = list(req.current_items)
+        new_totals: list[dict[str, Any]] = []
+
+        if structured.kind == "standing_rule":
+            rule = StandingRule(
+                scope=structured.scope,
+                target_food=structured.target_food,
+                adjustment=structured.adjustment,
+                rationale=structured.rationale,
+            )
+            rules.remember(user, rule)
+            stored_as_preference = True
+        else:
+            items_with_food = [
+                {**it, "food": it.get("description") or it.get("food") or ""}
+                for it in req.current_items
+            ]
+            updated_with_food = apply_feedback(items_with_food, structured)
+            applied = updated_with_food != items_with_food
+
+            updated_items = _rescale_items(req.current_items, updated_with_food)
+            new_totals = sum_totals(updated_items)
+
+            if req.meal_id is not None:
+                log_store.update(req.meal_id, updated_items, new_totals, user_id=user)
+
+        inp: dict[str, Any] = {
+            "text": req.meal_text,
+            "feedback": req.feedback_text,
+            "kind": structured.kind,
+        }
+        if structured.kind == "standing_rule":
+            out: dict[str, Any] = {
+                "scope": structured.scope,
+                "target_food": structured.target_food,
+                "adjustment": structured.adjustment,
+            }
+        else:
+            by_code = {t["code"]: t["amount"] for t in new_totals}
+            out = {
+                "grams": round(sum(float(it.get("grams", 0.0)) for it in updated_items), 1),
+                "calories": round(by_code.get("208", 0.0), 1),
+                "protein_g": round(by_code.get("203", 0.0), 1),
+                "fat_g": round(by_code.get("204", 0.0), 1),
+                "carb_g": round(by_code.get("205", 0.0), 1),
+            }
+        meta: dict[str, Any] = {
+            "source": "freeform_feedback",
+            "kind": structured.kind,
+            "target_food": structured.target_food,
+            "adjustment": structured.adjustment,
+            "rationale": structured.rationale,
+        }
+        added_to_arize = feedback_pusher(inp, out, meta)
+
+        return {
+            "ok": True,
+            "applied": applied,
+            "kind": structured.kind,
+            "target_food": structured.target_food,
+            "adjustment": structured.adjustment,
+            "rationale": structured.rationale,
+            "scope": structured.scope,
+            "stored_as_preference": stored_as_preference,
+            "per_item": updated_items,
+            "totals": new_totals,
+            "added_to_arize": added_to_arize,
+            "phoenix_url": phoenix_dashboard_url(),
+        }
+
+    @app.get("/feedback/standing-rules")
+    def feedback_standing_rules(user: str = Depends(current_user)) -> dict[str, Any]:
+        """The user's standing rules — preferences stored from free-form feedback (14.12)."""
+        return {"rules": rules.recent(user_id=user)}
 
     @app.post("/correct")
     def correct(

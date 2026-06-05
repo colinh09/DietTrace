@@ -17,6 +17,7 @@ import {
   type LoggedItem,
   type TraceStep,
 } from "@/lib/api";
+import { FreeformFeedback } from "@/components/freeform-feedback";
 import { macrosOf } from "@/lib/meal";
 
 // Each step's rail glyph: a globe for the web fallback, a history mark for a
@@ -268,6 +269,18 @@ export function MealTrace({
             </button>
           </div>
         )
+      )}
+
+      {/* Free-form feedback — natural language alternative to the gram-edit
+          correction; available whenever the gram-edit correction is also available.
+          Shows "DietTrace learned: …" inline after the user submits (14.12). */}
+      {canEdit && !editing && (
+        <FreeformFeedback
+          mealId={mealId}
+          mealText={mealText}
+          perItem={perItem}
+          onFeedbackApplied={() => onCorrected?.()}
+        />
       )}
 
       {/* The agent's work — secondary, behind a quiet toggle. */}

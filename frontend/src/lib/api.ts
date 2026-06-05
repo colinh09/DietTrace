@@ -396,6 +396,46 @@ export async function getRecentFeedback(): Promise<RecentFeedbackResponse> {
   return request<RecentFeedbackResponse>("/feedback/recent");
 }
 
+// Input for POST /feedback/freeform — the user's natural-language comment about a
+// logged meal, plus the current per_item context so the backend can apply the
+// structured interpretation without a second DB read.
+export interface FreeformFeedbackInput {
+  meal_id: number | null;
+  meal_text: string;
+  feedback_text: string;
+  current_items: LoggedItem[];
+}
+
+// What DietTrace learned from the free-form feedback (14.12): the structured
+// interpretation (kind / target_food / adjustment / rationale) plus the updated
+// per_item + totals so the UI can refresh without a history reload.
+export interface FreeformFeedbackResult {
+  ok: boolean;
+  applied: boolean;
+  kind: string | null;
+  target_food: string;
+  adjustment: number | null;
+  rationale: string;
+  scope: string;
+  stored_as_preference: boolean;
+  per_item: LoggedItem[];
+  totals: Nutrient[];
+  added_to_arize: boolean;
+  phoenix_url: string;
+  error?: string;
+}
+
+// Submit free-form feedback for a logged meal; returns the structured adaptation
+// so the UI can immediately show "DietTrace learned: …".
+export async function submitFreeformFeedback(
+  input: FreeformFeedbackInput,
+): Promise<FreeformFeedbackResult> {
+  return request<FreeformFeedbackResult>("/feedback/freeform", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 // A single Server-Sent Event from `POST /log/stream`: a `step` as the agent
 // works, or the final `result` (which also persists the meal and carries its id).
 export interface StreamEvent {
