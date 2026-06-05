@@ -46,7 +46,7 @@ class SafetyResult(TypedDict):
 # phrases — bare words like "starving" or "purge" (a recipe step) stay benign.
 _DISORDERED_EATING_PATTERNS = (
     r"make\s+myself\s+(throw\s+up|sick|vomit)",
-    r"force\s+myself\s+to\s+(throw\s+up|vomit)",
+    r"force\s+myself\s+to\s+(throw\s+up|vomit|be\s+sick)",
     r"throw\s+up\s+after",
     r"vomit(ing)?\s+after",
     r"binge\s+and\s+purge",

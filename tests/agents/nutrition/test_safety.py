@@ -53,6 +53,13 @@ DISORDERED_EATING = [
     "binge and purge routine for weight control", # binge\s+and\s+purge
     "pro-mia tips for beginners",                # pro[\s-]?mia\b
     "how to make myself sick after eating too much", # make\s+myself\s+sick (the "sick" branch)
+    "I force myself to be sick after big meals", # force\s+myself\s+to\s+(be\s+sick)
+]
+
+BENIGN_FORCE_SICK = [
+    # "be sick" without "force myself" is ordinary illness language — must not flag.
+    "I feel sick when I overeat",
+    "eating too much makes me feel sick",
 ]
 
 EXTREME_DEFICIT = [
@@ -153,3 +160,9 @@ def test_safe_result_is_fresh_copy():
     r2 = safety_check("oatmeal with berries")
     r1["flagged"] = True  # deliberately corrupt the first result
     assert r2["flagged"] is False
+
+
+@pytest.mark.parametrize("text", BENIGN_FORCE_SICK)
+def test_be_sick_without_force_myself_does_not_flag(text):
+    result = safety_check(text)
+    assert result["flagged"] is False
