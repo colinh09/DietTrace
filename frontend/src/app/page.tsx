@@ -208,6 +208,10 @@ export default function Home() {
           onPickDate={setDate}
           onOpenObs={setObs}
           onOpenMacros={() => setMacroOpen(true)}
+          onSeeded={() => {
+            loadHistory();
+            loadAnalysis();
+          }}
         />
         <div className="layout">
           <div className="col-log">

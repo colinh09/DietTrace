@@ -900,6 +900,42 @@ def create_app(
             "traces_buffered": get_buffer().trace_count(),
         }
 
+    @app.post("/demo/seed")
+    def demo_seed(user: str = Depends(current_user)) -> dict[str, Any]:
+        """Seed the calling user's account with canned demo data.
+
+        Logs curated fixture meals for today using pre-computed per_item/totals/trace
+        data — no live Gemini call. Sets sample macro targets. One meal is
+        deliberately over-portioned (peanut butter) so a judge can immediately demo
+        the /correct flow and watch the day band update.
+        """
+        from dietrace.web.demo_seed import DEMO_GOAL_RATIONALE, DEMO_GOALS, DEMO_MEALS
+
+        today = datetime.datetime.now(tz=datetime.UTC).date().isoformat()
+        meal_ids: list[int] = []
+        for meal in DEMO_MEALS:
+            entry_id = log_store.add(
+                meal["text"],
+                meal["totals"],
+                date=today,
+                user_id=user,
+                detail=meal["detail"],
+            )
+            meal_ids.append(entry_id)
+
+        goals_set = False
+        if goals_db is not None:
+            goals_db.save(user, DEMO_GOALS, rationale=DEMO_GOAL_RATIONALE, source="demo")
+            goals_set = True
+
+        return {
+            "seeded": True,
+            "meals": len(meal_ids),
+            "meal_ids": meal_ids,
+            "goals_set": goals_set,
+            "user": user,
+        }
+
     @app.get("/reasoning/{trace_id}")
     def reasoning(trace_id: str) -> dict[str, Any]:
         return {"trace_id": trace_id, "spans": get_buffer().get_trace(trace_id)}

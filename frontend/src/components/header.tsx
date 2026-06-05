@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Sparkle } from "lucide-react";
 import { formatHeaderDate, isSameDay } from "@/lib/date";
+import { DemoSeedButton } from "@/components/demo-seed-button";
 
 interface HeaderProps {
   date: Date;
@@ -15,6 +16,8 @@ interface HeaderProps {
   onOpenObs?: (tab: "accuracy" | "trust") => void;
   // Open the macro editor ("Set your targets") modal.
   onOpenMacros?: () => void;
+  // Called after POST /demo/seed completes so the page can refresh its data.
+  onSeeded?: () => void;
 }
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
@@ -87,7 +90,7 @@ function CalendarPopover({ date, onPick }: { date: Date; onPick: (d: Date) => vo
   );
 }
 
-export function Header({ date, onShift, onPickDate, onOpenObs, onOpenMacros }: HeaderProps) {
+export function Header({ date, onShift, onPickDate, onOpenObs, onOpenMacros, onSeeded }: HeaderProps) {
   const [calOpen, setCalOpen] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -131,6 +134,8 @@ export function Header({ date, onShift, onPickDate, onOpenObs, onOpenMacros }: H
         >
           Trust
         </button>
+        <span className="nav-sep" aria-hidden="true" />
+        <DemoSeedButton onSeeded={onSeeded} />
       </nav>
       <div className="datenav" ref={navRef}>
         <button

@@ -569,3 +569,16 @@ export async function postMacrosRetune(body: MacroPlanRequest): Promise<MacroRet
     body: JSON.stringify(body),
   });
 }
+
+// `POST /demo/seed` — populate the calling user's history with canned meals
+// + demo macro targets so a judge can see the full app state immediately
+//.
+export interface SeedDemoResult {
+  seeded: boolean;
+  meals: number;
+  goals_set: boolean;
+}
+
+export async function seedDemo(): Promise<SeedDemoResult> {
+  return request<SeedDemoResult>("/demo/seed", { method: "POST" });
+}
