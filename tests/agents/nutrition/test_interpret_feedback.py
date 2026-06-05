@@ -352,6 +352,59 @@ def test_apply_add_item_negative_adjustment_clamps_to_zero() -> None:
     assert result[-1]["grams"] == pytest.approx(0.0)
 
 
+def test_apply_portion_adjust_none_adjustment_is_noop() -> None:
+    """portion_adjust with adjustment=None returns items unchanged (early-return guard).
+
+    Without this guard, item["grams"] * None would raise TypeError, crashing the
+    feedback path on degenerate LLM output.
+    """
+    fb = StructuredFeedback(
+        kind="portion_adjust",
+        target_food="fries",
+        adjustment=None,
+        scope="this_food",
+        rationale="",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert result[0]["grams"] == pytest.approx(300.0)
+    assert result[1]["grams"] == pytest.approx(200.0)
+    assert len(result) == 2
+
+
+def test_apply_portion_adjust_empty_target_food_is_noop() -> None:
+    """portion_adjust with target_food='' returns items unchanged (early-return guard)."""
+    fb = StructuredFeedback(
+        kind="portion_adjust",
+        target_food="",
+        adjustment=0.5,
+        scope="this_food",
+        rationale="",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert result[0]["grams"] == pytest.approx(300.0)
+    assert result[1]["grams"] == pytest.approx(200.0)
+    assert len(result) == 2
+
+
+def test_apply_remove_item_empty_target_food_is_noop() -> None:
+    """remove_item with target_food='' returns items unchanged (early-return guard).
+
+    Without this guard, ``"" in food_name.lower()`` is always True, so every
+    item in the meal would be silently removed — catastrophic data loss.
+    """
+    fb = StructuredFeedback(
+        kind="remove_item",
+        target_food="",
+        adjustment=None,
+        scope="this_meal",
+        rationale="",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert len(result) == 2
+    assert result[0]["food"] == "fries"
+    assert result[1]["food"] == "burger"
+
+
 # ---------------------------------------------------------------------------
 # _strip_fences — fenced JSON response path
 # Gemini sometimes wraps its JSON in a ```json … ``` or ``` … ``` code block.
