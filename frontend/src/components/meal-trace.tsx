@@ -99,7 +99,14 @@ function ItemRow({
             <span>g</span>
           </span>
         ) : (
-          <span className="mono tnum dim">{item.removed ? "—" : `${Math.round(item.grams_edit)} g`}</span>
+          <span className="grams-cell">
+            <span className="mono tnum dim">{item.removed ? "—" : `${Math.round(item.grams_edit)} g`}</span>
+            {!item.removed && item.portion_basis && (
+              <span className="portion-basis" title={item.portion_basis}>
+                {item.portion_basis}
+              </span>
+            )}
+          </span>
         )}
       </div>
       <div className="num mono tnum">{cell(base.kcal)}</div>

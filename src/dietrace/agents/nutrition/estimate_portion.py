@@ -108,11 +108,15 @@ class PortionEstimate(BaseModel):
     ``grams`` is None when the unit could not be resolved. ``source`` names the
     strategy that produced it ("mass", "serving_size", "whole_item",
     "fallback_table", or "unknown") and ``confidence`` is in [0, 1].
+    ``basis`` is a plain-English explanation of the specific serving or measure
+    used — e.g. "matched serving: 1 cup" or "counted 10 piece(s) — 1 nut" —
+    so the UI can show why a food got its gram value.
     """
 
     grams: float | None
     source: str
     confidence: float
+    basis: str = ""
 
 
 def _singular(word: str) -> str:
@@ -255,7 +259,10 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
     # 1. Explicit mass unit — no food context needed, fully trusted.
     if key in _MASS_GRAMS:
         return PortionEstimate(
-            grams=quantity * _MASS_GRAMS[key], source="mass", confidence=1.0
+            grams=quantity * _MASS_GRAMS[key],
+            source="mass",
+            confidence=1.0,
+            basis=f"explicit weight: {quantity:g} {normalized}",
         )
 
     # 2. A serving whose unit/description names the query unit — scale it. Token
@@ -266,10 +273,12 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
         if matches:
             best = _best_unit_match(matches, key)
             per_unit = best.gram_weight / best.amount
+            serving_label = best.description or best.unit or key
             return PortionEstimate(
                 grams=quantity * per_unit,
                 source="serving_size",
                 confidence=_SERVING_CONFIDENCE,
+                basis=f"matched serving: {serving_label}",
             )
 
     # 3. A whole-item count. Counting single pieces — the named food ("10 almonds"),
@@ -291,10 +300,16 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
         )
         if serving and serving.amount:
             per_item = serving.gram_weight / serving.amount
+            serving_label = serving.description or serving.unit or "serving"
+            if counts_pieces:
+                basis = f"counted {quantity:g} piece(s) — {serving_label}"
+            else:
+                basis = f"no amount given → reference serving ({serving_label})"
             return PortionEstimate(
                 grams=quantity * per_item,
                 source="whole_item",
                 confidence=_WHOLE_ITEM_CONFIDENCE,
+                basis=basis,
             )
 
     # 4. Generic fallback table — a coarse household-measure guess.
@@ -303,6 +318,12 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
             grams=quantity * _FALLBACK_GRAMS[key],
             source="fallback_table",
             confidence=_FALLBACK_CONFIDENCE,
+            basis=f"generic {key or 'serving'} measure",
         )
 
-    return PortionEstimate(grams=None, source="unknown", confidence=0.0)
+    return PortionEstimate(
+        grams=None,
+        source="unknown",
+        confidence=0.0,
+        basis=f"unit not recognized: '{unit or '(none)'}' — no matching serving",
+    )

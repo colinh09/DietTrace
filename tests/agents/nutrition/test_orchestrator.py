@@ -132,3 +132,31 @@ def test_stream_meal_emits_steps_then_result(tmp_path) -> None:
     assert result["totals"] and result["per_item"]
     # The result's trace is exactly the step events that streamed.
     assert result["trace"] == [e for e in events if e["type"] == "step"]
+
+
+# ──  per-portion basis ─────────────────────────────────────────────
+
+
+def test_log_meal_items_carry_portion_basis(tmp_path) -> None:
+    """Each per-item in the logged meal carries a non-empty portion_basis string."""
+    client = _parse_client([{"food": "egg", "quantity": 1, "unit": "large"}])
+    meal = log_meal("an egg", _repo(tmp_path), client=client)
+
+    assert len(meal.per_item) == 1
+    assert meal.per_item[0].portion_basis  # non-empty basis string
+
+
+def test_stream_meal_estimate_step_carries_basis(tmp_path) -> None:
+    """The estimate_portion trace step emits a non-empty 'basis' field."""
+    from dietrace.agents.nutrition.orchestrator import stream_meal
+
+    client = _parse_client([{"food": "egg", "quantity": 1, "unit": "large"}])
+    events = list(stream_meal("an egg", _repo(tmp_path), client=client))
+
+    portion_steps = [
+        e for e in events
+        if e.get("type") == "step" and e.get("step") == "estimate_portion"
+    ]
+    assert portion_steps, "no estimate_portion step emitted"
+    for step in portion_steps:
+        assert step.get("basis"), f"missing basis on step: {step}"

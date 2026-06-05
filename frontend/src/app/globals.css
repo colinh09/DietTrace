@@ -258,6 +258,8 @@ body {
 .item-name-txt { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .num { text-align: right; font-size: 13px; }
 .dim { color: var(--muted-ink); }
+.grams-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.portion-basis { font-size: 10px; color: var(--faint); font-style: italic; text-align: right; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grams-edit { display: inline-flex; align-items: baseline; gap: 3px; justify-content: flex-end; }
 .grams-edit input { width: 44px; text-align: right; border: none; border-bottom: 1px dashed var(--line-strong); background: transparent; font-size: 13px; color: var(--accent-ink); padding: 1px 2px; -moz-appearance: textfield; transition: border-color .16s ease; }
 .grams-edit input::-webkit-outer-spin-button, .grams-edit input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

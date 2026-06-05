@@ -33,15 +33,21 @@ export interface GoalProgress extends Goal {
 }
 
 // One logged food's portion and its scaled nutrient panel (`LoggedItem`).
+// `portion_basis` explains how the gram weight was derived — e.g. "matched
+// serving: 1 cup" — so the UI can show why each food got its gram value
+//. Absent on older stored meals.
 export interface LoggedItem {
   fdc_id: number;
   description: string;
   grams: number;
+  portion_basis?: string;
   nutrients: Nutrient[];
 }
 
 // One step of the agent's reconstructed work, surfaced behind a meal's expand.
 // Every step carries `step` + `summary`; the rest depends on the step kind.
+// `basis` on an `estimate_portion` step explains which serving or measure was
+// used.
 export interface TraceStep {
   step:
     | "recall"
@@ -55,6 +61,7 @@ export interface TraceStep {
   matched?: string;
   fdc_id?: number;
   grams?: number;
+  basis?: string;
   foods?: (string | null)[];
   totals?: Nutrient[];
 }

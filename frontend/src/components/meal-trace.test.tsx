@@ -151,4 +151,27 @@ describe("MealTrace", () => {
     expect(screen.getByText("⚠ 1 of 2 food(s) dropped (1 logged)")).toBeInTheDocument();
     expect(screen.getByText("✓ high-trust sources")).toBeInTheDocument();
   });
+
+  // ──  per-portion basis note ────────────────────────────────────
+
+  it("shows the portion basis note per item when provided", () => {
+    const itemsWithBasis: LoggedItem[] = [
+      {
+        fdc_id: 1,
+        description: "peanut butter",
+        grams: 100,
+        portion_basis: "no amount given → reference serving (Quantity not specified)",
+        nutrients: [{ code: "208", name: "Energy", amount: 590, unit: "kcal" }],
+      },
+    ];
+    render(<MealTrace trace={[]} perItem={itemsWithBasis} />);
+    // The basis should be visible without expanding the trace
+    expect(screen.getByText(/reference serving/i)).toBeInTheDocument();
+  });
+
+  it("renders nothing extra when portion_basis is absent", () => {
+    // Existing items without portion_basis should render cleanly — no errors.
+    render(<MealTrace trace={trace} perItem={perItem} />);
+    expect(screen.queryByText(/reference serving/i)).not.toBeInTheDocument();
+  });
 });

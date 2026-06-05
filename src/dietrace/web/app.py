@@ -354,12 +354,15 @@ def _build_trace(
                     "summary": f"Matched '{food}' to USDA food {fdc_id}",
                 }
             )
+        basis = item.get("portion_basis", "")
         trace.append(
             {
                 "step": "estimate_portion",
                 "food": food,
                 "grams": grams,
-                "summary": f"Estimated {grams} g for '{food}'",
+                "basis": basis,
+                "summary": f"Estimated {grams} g for '{food}'"
+                + (f" ({basis})" if basis else ""),
             }
         )
     trace.append(

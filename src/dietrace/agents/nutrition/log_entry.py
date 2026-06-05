@@ -34,6 +34,7 @@ class MealItem(BaseModel):
 
     food: Food
     grams: float
+    portion_basis: str = ""
 
 
 class LoggedItem(BaseModel):
@@ -41,11 +42,14 @@ class LoggedItem(BaseModel):
 
     ``nutrients`` holds absolute amounts for ``grams`` of the food (not
     per-100 g), with energy (208) already resolved via Atwater when available.
+    ``portion_basis`` explains why this gram weight was chosen — e.g. "matched
+    serving: 1 cup" or "counted 10 piece(s) — 1 nut".
     """
 
     fdc_id: int
     description: str
     grams: float
+    portion_basis: str = ""
     nutrients: list[Nutrient] = []
 
     def nutrient(self, code: str) -> Nutrient | None:
@@ -124,6 +128,7 @@ def log_entry(items: list[MealItem]) -> LoggedMeal:
             fdc_id=item.food.fdc_id,
             description=item.food.description,
             grams=item.grams,
+            portion_basis=item.portion_basis,
             nutrients=_scaled_panel(item.food, item.grams),
         )
         for item in items

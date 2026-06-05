@@ -1018,3 +1018,47 @@ def test_history_returns_axes_per_meal(tmp_path) -> None:
     meal = meals[0]
     assert "axes" in meal, "/history meal must carry 'axes'"
     assert len(meal["axes"]) == 4
+
+
+# ──  per-portion basis in trace + per_item ─────────────────────────
+
+
+def test_build_trace_estimate_step_includes_basis() -> None:
+    """_build_trace reads portion_basis from per_item and emits it on the
+    estimate_portion step, so the UI can show why each gram value was reached."""
+    from dietrace.web.app import _build_trace
+
+    per_item = [
+        {
+            "description": "peanut butter",
+            "fdc_id": 1,
+            "grams": 100.0,
+            "portion_basis": "no amount given → reference serving (Quantity not specified)",
+        }
+    ]
+    totals = [{"code": "208", "amount": 590.0}]
+
+    trace = _build_trace(per_item, totals)
+
+    portion_steps = [s for s in trace if s["step"] == "estimate_portion"]
+    assert len(portion_steps) == 1
+    expected_basis = "no amount given → reference serving (Quantity not specified)"
+    assert portion_steps[0].get("basis") == expected_basis
+
+
+def test_log_per_item_carries_portion_basis(tmp_path) -> None:
+    """/log response per_item includes the portion_basis the logger returned."""
+    _basis = "matched serving: 1 cup"
+
+    def _logger_with_basis(text, examples=None):
+        return {
+            "totals": _STUB_TOTALS,
+            "per_item": [
+                {"description": text, "grams": 240.0, "portion_basis": _basis}
+            ],
+        }
+
+    client, _ = _client(tmp_path, logger=_logger_with_basis)
+    body = client.post("/log", json={"text": "oatmeal"}).json()
+
+    assert body["per_item"][0].get("portion_basis") == _basis

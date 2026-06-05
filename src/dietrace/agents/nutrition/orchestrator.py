@@ -85,12 +85,25 @@ def _resolve_food(
     return None, "none", None
 
 
-def _grams_for(food: Food, item: ParsedItem) -> float:
-    """Grams for *item* against *food*, with the orchestrator's serving fallback."""
+def _grams_for(food: Food, item: ParsedItem) -> tuple[float, str]:
+    """Grams and a plain-English basis for *item* against *food*.
+
+    Returns ``(grams, basis)`` — the basis explains which serving or measure
+    was used so the UI can show "why this food got Xg".
+    """
     estimate = estimate_portion(food, item.quantity, item.unit)
     if estimate.grams is not None:
-        return estimate.grams
-    return _fallback_grams(food, item.quantity)
+        return estimate.grams, estimate.basis
+    # estimate_portion couldn't resolve the unit — fall back to the food's
+    # reference serving (or 100 g/unit when no servings are listed).
+    grams = _fallback_grams(food, item.quantity)
+    primary = representative_serving(food.serving_sizes)
+    if primary:
+        serving_label = primary.description or primary.unit or "serving"
+        basis = f"unit unresolved → reference serving ({serving_label})"
+    else:
+        basis = "unit unresolved → estimated 100 g/unit"
+    return grams, basis
 
 
 def log_meal(
@@ -116,7 +129,8 @@ def log_meal(
         food, _source, _label = _resolve_food(repository, item, web_lookup, client)
         if food is None:
             continue
-        meal_items.append(MealItem(food=food, grams=_grams_for(food, item)))
+        grams, basis = _grams_for(food, item)
+        meal_items.append(MealItem(food=food, grams=grams, portion_basis=basis))
 
     return log_entry(meal_items)
 
@@ -193,15 +207,16 @@ def stream_meal(
                 summary=f"{named} → {label}",
             )
 
-        grams = _grams_for(food, item)
+        grams, basis = _grams_for(food, item)
         yield step(
             step="estimate_portion",
             status="done",
             food=item.food,
             grams=grams,
+            basis=basis,
             summary=f"{item.food} → {grams:.0f} g",
         )
-        meal_items.append(MealItem(food=food, grams=grams))
+        meal_items.append(MealItem(food=food, grams=grams, portion_basis=basis))
 
     logged = log_entry(meal_items)
     totals = [n.model_dump() for n in logged.totals]

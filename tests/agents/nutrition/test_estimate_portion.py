@@ -413,3 +413,57 @@ def test_per_piece_nfs_preferred_over_medium_sized_variant() -> None:
 
     assert est.grams == pytest.approx(80.0)  # 2 × 40 g (NFS), not 2 × 55 g (medium)
     assert est.source == "whole_item"
+
+
+# ──  per-portion basis strings ─────────────────────────────────────
+# Each estimate must explain HOW the gram weight was derived so the UI can show
+# "why peanut butter got 100g" etc. The basis field is a plain-English string.
+
+
+def test_mass_basis_describes_explicit_weight() -> None:
+    """Explicit g/oz has a basis mentioning 'explicit weight'."""
+    est = estimate_portion(_egg(), 120.0, "g")
+
+    assert est.source == "mass"
+    assert est.basis  # non-empty
+    assert "explicit weight" in est.basis.lower()
+
+
+def test_serving_size_basis_names_the_matched_serving() -> None:
+    """A serving-size hit names the matched serving description in its basis."""
+    est = estimate_portion(_toast(), 1.0, "slice")
+
+    assert est.source == "serving_size"
+    assert "1 slice" in est.basis  # serving description appears verbatim
+
+
+def test_whole_item_counted_basis_mentions_the_count() -> None:
+    """"10 almonds" — the count appears in the basis."""
+    est = estimate_portion(_almonds(), 10.0, "almonds")
+
+    assert est.source == "whole_item"
+    assert "10" in est.basis
+
+
+def test_whole_item_default_basis_mentions_reference_serving() -> None:
+    """"a latte" — no quantity, so the basis says 'reference serving'."""
+    est = estimate_portion(_latte(), 1.0, "")
+
+    assert est.source == "whole_item"
+    assert "reference serving" in est.basis.lower()
+
+
+def test_fallback_table_basis_names_the_unit() -> None:
+    """A fallback-table hit names the unit (e.g. 'cup') in its basis."""
+    est = estimate_portion(_plain(), 1.0, "cup")
+
+    assert est.source == "fallback_table"
+    assert "cup" in est.basis.lower()
+
+
+def test_unknown_basis_is_non_empty() -> None:
+    """An unresolvable unit still produces a non-empty basis string."""
+    est = estimate_portion(_plain(), 1.0, "smidgen")
+
+    assert est.source == "unknown"
+    assert est.basis  # something is reported even when nothing matched
