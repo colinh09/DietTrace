@@ -68,6 +68,26 @@ def test_overlay_lookup_hits_ches_and_shes_plurals() -> None:
     assert overlay_fdc_id("radish", table) == 400
 
 
+def test_normalize_singularizes_xes_ending() -> None:
+    """'mixes' → 'mix' via the -xes suffix branch so a curated 'mix' pin hits.
+
+    The ``for suffix in (..., 'xes', ...)`` loop handles food names whose plural
+    ends in '-xes' (e.g. 'trail mixes', 'mixes'); without it they fall through to
+    the bare-s strip which would yield 'mixe', a miss against a 'mix' overlay key.
+    """
+    assert normalize("mixes") == "mix"
+    assert normalize("mixes") == normalize("mix")
+
+
+def test_overlay_lookup_hits_xes_plural() -> None:
+    """A 'mixes' query (or 'trail mixes') resolves to the singularized overlay pin."""
+    table = {"mix": 500, "trail mix": 501}
+    assert overlay_fdc_id("mixes", table) == 500
+    assert overlay_fdc_id("mix", table) == 500
+    assert overlay_fdc_id("trail mixes", table) == 501
+    assert overlay_fdc_id("trail mix", table) == 501
+
+
 # ---- load_overlay: the lru_cache'd file-loading paths ----
 # All tests above pass an explicit ``overlay`` dict to ``overlay_fdc_id``,
 # bypassing ``load_overlay()`` entirely. These three tests cover the file-loading
