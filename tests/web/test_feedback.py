@@ -94,6 +94,69 @@ def test_corrected_expected_original_grams_zero_is_defensive_noop() -> None:
     assert expected.get("calories") == 0.0
 
 
+def test_corrected_expected_negative_corrected_grams_clamps_to_zero() -> None:
+    """A negative corrected_grams must not produce negative calorie ground truth.
+
+    The Phoenix feedback dataset would be poisoned by a negative-calorie example
+    (same class of defect as the ParsedItem.quantity NaN/negative fix and the
+    apply_feedback negative-gram clamps). The corrected grams and all macro values
+    must be floored at 0.0 on degenerate input.
+    """
+    expected = corrected_expected(_correction(original=317.0, corrected=-50.0))
+    assert expected["grams"] == 0.0
+    for key in ("calories", "protein_g", "fat_g", "carb_g"):
+        assert expected.get(key, 0.0) >= 0.0, f"{key} must not be negative"
+
+
+def test_store_migrates_older_db_missing_user_id_column(tmp_path) -> None:
+    """An older corrections DB without user_id migrates transparently on open.
+
+    The migration branch (ALTER TABLE … ADD COLUMN user_id … DEFAULT 'demo') runs
+    when FeedbackStore opens a DB whose corrections table predates per-user scoping.
+    After migration, existing rows are visible under DEMO_USER and new writes work.
+    """
+    import sqlite3
+
+    from dietrace.web.identity import DEMO_USER
+
+    _OLD_SCHEMA = (
+        "CREATE TABLE IF NOT EXISTS corrections ("
+        "id              INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "created_at      TEXT NOT NULL, "
+        "food            TEXT NOT NULL, "
+        "original_grams  REAL NOT NULL, "
+        "corrected_grams REAL NOT NULL, "
+        "expected_json   TEXT NOT NULL)"
+    )
+
+    db_path = tmp_path / "old_feedback.sqlite"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(_OLD_SCHEMA)
+    conn.execute(
+        "INSERT INTO corrections "
+        "(created_at, food, original_grams, corrected_grams, expected_json) "
+        "VALUES (?, ?, ?, ?, ?)",
+        ("2024-01-01T00:00:00+00:00", "oatmeal", 80.0, 100.0, '{"grams": 100.0}'),
+    )
+    conn.commit()
+    conn.close()
+
+    store = FeedbackStore(db_path)
+
+    # Existing row is surfaced under DEMO_USER (the migration DEFAULT).
+    assert store.count(DEMO_USER) == 1
+    recent = store.recent(DEMO_USER)
+    assert len(recent) == 1
+    assert recent[0]["food"] == "oatmeal"
+    assert recent[0]["original_grams"] == 80.0
+    assert recent[0]["corrected_grams"] == 100.0
+
+    # New writes after migration work normally.
+    correction = _correction(317.0, 200.0)
+    store.add(correction, corrected_expected(correction), user_id=DEMO_USER)
+    assert store.count(DEMO_USER) == 2
+
+
 def test_store_persists_and_counts_corrections(tmp_path) -> None:
     store = FeedbackStore(tmp_path / "feedback.sqlite")
     assert store.count() == 0

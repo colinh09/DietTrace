@@ -65,11 +65,14 @@ def corrected_expected(correction: Correction) -> dict[str, Any]:
     """The expected macros for the corrected portion — the example's ground truth.
 
     Rescales the logged panel by ``corrected/original`` grams. A macro the panel
-    didn't carry is omitted rather than guessed at.
+    didn't carry is omitted rather than guessed at. Negative corrected_grams are
+    clamped to 0.0 so the Phoenix feedback dataset never receives negative calorie
+    ground truth (same guard as ParsedItem.quantity and apply_feedback grams).
     """
     base = correction.original_grams
-    factor = correction.corrected_grams / base if base else 0.0
-    expected: dict[str, Any] = {"grams": correction.corrected_grams}
+    corrected = max(0.0, correction.corrected_grams)
+    factor = corrected / base if base else 0.0
+    expected: dict[str, Any] = {"grams": corrected}
     for key, code in (
         ("calories", _CALORIE),
         ("protein_g", _PROTEIN),
