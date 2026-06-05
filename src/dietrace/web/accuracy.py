@@ -205,6 +205,13 @@ def _fetch_live_scores() -> dict[str, Any] | None:
 _cache: tuple[float, dict[str, Any] | None] | None = None
 _CACHE_TTL = 60.0
 
+# The base seeding snapshot (USDA experiment story).  These numbers only change
+# when _BASELINE/_CURRENT are updated by hand, so a 1-hour TTL is appropriate.
+# Persisting this avoids re-running _measured_macro_scores() on every request
+# while the live Phoenix fetch is slow or unreachable.
+_base_snapshot: tuple[float, dict[str, Any]] | None = None
+_BASE_TTL = 3600.0
+
 
 def _cached_live_fetch() -> dict[str, Any] | None:
     """``_fetch_live_scores`` with a short TTL so the page never hammers Phoenix."""
@@ -217,13 +224,83 @@ def _cached_live_fetch() -> dict[str, Any] | None:
     return scores
 
 
+def _build_base_report() -> dict[str, Any]:
+    """Compute the static base report from the _BASELINE/_CURRENT constants.
+
+    Called at most once per _BASE_TTL window; result is stored in _base_snapshot
+    so _measured_macro_scores() only runs when the snapshot is cold.
+    """
+    measured = _measured_macro_scores()
+    macro_current = measured or {"pass_rate": 0.0, "mean_score": 0.0}
+    return {
+        "headline": {
+            "calorie_accuracy": _CURRENT["calorie"],
+            "macro_accuracy": _CURRENT["macro"],
+            "within_tolerance": _CURRENT["within_tolerance"],
+        },
+        "metrics": [
+            {**m, "baseline": _BASELINE[m["key"]], "current": _CURRENT[m["key"]]}
+            for m in _METRICS
+        ],
+        "loop": _LOOP,
+        "dataset": {"cases": _case_count(), "source": "USDA FoodData Central (CC0)"},
+        "phoenix_url": phoenix_dashboard_url(),
+        "source": "measured",
+        "experiments": None,
+        "trend": [dict(_BASELINE), dict(_CURRENT)],
+        "macros": {
+            "headline": {
+                "pass_rate": macro_current["pass_rate"],
+                "mean_score": macro_current["mean_score"],
+            },
+            "experiments": None,
+            "trend": [dict(macro_current)] if measured else [],
+            "dataset": {"cases": _macro_case_count()},
+        },
+    }
+
+
+def _cached_base_report() -> dict[str, Any]:
+    """Return the base seeding report; recomputes at most once per _BASE_TTL.
+
+    Returns a top-level copy (nested dicts rebuilt) with source='measured' on a
+    cold cache and source='cached' on a warm cache hit so callers can distinguish
+    the two paths without risking mutation of the stored snapshot.
+    """
+    global _base_snapshot
+    now = time.time()
+    if _base_snapshot is None or now - _base_snapshot[0] > _BASE_TTL:
+        _base_snapshot = (now, _build_base_report())
+        source = "measured"
+    else:
+        source = "cached"
+    base = _base_snapshot[1]
+    return {
+        "headline": dict(base["headline"]),
+        "metrics": [dict(m) for m in base["metrics"]],
+        "loop": base["loop"],
+        "dataset": dict(base["dataset"]),
+        "phoenix_url": base["phoenix_url"],
+        "source": source,
+        "experiments": base["experiments"],
+        "trend": [dict(p) for p in base["trend"]],
+        "macros": {
+            "headline": dict(base["macros"]["headline"]),
+            "experiments": base["macros"]["experiments"],
+            "trend": [dict(p) for p in base["macros"]["trend"]],
+            "dataset": dict(base["macros"]["dataset"]),
+        },
+    }
+
+
 def accuracy_report(
     fetch: Callable[[], dict[str, Any] | None] = _cached_live_fetch,
 ) -> dict[str, Any]:
     """The Arize accuracy story + numbers for the web ``/accuracy`` page.
 
     Reads live Phoenix scores via *fetch* (injectable for tests); falls back to the
-    last measured values when Phoenix is unavailable.
+    cached base seeding report when Phoenix is unavailable so the modal opens
+    instantly without waiting for a slow or absent live fetch.
     """
     live = fetch()
     if live:
@@ -234,52 +311,48 @@ def accuracy_report(
         series = live.get("series", [live["baseline"], live["current"]])
         # Each experiment's scores mapped to the metric keys → a trend the page plots.
         trend = [{k: s.get(_EVALUATOR_OF[k], 0.0) for k in _EVALUATOR_OF} for s in series]
-    else:
-        baseline, current = _BASELINE, _CURRENT
-        source = "measured"
-        experiments = None
-        trend = [dict(_BASELINE), dict(_CURRENT)]  # baseline → current, two points
 
-    # Macro-plan section — live from the macros Phoenix experiment or measured fallback.
-    if live and "macros" in live:
-        m = live["macros"]
-        macro_current = {k: m["current"].get(v, 0.0) for k, v in _MACRO_EVALUATOR_OF.items()}
-        macro_experiments = m["experiments"]
-        macro_trend = [
-            {k: s.get(v, 0.0) for k, v in _MACRO_EVALUATOR_OF.items()}
-            for s in m["series"]
-        ]
-    else:
-        # No live macro experiment — compute the real scores from the seed dataset
-        # with the same evaluators (honest, deterministic) rather than fabricating.
-        measured = _measured_macro_scores()
-        macro_current = measured or {"pass_rate": 0.0, "mean_score": 0.0}
-        macro_experiments = None
-        macro_trend = [dict(macro_current)] if measured else []
+        # Macro-plan section — live from the macros Phoenix experiment.
+        if "macros" in live:
+            m = live["macros"]
+            macro_current = {k: m["current"].get(v, 0.0) for k, v in _MACRO_EVALUATOR_OF.items()}
+            macro_experiments = m["experiments"]
+            macro_trend = [
+                {k: s.get(v, 0.0) for k, v in _MACRO_EVALUATOR_OF.items()}
+                for s in m["series"]
+            ]
+        else:
+            measured = _measured_macro_scores()
+            macro_current = measured or {"pass_rate": 0.0, "mean_score": 0.0}
+            macro_experiments = None
+            macro_trend = [dict(macro_current)] if measured else []
 
-    return {
-        "headline": {
-            "calorie_accuracy": current["calorie"],
-            "macro_accuracy": current["macro"],
-            "within_tolerance": current["within_tolerance"],
-        },
-        "metrics": [
-            {**m, "baseline": baseline[m["key"]], "current": current[m["key"]]}
-            for m in _METRICS
-        ],
-        "loop": _LOOP,
-        "dataset": {"cases": _case_count(), "source": "USDA FoodData Central (CC0)"},
-        "phoenix_url": phoenix_dashboard_url(),
-        "source": source,
-        "experiments": experiments,
-        "trend": trend,
-        "macros": {
+        return {
             "headline": {
-                "pass_rate": macro_current["pass_rate"],
-                "mean_score": macro_current["mean_score"],
+                "calorie_accuracy": current["calorie"],
+                "macro_accuracy": current["macro"],
+                "within_tolerance": current["within_tolerance"],
             },
-            "experiments": macro_experiments,
-            "trend": macro_trend,
-            "dataset": {"cases": _macro_case_count()},
-        },
-    }
+            "metrics": [
+                {**m, "baseline": baseline[m["key"]], "current": current[m["key"]]}
+                for m in _METRICS
+            ],
+            "loop": _LOOP,
+            "dataset": {"cases": _case_count(), "source": "USDA FoodData Central (CC0)"},
+            "phoenix_url": phoenix_dashboard_url(),
+            "source": source,
+            "experiments": experiments,
+            "trend": trend,
+            "macros": {
+                "headline": {
+                    "pass_rate": macro_current["pass_rate"],
+                    "mean_score": macro_current["mean_score"],
+                },
+                "experiments": macro_experiments,
+                "trend": macro_trend,
+                "dataset": {"cases": _macro_case_count()},
+            },
+        }
+
+    # No live data — serve the static USDA experiment story from the base cache.
+    return _cached_base_report()
