@@ -95,7 +95,7 @@ def _extract_case_results(run: dict[str, Any]) -> list[CaseResult]:
     if not evaluations:
         score_val = run.get("score")
         score = float(score_val) if score_val is not None else None
-        label = _normalize_label(str(run.get("label", "")))
+        label = _normalize_label(run.get("label") or "")
         return [
             CaseResult(
                 example_id=example_id,
@@ -111,7 +111,7 @@ def _extract_case_results(run: dict[str, Any]) -> list[CaseResult]:
     for annotation in evaluations:
         score_val = annotation.get("score")
         score = float(score_val) if score_val is not None else None
-        label = _normalize_label(str(annotation.get("label", "")))
+        label = _normalize_label(annotation.get("label") or "")
         results.append(
             CaseResult(
                 example_id=example_id,

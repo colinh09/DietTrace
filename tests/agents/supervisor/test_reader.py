@@ -92,3 +92,138 @@ def test_na_results_excluded_from_aggregation() -> None:
     # n/a is dropped: 1 pass of 2 scored cases, mean of 1.0 and 0.0 — not 2/3.
     assert summary.pass_rate == 0.5
     assert summary.mean_score == 0.5
+
+
+def test_mean_score_none_when_all_na() -> None:
+    """mean_score is None when every result carries label='n/a' (no applicable scores).
+
+    The supervisor reads mean_score to decide if enough data exists; returning
+    None (not a placeholder float) is the fail-soft signal that no real scores
+    were collected in this experiment.
+    """
+    raw = [
+        {
+            "id": "e1",
+            "name": "n",
+            "runs": [
+                {
+                    "id": "r1",
+                    "datasetExampleId": "a",
+                    "annotations": [{"score": 1.0, "label": "n/a"}],
+                }
+            ],
+        }
+    ]
+    summary = normalize_experiments(raw)[0]
+    assert summary.mean_score is None
+
+
+def test_pass_rate_zero_when_no_scored_cases() -> None:
+    """pass_rate is 0.0 when every result has label='n/a' — no applicable cases."""
+    raw = [
+        {
+            "id": "e1",
+            "name": "n",
+            "runs": [
+                {
+                    "id": "r1",
+                    "datasetExampleId": "a",
+                    "annotations": [{"score": 0.5, "label": "n/a"}],
+                }
+            ],
+        }
+    ]
+    summary = normalize_experiments(raw)[0]
+    assert summary.pass_rate == 0.0
+
+
+def test_is_passing_score_fallback_true_for_unknown_label_at_or_above_half() -> None:
+    """When the label is not in any canonical set and score >= 0.5 the case passes.
+
+    Phoenix occasionally emits non-standard label strings; the score-based
+    fallback in _is_passing ensures a >50%-accurate result is not silently
+    counted as a failure by the supervisor, which would over-flag regressions.
+    """
+    raw = [
+        {
+            "id": "e1",
+            "name": "n",
+            "runs": [
+                {
+                    "id": "r1",
+                    "datasetExampleId": "a",
+                    "annotations": [{"score": 0.7, "label": "unexpected_label"}],
+                }
+            ],
+        }
+    ]
+    result = normalize_experiments(raw)[0].case_results[0]
+    assert result.passed is True
+
+
+def test_is_passing_score_fallback_false_for_unknown_label_below_half() -> None:
+    """When the label is unknown and score < 0.5 the case does not pass."""
+    raw = [
+        {
+            "id": "e1",
+            "name": "n",
+            "runs": [
+                {
+                    "id": "r1",
+                    "datasetExampleId": "a",
+                    "annotations": [{"score": 0.3, "label": "borderline"}],
+                }
+            ],
+        }
+    ]
+    result = normalize_experiments(raw)[0].case_results[0]
+    assert result.passed is False
+
+
+def test_is_passing_false_for_unknown_label_with_no_score() -> None:
+    """When label is unknown and score is None the final-guard returns False.
+
+    This is the last resort in _is_passing: an annotation with neither a
+    canonical label nor a numeric score cannot be resolved — treating it as
+    a non-pass is conservative and prevents silent regressions from slipping
+    through as passes.
+    """
+    raw = [
+        {
+            "id": "e1",
+            "name": "n",
+            "runs": [
+                {
+                    "id": "r1",
+                    "datasetExampleId": "a",
+                    "annotations": [{"score": None, "label": "unknown_label"}],
+                }
+            ],
+        }
+    ]
+    result = normalize_experiments(raw)[0].case_results[0]
+    assert result.passed is False
+
+
+def test_normalize_label_none_becomes_unknown() -> None:
+    """A None label (from an incomplete Phoenix annotation) is coerced to 'unknown'.
+
+    Phoenix may return null for a label field when an evaluator produces a score
+    but no string label. _normalize_label must not raise on None — it returns the
+    safe sentinel 'unknown' so downstream label comparisons work without guards.
+    """
+    raw = [
+        {
+            "id": "e1",
+            "name": "n",
+            "runs": [
+                {
+                    "id": "r1",
+                    "datasetExampleId": "a",
+                    "annotations": [{"score": 0.5, "label": None}],
+                }
+            ],
+        }
+    ]
+    result = normalize_experiments(raw)[0].case_results[0]
+    assert result.label == "unknown"
