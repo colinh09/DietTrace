@@ -59,6 +59,41 @@ def test_macro_absent_from_the_panel_is_omitted_not_guessed() -> None:
     assert expected == {"grams": 50.0}  # only grams; no fabricated macros
 
 
+def test_corrected_expected_corrected_grams_zero() -> None:
+    """A correction to 0 g (user didn't eat it) yields all-zero macros.
+
+    The rescale factor is 0/base = 0.0, so every macro becomes 0. The result
+    is a valid ground-truth entry that says the food contributed nothing — the
+    correct expectation when the user removes a logged item via a correction.
+    """
+    expected = corrected_expected(_correction(original=317.0, corrected=0.0))
+    assert expected["grams"] == 0.0
+    assert expected["calories"] == 0.0
+    assert expected["protein_g"] == 0.0
+    assert expected["fat_g"] == 0.0
+    assert expected["carb_g"] == 0.0
+
+
+def test_corrected_expected_original_grams_zero_is_defensive_noop() -> None:
+    """When original_grams is 0 the function cannot rescale (0/0 is undefined).
+
+    The ``if base else 0.0`` guard yields factor=0.0 so all macros are zeroed
+    and grams is set to the corrected value. This pins the defensive branch so
+    a future refactor cannot accidentally raise ZeroDivisionError or produce NaN.
+    """
+    correction = Correction(
+        food="mystery",
+        original_grams=0.0,
+        corrected_grams=100.0,
+        nutrients=[
+            {"code": "208", "name": "Energy", "amount": 200.0, "unit": "kcal"},
+        ],
+    )
+    expected = corrected_expected(correction)
+    assert expected["grams"] == 100.0
+    assert expected.get("calories") == 0.0
+
+
 def test_store_persists_and_counts_corrections(tmp_path) -> None:
     store = FeedbackStore(tmp_path / "feedback.sqlite")
     assert store.count() == 0
