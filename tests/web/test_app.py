@@ -22,8 +22,11 @@ def _stub_logger(text: str, examples=()) -> dict:
     return {"totals": _STUB_TOTALS, "per_item": [{"description": text, "grams": 118.0}]}
 
 
-def _client(tmp_path, logger=_stub_logger, pusher=lambda *a: False):
+def _client(tmp_path, logger=_stub_logger, pusher=lambda *a: False, usda_loader=None):
     store = MealLogStore(tmp_path / "log.sqlite")
+    kwargs: dict = {}
+    if usda_loader is not None:
+        kwargs["usda_case_loader"] = usda_loader
     app = create_app(
         meal_logger=logger,
         store=store,
@@ -32,6 +35,7 @@ def _client(tmp_path, logger=_stub_logger, pusher=lambda *a: False):
         memory=SqliteMemory(tmp_path / "memory.sqlite"),
         feedback_pusher=pusher,
         tracer_init=lambda name: None,
+        **kwargs,
     )
     return TestClient(app), store
 
@@ -689,6 +693,124 @@ def test_retune_with_no_corrections_is_a_noop(tmp_path) -> None:
     client, _ = _client(tmp_path)
     res = client.post("/retune", headers={"X-DietTrace-User": "nobody"}).json()
     assert res["cases"] == 0 and res["before"] is None
+
+
+_CORRECTION_PAYLOAD = {
+    "meal_text": "chipotle bowl",
+    "items": [
+        {
+            "description": "bowl",
+            "original_grams": 100.0,
+            "corrected_grams": 100.0,
+            "nutrients": [
+                {"code": "208", "name": "Energy", "amount": 750.0, "unit": "kcal"}
+            ],
+        }
+    ],
+}
+
+_USDA_CASES = [
+    {"text": "one large egg", "calories": 71.5},
+    {"text": "medium apple", "calories": 95.0},
+]
+
+
+def test_retune_includes_base_set_drift_check(tmp_path) -> None:
+    """POST /retune response includes a base_drift block for the USDA test set."""
+
+    def learning_logger(text, examples=()):
+        cal = 750.0 if examples else 800.0
+        return {
+            "totals": [{"code": "208", "name": "Energy", "amount": cal, "unit": "kcal"}],
+            "per_item": [],
+        }
+
+    client, _ = _client(
+        tmp_path, logger=learning_logger, usda_loader=lambda: list(_USDA_CASES)
+    )
+    client.post("/correct", json=_CORRECTION_PAYLOAD, headers={"X-DietTrace-User": "alice"})
+
+    res = client.post("/retune", headers={"X-DietTrace-User": "alice"}).json()
+
+    assert "base_drift" in res
+    drift = res["base_drift"]
+    assert drift["cases"] == len(_USDA_CASES)
+    assert "base_score" in drift
+    assert "tuned_score" in drift
+    assert isinstance(drift["drifted"], bool)
+
+
+def test_retune_drift_flags_regression_in_base_accuracy(tmp_path) -> None:
+    """drifted=True when few-shot examples lower accuracy on the USDA test set."""
+
+    def regressing_logger(text, examples=()):
+        if text == "chipotle bowl":
+            cal = 750.0
+        else:
+            # USDA cases: examples push the model far from the true value.
+            cal = 200.0 if examples else 750.0
+        return {
+            "totals": [{"code": "208", "name": "Energy", "amount": cal, "unit": "kcal"}],
+            "per_item": [],
+        }
+
+    usda_cases = [{"text": "one large egg", "calories": 750.0}]
+    client, _ = _client(
+        tmp_path, logger=regressing_logger, usda_loader=lambda: list(usda_cases)
+    )
+    client.post("/correct", json=_CORRECTION_PAYLOAD, headers={"X-DietTrace-User": "alice"})
+
+    res = client.post("/retune", headers={"X-DietTrace-User": "alice"}).json()
+
+    assert res["base_drift"]["drifted"] is True
+
+
+def test_retune_no_drift_when_base_accuracy_holds(tmp_path) -> None:
+    """drifted=False when few-shot examples don't regress base accuracy."""
+
+    def stable_logger(text, examples=()):
+        return {
+            "totals": [{"code": "208", "name": "Energy", "amount": 750.0, "unit": "kcal"}],
+            "per_item": [],
+        }
+
+    usda_cases = [{"text": "one large egg", "calories": 750.0}]
+    client, _ = _client(
+        tmp_path, logger=stable_logger, usda_loader=lambda: list(usda_cases)
+    )
+    client.post("/correct", json=_CORRECTION_PAYLOAD, headers={"X-DietTrace-User": "alice"})
+
+    res = client.post("/retune", headers={"X-DietTrace-User": "alice"}).json()
+
+    assert res["base_drift"]["drifted"] is False
+
+
+def test_retune_stream_summary_includes_base_drift(tmp_path) -> None:
+    """The retune/stream summary event includes base_drift alongside improvement."""
+
+    def learning_logger(text, examples=()):
+        cal = 750.0 if examples else 1440.0
+        return {
+            "totals": [{"code": "208", "name": "Energy", "amount": cal, "unit": "kcal"}],
+            "per_item": [],
+        }
+
+    usda_cases = [{"text": "one large egg", "calories": 71.5}]
+    client, _ = _client(
+        tmp_path, logger=learning_logger, usda_loader=lambda: list(usda_cases)
+    )
+    client.post("/correct", json=_CORRECTION_PAYLOAD, headers={"X-DietTrace-User": "alice"})
+
+    res = client.post("/retune/stream", headers={"X-DietTrace-User": "alice"})
+    events = [
+        json.loads(line[6:])
+        for line in res.text.split("\n\n")
+        if line.startswith("data: ")
+    ]
+    summary = events[-1]
+    assert summary["type"] == "summary"
+    assert "base_drift" in summary
+    assert summary["base_drift"]["cases"] == len(usda_cases)
 
 
 def test_feedback_records_and_pushes_a_correction_to_arize(tmp_path) -> None:

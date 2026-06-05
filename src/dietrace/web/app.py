@@ -309,6 +309,52 @@ def _calorie_accuracy(
     return round(sum(_case_score(c, estimate) for c in cases) / len(cases), 3)
 
 
+def _load_usda_eval_cases() -> list[dict[str, Any]]:
+    """Load calorie expectations from the USDA nutrition eval dataset."""
+    from pathlib import Path
+
+    directory = Path("evals/dataset/nutrition")
+    if not directory.exists():
+        return []
+    cases: list[dict[str, Any]] = []
+    for path in sorted(directory.glob("*.json")):
+        try:
+            data = json.loads(path.read_text())
+            text = data.get("input", {}).get("text", "")
+            calories = float(data.get("expected", {}).get("calories", 0.0))
+            if text and calories > 0:
+                cases.append({"text": text, "calories": calories})
+        except Exception:
+            continue
+    return cases
+
+
+_BASE_DRIFT_THRESHOLD = 0.05  # accuracy drop > 5 pp flags regression
+
+
+def _check_base_drift(
+    usda_cases: list[dict[str, Any]],
+    examples: list,
+    logger_fn: Callable,
+) -> dict[str, Any] | None:
+    """Run the base USDA eval set with/without few-shot to detect accuracy drift.
+
+    Returns None when no USDA cases are available; otherwise returns
+    {cases, base_score, tuned_score, drifted} so the retune response surfaces
+    whether personalization regressed general accuracy.
+    """
+    if not usda_cases:
+        return None
+    base_score = _calorie_accuracy(usda_cases, lambda t: logger_fn(t, examples=[]))
+    tuned_score = _calorie_accuracy(usda_cases, lambda t: logger_fn(t, examples=examples))
+    return {
+        "cases": len(usda_cases),
+        "base_score": base_score,
+        "tuned_score": tuned_score,
+        "drifted": tuned_score < base_score - _BASE_DRIFT_THRESHOLD,
+    }
+
+
 def _build_trace(
     per_item: list[dict[str, Any]],
     totals: list[dict[str, Any]],
@@ -391,6 +437,7 @@ def create_app(
     tracer_init: Callable[[str], Any] = init_tracer,
     goals_loader: Callable[[], list[dict[str, Any]]] = load_goals,
     macro_client: Any | None = None,
+    usda_case_loader: Callable[[], list[dict[str, Any]]] = _load_usda_eval_cases,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
@@ -830,15 +877,23 @@ def create_app(
         """
         cases = learning.eval_cases(user)
         if not cases:
-            return {"cases": 0, "before": None, "after": None, "improved": False}
+            return {
+                "cases": 0, "before": None, "after": None,
+                "improved": False, "base_drift": None,
+            }
         examples = learning.examples(user)
         before = _calorie_accuracy(cases, lambda t: logger_fn(t, examples=[]))
         after = _calorie_accuracy(cases, lambda t: logger_fn(t, examples=examples))
+        # Regression guard: re-run the base USDA eval set so personalization
+        # can't silently lower general accuracy while improving on the user's own meals.
+        usda_cases = usda_case_loader()
+        base_drift = _check_base_drift(usda_cases, examples, logger_fn)
         return {
             "cases": len(cases),
             "before": before,
             "after": after,
             "improved": after >= before,
+            "base_drift": base_drift,
         }
 
     @app.post("/retune/stream")
@@ -866,12 +921,15 @@ def create_app(
                 yield f"data: {json.dumps(event)}\n\n"
             before = round(sum(befores) / len(befores), 3) if befores else None
             after = round(sum(afters) / len(afters), 3) if afters else None
+            usda_cases = usda_case_loader()
+            base_drift = _check_base_drift(usda_cases, examples, logger_fn)
             summary = {
                 "type": "summary",
                 "cases": len(cases),
                 "before": before,
                 "after": after,
                 "improved": bool(after is not None and before is not None and after >= before),
+                "base_drift": base_drift,
             }
             yield f"data: {json.dumps(summary)}\n\n"
 
