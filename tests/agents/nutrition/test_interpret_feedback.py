@@ -321,3 +321,66 @@ def test_apply_unknown_kind_no_change() -> None:
     )
     result = apply_feedback(_ITEMS, fb)
     assert result == _ITEMS
+
+
+# ---------------------------------------------------------------------------
+# _strip_fences — fenced JSON response path
+# Gemini sometimes wraps its JSON in a ```json … ``` or ``` … ``` code block.
+# The leading fence line and trailing "```" must be stripped before
+# json.loads; without this, interpret_feedback would silently return None
+# even for a well-formed payload (the same gap was pinned for personalize_plan).
+# ---------------------------------------------------------------------------
+
+
+def test_fenced_json_block_is_parsed() -> None:
+    """```json … ``` response is stripped and parsed into StructuredFeedback."""
+    payload = _fb_json(
+        kind="portion_adjust",
+        target_food="fries",
+        adjustment=0.5,
+        scope="this_food",
+        rationale="half portion",
+    )
+    fenced = f"```json\n{payload}\n```"
+    result = interpret_feedback(_MEAL, "the fries are double", client=_client(fenced))
+
+    assert isinstance(result, StructuredFeedback)
+    assert result.kind == "portion_adjust"
+    assert result.target_food == "fries"
+    assert result.adjustment == pytest.approx(0.5)
+
+
+def test_plain_fence_block_is_parsed() -> None:
+    """``` … ``` (no language tag) is also stripped and parsed correctly."""
+    payload = _fb_json(
+        kind="remove_item",
+        target_food="salad",
+        adjustment=None,
+        scope="this_meal",
+        rationale="didn't eat it",
+    )
+    fenced = f"```\n{payload}\n```"
+    result = interpret_feedback(_MEAL, "I skipped the salad", client=_client(fenced))
+
+    assert isinstance(result, StructuredFeedback)
+    assert result.kind == "remove_item"
+    assert result.target_food == "salad"
+    assert result.adjustment is None
+
+
+def test_fenced_block_without_trailing_fence_is_parsed() -> None:
+    """A leading ``` with no closing fence line is still stripped safely."""
+    payload = _fb_json(
+        kind="add_item",
+        target_food="apple",
+        adjustment=150.0,
+        scope="this_meal",
+        rationale="added fruit",
+    )
+    # No trailing "```" — _strip_fences only conditionally removes it.
+    fenced = f"```json\n{payload}"
+    result = interpret_feedback(_MEAL, "also an apple", client=_client(fenced))
+
+    assert isinstance(result, StructuredFeedback)
+    assert result.kind == "add_item"
+    assert result.adjustment == pytest.approx(150.0)
