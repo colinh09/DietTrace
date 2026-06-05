@@ -30,6 +30,9 @@ BENIGN = [
     "I'm allergic to peanuts, so I had a turkey sandwich instead",
     "skipped the cheese since I'm watching sodium",
     "need to purge the old leftovers from the fridge",
+    # Past-tense "threw up" does not match the present-tense `throw\s+up\s+after`
+    # pattern — illness-related vomiting after the fact is not a guardrail trigger.
+    "I threw up after the stomach flu, just logging what I managed to eat today",
     # allergen-free compound words (hyphenated and space-separated) must not
     # trigger a conflict — the allergen appears in a "X-free" product name,
     # not as an eaten ingredient.
@@ -42,6 +45,10 @@ BENIGN = [
 
 DISORDERED_EATING = [
     "how do I make myself throw up after eating",
+    # Pins the `throw\s+up\s+after` pattern independently — the case above also
+    # matches the earlier `make\s+myself` branch, so removing `throw\s+up\s+after`
+    # from the pattern list would not break it. This case has no "make myself".
+    "I throw up after every dinner to feel better",
     "I purge after every meal, is that bad",
     "looking for thinspo to stay motivated",
     "got a pro ana meal plan I want to log",
