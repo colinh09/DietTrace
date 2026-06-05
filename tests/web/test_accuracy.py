@@ -26,6 +26,27 @@ def test_report_describes_the_self_supervision_loop() -> None:
     ]
 
 
+def test_loop_labels_are_plain_language() -> None:
+    """Loop step labels must be jargon-free.
+
+    Jargon terms like 'OpenInference spans' and 'Phoenix MCP server' must be
+    absent; plain equivalents ('traced', 'reads its own results back') must
+    be present.
+    """
+    report = accuracy_report(fetch=_no_live)
+    labels = {step["step"]: step["label"] for step in report["loop"]}
+
+    # No technical jargon allowed.
+    assert "OpenInference" not in labels["trace"], "drop 'OpenInference spans'"
+    assert "MCP server" not in labels["detect"], "drop 'Phoenix MCP server'"
+
+    # Plain equivalents must be present.
+    assert "traced" in labels["trace"].lower(), "trace label should say 'traced'"
+    assert "reads its own results back" in labels["detect"].lower(), (
+        "detect label should say 'reads its own results back'"
+    )
+
+
 def test_report_links_phoenix_and_cites_usda() -> None:
     report = accuracy_report(fetch=_no_live)
     assert report["phoenix_url"]

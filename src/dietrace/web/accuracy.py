@@ -51,22 +51,22 @@ _METRICS = [
 _LOOP = [
     {
         "step": "trace",
-        "label": "Every logged meal is traced to Arize Phoenix (OpenInference spans).",
+        "label": "Every logged meal is traced to Arize Phoenix so every estimate is on record.",
     },
     {
         "step": "evaluate",
         "label": "An eval suite scores each estimate against USDA ground truth "
-        "as a Phoenix experiment.",
+        "and saves the results as a Phoenix experiment.",
     },
     {
         "step": "detect",
-        "label": "A supervisor agent reads the experiments back over the Phoenix "
-        "MCP server and classifies each case improving / stable / regressing.",
+        "label": "A supervisor agent reads its own results back and classifies "
+        "each case as improving, stable, or regressing.",
     },
     {
         "step": "improve",
         "label": "On a regression it proposes a prompt fix and opens a GitHub PR "
-        "— human-in-the-loop.",
+        "— a human reviews every change.",
     },
 ]
 
