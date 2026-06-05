@@ -538,3 +538,87 @@ def test_exact_unit_match_beats_first_listed_serving() -> None:
     est = estimate_portion(_exact_unit_sauce(), 1.0, "tablespoon")
     assert est.grams == pytest.approx(16.0)  # exact-unit serving (second listed)
     assert est.source == "serving_size"
+
+
+# ── _is_medium_size "regular" arm ────────────────────────────────────────────
+# _is_medium_size returns True when "medium" OR "regular" appears in a serving's
+# description/unit text.  Every existing test uses "medium" (shrimp, grain_nfs);
+# the "regular" arm has no direct coverage.  A typo or deletion there would
+# silently change logged gram weights — both _best_unit_match (step 2, serving_size
+# source) and _per_piece_serving (step 3, whole_item source) use _is_medium_size.
+
+
+def _roll_regular() -> Food:
+    """A dinner roll listing jumbo / regular / mini pieces, no unit repeats "roll".
+
+    Neither serving's unit contains the food-name token "roll", so step 2
+    (serving-size match) finds no candidates and resolution falls to step 3
+    (whole-item count via _per_piece_serving).  There, loops 1 (whole-food) and 2
+    (NFS) both miss, so loop 3 (medium/regular) is the deciding branch.  With
+    three sizes, the regular piece (30 g) must beat the smallest fallback (mini,
+    10 g) so that removing "regular" from _is_medium_size produces the wrong
+    answer and the test fails.
+    """
+    return Food(
+        fdc_id=88885,
+        description="Roll, dinner",
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="jumbo", gram_weight=60.0, description="1 jumbo"),
+            ServingSize(amount=1.0, unit="regular", gram_weight=30.0, description="1 regular"),
+            ServingSize(amount=1.0, unit="mini", gram_weight=10.0, description="1 mini"),
+        ],
+    )
+
+
+def _sauce_regular() -> Food:
+    """A chili sauce with mini and regular tablespoon servings, no exact-unit match.
+
+    Both servings carry the "tablespoon" token so they both enter _best_unit_match.
+    Neither has unit="tablespoon" exactly (path 1 misses), but "regular tablespoon"
+    contains "regular" so path 2 (medium/regular) fires before path 3 (first-listed).
+    Removing "regular" from _is_medium_size would fall back to the first-listed
+    "mini tablespoon" (8 g) instead of the correct 16 g serving.
+    """
+    return Food(
+        fdc_id=88886,
+        description="Sauce, chili",
+        data_type="branded_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="mini tablespoon",
+                        gram_weight=8.0, description="1 mini tablespoon"),
+            ServingSize(amount=1.0, unit="regular tablespoon",
+                        gram_weight=16.0, description="1 regular tablespoon"),
+        ],
+    )
+
+
+def test_per_piece_regular_preferred_over_jumbo_and_mini() -> None:
+    """_per_piece_serving returns the 'regular' piece (30 g) via loop 3.
+
+    Step 2 finds no match (serving units lack "roll"), so resolution reaches step 3
+    and calls _per_piece_serving.  Loops 1 (whole-food name) and 2 (NFS) both miss;
+    loop 3 fires on "regular" inside _is_medium_size so 2 rolls → 60 g, not 20 g.
+    Removing "regular" from _is_medium_size silently falls to min() → the 10 g
+    mini piece → 20 g total, breaking this assertion.
+    """
+    est = estimate_portion(_roll_regular(), 2.0, "roll")
+
+    assert est.grams == pytest.approx(60.0)  # 2 × 30 g (regular), not 2 × 10 g (mini)
+    assert est.source == "whole_item"
+
+
+def test_best_unit_match_regular_beats_first_listed() -> None:
+    """_best_unit_match returns the 'regular tablespoon' (path 2) even though
+    'mini tablespoon' is listed first (path 3 would return it).
+
+    Both servings carry the "tablespoon" token so both enter _best_unit_match.
+    Path 1 (exact unit) misses; path 2 (medium/regular) fires on "regular" in the
+    second serving's text, returning 16 g over 8 g.  Removing "regular" from
+    _is_medium_size falls through to path 3 (first-listed, 8 g), giving 16 g not
+    32 g and breaking this assertion.
+    """
+    est = estimate_portion(_sauce_regular(), 2.0, "tablespoon")
+
+    assert est.grams == pytest.approx(32.0)  # 2 × 16 g (regular), not 2 × 8 g (mini)
+    assert est.source == "serving_size"
