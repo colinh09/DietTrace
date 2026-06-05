@@ -447,6 +447,54 @@ def test_trust_stats_are_per_user(tmp_path) -> None:
     assert bob["count"] == 2
 
 
+def test_recall_after_correction_does_not_double_count_trust(tmp_path) -> None:
+    # Reproduces the "2 meals count" bug.
+    #
+    # Flow: fresh log → correct it (stores in recall memory) → re-log same text
+    # (recall path). From the user's perspective this is ONE meal; the trust
+    # count should be 1 (the fresh, agent-analysed log), NOT 2.
+    #
+    # Recalled meals bypass the agent — they are vouched by the user's own
+    # correction, not assessed fresh. Recording a second trust entry here
+    # inflates the count and the mean_confidence (recalls are always 1.0).
+    client, _ = _client(tmp_path, logger=_clean_logger)
+
+    # 1. Fresh log — agent analyses the meal → trust entry 1.
+    r = client.post("/log", json={"text": "chicken breast"}).json()
+    meal_id = r["id"]
+
+    # 2. Correct it — correction is stored in recall memory; no new trust entry.
+    client.post(
+        "/correct",
+        json={
+            "meal_id": meal_id,
+            "meal_text": "chicken breast",
+            "items": [
+                {
+                    "description": "chicken breast",
+                    "fdc_id": 171477,
+                    "original_grams": 140.0,
+                    "corrected_grams": 150.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 200.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+    )
+
+    # 3. Re-log same text — hits the recall path (correction is in memory).
+    recall_r = client.post("/log", json={"text": "chicken breast"}).json()
+    assert recall_r.get("recalled") is True, "expected the second log to be recalled"
+
+    # Trust count must be 1 (the one fresh log), not 2.
+    trust = client.get("/trust").json()
+    assert trust["count"] == 1, (
+        f"expected count=1 but got {trust['count']}; "
+        "the recall path must not create a second trust entry"
+    )
+
+
 def test_correction_counts_are_per_user(tmp_path) -> None:
     client, _ = _client(tmp_path)
     body = {"food": "x", "original_grams": 100.0, "corrected_grams": 50.0, "nutrients": []}

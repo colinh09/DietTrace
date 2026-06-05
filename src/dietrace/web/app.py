@@ -466,7 +466,9 @@ def create_app(
                 req.text, totals, date=req.date, user_id=user,
                 detail=_meal_detail(per_item, trace, quality, review),
             )
-            _record_trust(per_item, quality, review, user, req.text)
+            # Recalled meals bypass agent analysis (user-vouched, confidence=1.0).
+            # The original fresh log already has a trust entry; recording a second
+            # one here inflates the count and mean_confidence artificially (14.5).
             return {
                 "id": entry_id,
                 "per_item": per_item,
@@ -532,7 +534,7 @@ def create_app(
                 req.text, totals, date=req.date, user_id=user,
                 detail=_meal_detail(per_item, full_trace, quality, review),
             )
-            _record_trust(per_item, quality, review, user, req.text)
+            # No trust entry for recalled meals — see the /log recall path comment.
             result = {
                 "type": "result",
                 "id": entry_id,
