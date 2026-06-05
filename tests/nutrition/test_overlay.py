@@ -7,7 +7,7 @@ plural key silently missing the singular parse and falling through to ranked
 search.
 """
 
-from dietrace.nutrition.overlay import normalize, overlay_fdc_id
+from dietrace.nutrition.overlay import load_overlay, normalize, overlay_fdc_id
 
 
 def test_normalize_lowercases_strips_punctuation_and_collapses() -> None:
@@ -66,3 +66,52 @@ def test_overlay_lookup_hits_ches_and_shes_plurals() -> None:
     assert overlay_fdc_id("radishes", table) == 400
     assert overlay_fdc_id("peach", table) == 300
     assert overlay_fdc_id("radish", table) == 400
+
+
+# ---- load_overlay: the lru_cache'd file-loading paths ----
+# All tests above pass an explicit ``overlay`` dict to ``overlay_fdc_id``,
+# bypassing ``load_overlay()`` entirely. These three tests cover the file-loading
+# branches directly so the fail-soft paths don't rot silently.
+#
+# Each test clears the lru_cache before and after calling ``load_overlay()``
+# to guarantee a fresh file read rather than a stale cache hit, and to avoid
+# leaking state into subsequent tests.
+
+
+def test_load_overlay_returns_empty_when_file_missing(tmp_path, monkeypatch) -> None:
+    """DIETRACE_OVERLAY pointing to a nonexistent file → {} (file-not-found branch)."""
+    monkeypatch.setenv("DIETRACE_OVERLAY", str(tmp_path / "nonexistent.json"))
+    load_overlay.cache_clear()
+    try:
+        result = load_overlay()
+    finally:
+        load_overlay.cache_clear()
+    assert result == {}
+
+
+def test_load_overlay_returns_empty_on_malformed_json(tmp_path, monkeypatch) -> None:
+    """A file that exists but contains invalid JSON falls back to {} (fail-soft branch)."""
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not valid json}")
+    monkeypatch.setenv("DIETRACE_OVERLAY", str(bad))
+    load_overlay.cache_clear()
+    try:
+        result = load_overlay()
+    finally:
+        load_overlay.cache_clear()
+    assert result == {}
+
+
+def test_load_overlay_returns_populated_dict_on_valid_json(tmp_path, monkeypatch) -> None:
+    """A valid JSON file produces a normalized-key → fdc_id dict (happy path)."""
+    valid = tmp_path / "foods.json"
+    valid.write_text('{"almond": 1234, "chicken breast": 5678, "Green Beans": 9000}')
+    monkeypatch.setenv("DIETRACE_OVERLAY", str(valid))
+    load_overlay.cache_clear()
+    try:
+        result = load_overlay()
+    finally:
+        load_overlay.cache_clear()
+    assert result[normalize("almond")] == 1234
+    assert result[normalize("chicken breast")] == 5678
+    assert result[normalize("Green Beans")] == 9000
