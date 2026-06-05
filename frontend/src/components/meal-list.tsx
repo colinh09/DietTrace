@@ -119,6 +119,7 @@ function MealRow({
             perItem={detail.perItem}
             reasons={detail.reasons}
             mealText={meal.text}
+            mealId={meal.id}
             startEditing={reviewMode}
             onCorrected={onCorrected}
           />

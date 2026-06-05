@@ -78,6 +78,24 @@ class FirestoreMealStore:
         self._db.collection(_MEALS).document(str(meal_id)).set(doc)
         return meal_id
 
+    def update(
+        self,
+        meal_id: int,
+        per_item: list[dict[str, Any]],
+        totals: list[dict[str, Any]],
+        user_id: str = DEMO_USER,
+    ) -> bool:
+        """Rewrite a meal's totals and per_item after a correction."""
+        ref = self._db.collection(_MEALS).document(str(meal_id))
+        snap = ref.get()
+        if not snap.exists or snap.to_dict().get("user_id") != user_id:
+            return False
+        data = snap.to_dict()
+        detail = data.get("detail") or {}
+        detail["per_item"] = per_item
+        ref.update({"totals": totals, "detail": detail})
+        return True
+
     def delete(self, meal_id: int, user_id: str = DEMO_USER) -> bool:
         ref = self._db.collection(_MEALS).document(str(meal_id))
         snap = ref.get()

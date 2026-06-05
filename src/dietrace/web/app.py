@@ -109,6 +109,7 @@ class CorrectionItem(BaseModel):
 class MealCorrection(BaseModel):
     """A user's corrected version of a logged meal — the new ground truth for it."""
 
+    meal_id: int | None = None  # the log_store row to rewrite in-place
     meal_text: str
     items: list[CorrectionItem]
 
@@ -766,6 +767,8 @@ def create_app(
         """
         corrected_items = [_rescale_item(item) for item in correction.items]
         totals = sum_totals(corrected_items)
+        if correction.meal_id is not None:
+            log_store.update(correction.meal_id, corrected_items, totals, user_id=user)
         learning.remember(user, correction.meal_text, corrected_items, totals)
         inp, out, meta = _meal_example(correction.meal_text, corrected_items, totals)
         added_to_arize = feedback_pusher(inp, out, meta)

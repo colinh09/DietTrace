@@ -843,3 +843,98 @@ def test_stream_result_carries_safety_block(tmp_path, monkeypatch) -> None:
     assert result["type"] == "result"
     assert result["safety"]["flagged"] is True
     assert result["safety"]["category"] == "disordered_eating"
+
+
+# ──  /correct rewrites the stored meal when meal_id is given ──────
+
+def test_correction_with_meal_id_updates_stored_totals(tmp_path) -> None:
+    """Giving meal_id to /correct rewrites the stored meal's totals."""
+    client, _ = _client(tmp_path)
+
+    log_resp = client.post("/log", json={"text": "2 eggs"}).json()
+    meal_id = log_resp["id"]
+
+    # Pre-correction: 105 kcal from the stub logger.
+    pre = client.get("/history").json()["meals"]
+    assert {t["code"]: t["amount"] for t in pre[0]["totals"]}["208"] == 105.0
+
+    client.post(
+        "/correct",
+        json={
+            "meal_id": meal_id,
+            "meal_text": "2 eggs",
+            "items": [
+                {
+                    "description": "egg",
+                    "fdc_id": 748967,
+                    "original_grams": 100.0,
+                    "corrected_grams": 150.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 200.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+    )
+
+    # Post-correction: stored meal should carry 300 kcal (200 * 1.5).
+    post = client.get("/history").json()["meals"]
+    assert {t["code"]: t["amount"] for t in post[0]["totals"]}["208"] == 300.0
+
+
+def test_correction_with_meal_id_analysis_reflects_update(tmp_path) -> None:
+    """/analysis totals sync with the corrected meal's stored values."""
+    client, _ = _client(tmp_path)
+
+    log_resp = client.post("/log", json={"text": "2 eggs"}).json()
+    meal_id = log_resp["id"]
+
+    client.post(
+        "/correct",
+        json={
+            "meal_id": meal_id,
+            "meal_text": "2 eggs",
+            "items": [
+                {
+                    "description": "egg",
+                    "fdc_id": 748967,
+                    "original_grams": 100.0,
+                    "corrected_grams": 150.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 200.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+    )
+
+    analysis = client.get("/analysis").json()
+    assert {t["code"]: t["amount"] for t in analysis["totals"]}["208"] == 300.0
+
+
+def test_correction_without_meal_id_leaves_store_unchanged(tmp_path) -> None:
+    """/correct without meal_id is backward-compatible — stored meal untouched."""
+    client, _ = _client(tmp_path)
+
+    client.post("/log", json={"text": "sandwich"})
+
+    client.post(
+        "/correct",
+        json={
+            "meal_text": "sandwich",
+            "items": [
+                {
+                    "description": "sandwich",
+                    "fdc_id": 0,
+                    "original_grams": 100.0,
+                    "corrected_grams": 200.0,
+                    "nutrients": [
+                        {"code": "208", "name": "Energy", "amount": 400.0, "unit": "kcal"}
+                    ],
+                }
+            ],
+        },
+    ).json()
+
+    history = client.get("/history").json()["meals"]
+    assert {t["code"]: t["amount"] for t in history[0]["totals"]}["208"] == 105.0

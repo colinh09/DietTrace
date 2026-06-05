@@ -79,3 +79,24 @@ def test_delete_removes_a_meal(tmp_path) -> None:
     assert store.delete(meal_id) is True
     assert store.list() == []
     assert store.delete(meal_id) is False  # already gone
+
+
+def test_update_rewrites_totals_and_per_item(tmp_path) -> None:
+    store = MealLogStore(tmp_path / "log.sqlite")
+    old_totals = [{"code": "208", "name": "Energy", "amount": 100.0, "unit": "kcal"}]
+    detail = {"per_item": [{"description": "egg", "grams": 50.0, "nutrients": []}],
+              "trace": [], "confidence": 0.9, "reasons": []}
+    meal_id = store.add("eggs", old_totals, detail=detail)
+
+    new_totals = [{"code": "208", "name": "Energy", "amount": 300.0, "unit": "kcal"}]
+    new_per_item = [{"description": "egg", "grams": 150.0, "nutrients": []}]
+    assert store.update(meal_id, new_per_item, new_totals) is True
+
+    meal = store.list()[0]
+    assert {t["code"]: t["amount"] for t in meal["totals"]}["208"] == 300.0
+    assert meal["per_item"][0]["grams"] == 150.0
+
+
+def test_update_returns_false_for_missing_meal(tmp_path) -> None:
+    store = MealLogStore(tmp_path / "log.sqlite")
+    assert store.update(9999, [], []) is False

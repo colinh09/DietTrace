@@ -193,13 +193,15 @@ export interface CorrectionResult {
 
 // Save a corrected meal: remove wrong items / fix portions → the agent remembers
 // it (recalls the same meal, learns from similar ones) and Arize gets the truth.
+// Pass mealId to also rewrite the stored meal's totals in-place.
 export async function correctMeal(
   mealText: string,
   items: CorrectionItemInput[],
+  mealId?: number,
 ): Promise<CorrectionResult> {
   return request<CorrectionResult>("/correct", {
     method: "POST",
-    body: JSON.stringify({ meal_text: mealText, items }),
+    body: JSON.stringify({ meal_text: mealText, items, meal_id: mealId ?? null }),
   });
 }
 

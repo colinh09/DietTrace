@@ -100,4 +100,24 @@ describe("MealTrace", () => {
     await waitFor(() => expect(screen.getByText(/Learned/i)).toBeInTheDocument());
     expect(onCorrected).toHaveBeenCalled();
   });
+
+  it("passes mealId to correctMeal when provided", async () => {
+    vi.clearAllMocks();
+    vi.mocked(correctMeal).mockResolvedValue(ok);
+    render(
+      <MealTrace
+        trace={trace}
+        perItem={perItem}
+        mealText="chicken and rice"
+        mealId={42}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /something's off/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save correction/i }));
+
+    await waitFor(() => expect(correctMeal).toHaveBeenCalled());
+    const [, , mealId] = vi.mocked(correctMeal).mock.calls[0];
+    expect(mealId).toBe(42);
+  });
 });

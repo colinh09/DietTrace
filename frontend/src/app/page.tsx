@@ -181,6 +181,12 @@ export default function Home() {
     [date, loadHistory, loadAnalysis],
   );
 
+  const handleCorrected = useCallback(() => {
+    loadMemory();
+    loadHistory();
+    loadAnalysis();
+  }, [loadMemory, loadHistory, loadAnalysis]);
+
   const heading = isSameDay(date, new Date()) ? "Today" : "Logged";
 
   // The latest agent trace to surface on the dashboard — the most recent meal
@@ -212,7 +218,7 @@ export default function Home() {
               heading={heading}
               detailsById={details}
               onEdit={handleDelete}
-              onCorrected={loadMemory}
+              onCorrected={handleCorrected}
             />
           </div>
           <Dashboard

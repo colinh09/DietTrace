@@ -114,6 +114,7 @@ export function MealTrace({
   perItem,
   reasons,
   mealText,
+  mealId,
   startEditing = false,
   onCorrected,
 }: {
@@ -121,6 +122,9 @@ export function MealTrace({
   perItem: LoggedItem[];
   reasons?: string[];
   mealText?: string;
+  // The logged meal's store id — passed to /correct so the stored totals are
+  // rewritten in-place and /history + /analysis reflect the correction.
+  mealId?: number;
   // Mount straight into the editor — the "review?" affordance on a low-confidence
   // meal opens the correction editor in one tap.
   startEditing?: boolean;
@@ -152,7 +156,7 @@ export function MealTrace({
         nutrients: it.nutrients,
       }));
     try {
-      setResult(await correctMeal(mealText, kept));
+      setResult(await correctMeal(mealText, kept, mealId));
       setStatus("saved");
       setEditing(false);
       onCorrected?.();

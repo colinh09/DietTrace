@@ -80,6 +80,35 @@ class MealLogStore:
             )
             return int(cursor.lastrowid)
 
+    def update(
+        self,
+        meal_id: int,
+        per_item: list[dict[str, Any]],
+        totals: list[dict[str, Any]],
+        user_id: str = DEMO_USER,
+    ) -> bool:
+        """Rewrite a stored meal's totals and per_item after a correction.
+
+        Patches totals_json and detail_json.per_item while keeping the rest of
+        the detail (trace, confidence, reasons, needs_review) intact. Scoped to
+        user_id so one user cannot overwrite another's meal.
+        """
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT detail_json FROM meals WHERE id = ? AND user_id = ?",
+                (meal_id, user_id),
+            ).fetchone()
+            if row is None:
+                return False
+            detail = json.loads(row["detail_json"]) if row["detail_json"] else {}
+            detail["per_item"] = per_item
+            cursor = conn.execute(
+                "UPDATE meals SET totals_json = ?, detail_json = ? "
+                "WHERE id = ? AND user_id = ?",
+                (json.dumps(totals), json.dumps(detail), meal_id, user_id),
+            )
+            return cursor.rowcount > 0
+
     def delete(self, meal_id: int, user_id: str = DEMO_USER) -> bool:
         """Delete *user_id*'s meal *meal_id*; return True if a row was removed.
 
