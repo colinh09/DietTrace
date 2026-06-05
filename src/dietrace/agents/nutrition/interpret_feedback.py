@@ -7,7 +7,7 @@ preworkout, aim for 80g carbs") into a typed action that the deterministic
 ``apply_feedback`` function can execute without any further LLM involvement.
 
 Mirrors ``agents/nutrition/parse_meal.py``:
-- Injectable client so tests never hit Vertex.
+- Injectable client so tests never hit Vertex (offline + mocked, ).
 - ``response_schema=StructuredFeedback`` so Gemini returns schema-valid JSON.
 - Fail-soft on every axis: model exception, missing text, non-JSON, wrong
   shape — all return ``None`` rather than raising, so the caller can fall back
