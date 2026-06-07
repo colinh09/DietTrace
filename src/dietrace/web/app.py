@@ -1406,6 +1406,10 @@ def create_app(
         The confirmed meal is also written to the user's Phoenix dataset over the
         MCP server, off the hot path (the npx MCP server is slow), fail-soft."""
         cid = confirms.add(user, req.meal_text, req.items, req.totals)
+        # XOR rule: a meal can't be both held-out ground
+        # truth AND a correction the corrector learns from. Correcting drops it from
+        # confirmations; confirming drops any feedback banked against it.
+        fblog.delete_by_meal(user, req.meal_text)
         example = {
             "input": {"text": req.meal_text},
             "output": {"calories": calories_of(req.totals)},

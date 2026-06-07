@@ -407,7 +407,15 @@ export function LearningObservability({
           <Gauge size={14} /> state
         </button>
       </div>
-      <AgentFeed events={feedEvents} running={retuning} />
+      {/* While a re-tune streams, show the live per-meal scoring right in the
+          rail — every dataset point re-scored base vs tuned as the eval runs. */}
+      {retuning && (
+        <section className="dash-card agent-retune-live">
+          <div className="dash-card-head mono">re-tuning · live</div>
+          <RetuneLive phase={livePhase} rules={liveRules} rows={liveRows} />
+        </section>
+      )}
+      <AgentFeed events={feedEvents} />
       {feedEvents.length === 0 && !retuning && (
         <p className="agent-feed-empty">
           Log a meal and the supervisor&apos;s decisions show up here.
@@ -552,8 +560,10 @@ export function LearningObservability({
           </div>
         )}
 
+        {/* The live streaming view lives in the rail (always visible); here the
+            modal just shows the ship verdict once the re-tune is done. */}
         {retuning && (
-          <RetuneLive phase={livePhase} rules={liveRules} rows={liveRows} />
+          <p className="lo-mode-hint">Re-tuning live — watch it in the rail →</p>
         )}
         {result && !retuning && <RetuneResult result={result} />}
 

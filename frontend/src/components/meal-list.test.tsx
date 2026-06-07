@@ -285,9 +285,10 @@ describe("MealList", () => {
     render(<MealList meals={[datasetMeal]} />);
     const row = screen.getByText(/a big bowl of white rice/).closest("li") as HTMLElement;
 
-    // Badged as a dataset point (no confidence chip), but now showing real macros.
+    // Badged as a dataset point AND keeping its confidence chip (the badge is an
+    // extra tag, not a replacement), with real macros.
     expect(within(row).getByText(/dataset point/i)).toBeInTheDocument();
-    expect(row.querySelector(".conf-chip")).toBeNull();
+    expect(row.querySelector(".conf-chip")).not.toBeNull();
     expect(within(row).getByText(/418/)).toBeInTheDocument();
     expect(within(row).getByText(/P 8/)).toBeInTheDocument();
 

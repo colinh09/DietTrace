@@ -12,6 +12,7 @@ import type { ConfidenceAxis, LoggedItem, Meal, TraceStep } from "@/lib/api";
 import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
 import { MealTrace } from "@/components/meal-trace";
+import type { AgentActivity } from "@/components/agent-decision";
 
 // The agent's-work detail for a meal, captured from its `/log` response: the
 // reconstructed trace steps, the per-item nutrient panels, and the online
@@ -56,11 +57,13 @@ function MealRow({
   detail,
   onEdit,
   onCorrected,
+  onAgentEvent,
 }: {
   meal: Meal;
   detail?: MealDetail;
   onEdit?: (meal: Meal) => void;
   onCorrected?: () => void;
+  onAgentEvent?: AgentActivity;
 }) {
   // A meal is collapsed to a one-line summary by default; clicking the row
   // expands its full breakdown (every accountability card, incl. confidence).
@@ -145,7 +148,9 @@ function MealRow({
             <span className="mm-sep">·</span>
             <span className="mm-part">F {Math.round(macros.fat)}</span>
           </span>
-          {isDataset ? (
+          {/* A dataset point keeps its confidence chip — the badge is an extra
+              tag alongside it, not a replacement. */}
+          {isDataset && (
             <span
               className="dataset-badge"
               title="A meal you confirmed — held out as ground truth to test the agent. It never sees this while learning; it's only scored against it."
@@ -153,13 +158,12 @@ function MealRow({
               <span className="dataset-badge-dot" aria-hidden="true" />
               dataset point
             </span>
-          ) : (
-            <span className={"conf-chip " + chip} title={confTitle}>
-              <span className="conf-dot" aria-hidden="true" />
-              <span className="conf-label">{conf.level}</span>
-              <span className="conf-pct tnum"> · {conf.pct}%</span>
-            </span>
           )}
+          <span className={"conf-chip " + chip} title={confTitle}>
+            <span className="conf-dot" aria-hidden="true" />
+            <span className="conf-label">{conf.level}</span>
+            <span className="conf-pct tnum"> · {conf.pct}%</span>
+          </span>
           <button
             type="button"
             className="meal-edit"
@@ -195,6 +199,7 @@ function MealRow({
               mealId={meal.id}
               totals={meal.totals}
               onCorrected={onCorrected}
+              onAgentEvent={onAgentEvent}
               readOnly={isDataset}
             />
           ) : (
@@ -216,12 +221,14 @@ export function MealList({
   detailsById,
   onEdit,
   onCorrected,
+  onAgentEvent,
 }: {
   meals: Meal[];
   heading?: string;
   detailsById?: Record<number, MealDetail>;
   onEdit?: (meal: Meal) => void;
   onCorrected?: () => void;
+  onAgentEvent?: AgentActivity;
 }) {
   return (
     <section className="meals">
@@ -244,6 +251,7 @@ export function MealList({
               detail={detailsById?.[meal.id] ?? detailFromMeal(meal)}
               onEdit={onEdit}
               onCorrected={onCorrected}
+              onAgentEvent={onAgentEvent}
             />
           ))}
         </ul>

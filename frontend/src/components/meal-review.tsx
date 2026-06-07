@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { confirmMeal, type LoggedItem, type Nutrient } from "@/lib/api";
 import { FreeformFeedback } from "@/components/freeform-feedback";
+import type { AgentActivity } from "@/components/agent-decision";
 import { QuantityEditor } from "@/components/quantity-editor";
 
 type Mode = "ask" | "tweaking" | "correcting" | "confirmed";
@@ -19,12 +20,14 @@ export function MealReview({
   perItem,
   totals,
   onCorrected,
+  onAgentEvent,
 }: {
   mealId?: number;
   mealText: string;
   perItem: LoggedItem[];
   totals: Nutrient[];
   onCorrected?: () => void;
+  onAgentEvent?: AgentActivity;
 }) {
   const [mode, setMode] = useState<Mode>("ask");
   const [saving, setSaving] = useState(false);
@@ -33,7 +36,16 @@ export function MealReview({
     if (saving) return;
     setSaving(true);
     confirmMeal(mealText, perItem, totals)
-      .then(() => setMode("confirmed"))
+      .then(() => {
+        setMode("confirmed");
+        // Live: refresh the state counts AND drop an entry into the activity feed.
+        onCorrected?.();
+        onAgentEvent?.({
+          op: "add_dataset_point",
+          reason: "you confirmed it — added to your held-out dataset",
+          mealText,
+        });
+      })
       .catch(() => {})
       .finally(() => setSaving(false));
   };
@@ -104,7 +116,16 @@ export function MealReview({
           mealId={mealId}
           mealText={mealText}
           perItem={perItem}
-          onFeedbackApplied={() => onCorrected?.()}
+          onFeedbackApplied={(res) => {
+            onCorrected?.();
+            onAgentEvent?.({
+              op: "bank_feedback",
+              reason: res.stored_as_preference
+                ? "learned a standing rule from your correction"
+                : "banked your correction to learn from on the next re-tune",
+              mealText,
+            });
+          }}
         />
       )}
     </div>

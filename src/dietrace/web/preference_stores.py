@@ -318,6 +318,19 @@ class FeedbackLog:
             )
             return cur.rowcount > 0
 
+    def delete_by_meal(self, user_id: str, meal_text: str) -> int:
+        """Drop any feedback banked against *meal_text* — the confirm side of the
+        XOR rule, so a meal can't be both held-out ground truth and a correction
+        the corrector learns from."""
+        if not meal_text:
+            return 0
+        with _connect(self._db_path) as conn:
+            cur = conn.execute(
+                "DELETE FROM feedback_log WHERE user_id = ? AND meal_text = ?",
+                (user_id, meal_text),
+            )
+            return cur.rowcount
+
     def count(self, user_id: str = DEMO_USER) -> int:
         with _connect(self._db_path) as conn:
             row = conn.execute(

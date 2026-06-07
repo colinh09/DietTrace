@@ -236,6 +236,20 @@ export default function Home() {
     loadAnalysis();
   }, [bumpLearning, loadHistory, loadAnalysis]);
 
+  // Push a supervisor action into the activity feed live — every correction the
+  // user gives and every meal they confirm shows up the moment it happens.
+  const pushAgentEvent = useCallback(
+    (e: { op: AgentEvent["op"]; reason: string; mealText?: string }) => {
+      setAgentEvents((cur) =>
+        [{ ...e, id: `act-${Date.now()}-${cur.length}`, when: "now" }, ...cur].slice(
+          0,
+          30,
+        ),
+      );
+    },
+    [],
+  );
+
   // Onboarding finished (or was skipped): enter the app and refresh the day so
   // the just-saved targets show in the band.
   const handleOnboarded = useCallback(
@@ -317,6 +331,7 @@ export default function Home() {
                 detailsById={details}
                 onEdit={handleDelete}
                 onCorrected={handleCorrected}
+                onAgentEvent={pushAgentEvent}
               />
             </section>
           </div>

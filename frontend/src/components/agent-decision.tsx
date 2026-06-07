@@ -42,6 +42,15 @@ export interface AgentEvent extends SupervisorDecision {
   when?: string;
 }
 
+// A callback to push a new activity into the feed (the id + timing are stamped by
+// the page) — fired when the user confirms a meal or gives feedback, so the feed
+// updates live on every action.
+export type AgentActivity = (e: {
+  op: AgentEvent["op"];
+  reason: string;
+  mealText?: string;
+}) => void;
+
 // The agent-observability feed: the supervisor's decisions in order (newest
 // first), so the agent's autonomous choices read like a log as they happen.
 export function AgentFeed({

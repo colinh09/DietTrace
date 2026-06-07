@@ -143,6 +143,19 @@ def test_correcting_a_meal_removes_it_from_the_gate_set(tmp_path) -> None:
     assert confirms.count("loop-user") == 0  # corrected → removed from gate set
 
 
+def test_confirming_a_meal_removes_its_feedback(tmp_path) -> None:
+    """XOR (the other direction): confirming a meal drops any feedback banked
+    against it, so it can't be both a correction signal and held-out truth."""
+    client, confirms, fblog, _ = _make_app(tmp_path)
+    fblog.add("loop-user", "way more oats", None, "oatmeal")
+    assert fblog.count("loop-user") == 1
+
+    client.post("/confirm", headers=_H,
+                json={"meal_text": "oatmeal", "items": [], "totals": _energy(300)})
+    assert confirms.count("loop-user") == 1  # confirmed → in the gate set
+    assert fblog.count("loop-user") == 0  # its feedback was dropped (XOR)
+
+
 def test_edit_and_delete_feedback(tmp_path) -> None:
     client, _, fblog, _ = _make_app(tmp_path)
     fid = fblog.add("loop-user", "original", None, None)

@@ -9,6 +9,7 @@
 import { Globe, History } from "lucide-react";
 import type { ConfidenceAxis, LoggedItem, Nutrient, TraceStep } from "@/lib/api";
 import { MealReview } from "@/components/meal-review";
+import type { AgentActivity } from "@/components/agent-decision";
 import { macrosOf } from "@/lib/meal";
 
 // Each step's rail glyph: a globe for the web fallback, a history mark for a
@@ -139,6 +140,7 @@ export function MealTrace({
   mealId,
   totals,
   onCorrected,
+  onAgentEvent,
   readOnly = false,
 }: {
   trace: TraceStep[];
@@ -155,6 +157,7 @@ export function MealTrace({
   // stored totals are rewritten in-place and /history + /analysis reflect it.
   mealId?: number;
   onCorrected?: () => void;
+  onAgentEvent?: AgentActivity;
   // A held-out dataset point: show the breakdown, but not the confirm/correct
   // review (it's already the user's confirmed ground truth).
   readOnly?: boolean;
@@ -189,6 +192,7 @@ export function MealTrace({
             perItem={perItem}
             totals={totals ?? []}
             onCorrected={onCorrected}
+            onAgentEvent={onAgentEvent}
           />
         </section>
       )}

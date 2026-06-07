@@ -114,16 +114,20 @@ def test_supervisor_end_to_end_journey(tmp_path, monkeypatch, capsys) -> None:
         return client.post("/log", json={"text": text}, headers=_USER).json()
 
     print("\n=== 1. Log a few meals — each carries the supervisor's decision ===")
-    for text in ["two eggs and toast", "preworkout oats", "grilled chicken salad"]:
+    for text in [
+        "two eggs and toast", "preworkout oats", "grilled chicken salad", "an apple",
+    ]:
         res = log(text)
         op = res["supervisor"]["op"]
         print(f"  log {text!r:28} -> supervisor: {op} :: {res['supervisor']['reason']}")
         assert op == "add_dataset_point"  # no signal yet → build the held-out set
 
+    # Corrections and confirmations stay disjoint (the XOR rule) — revise meals we
+    # do NOT confirm, confirm meals we do NOT revise.
     print("\n=== 2. Make a couple of revisions (banked corrections) ===")
     for text, fb in [
-        ("preworkout oats", "that was way more — a big bowl before my run"),
         ("two eggs and toast", "the toast was two slices, not one"),
+        ("an apple", "it was a big honeycrisp, not a small one"),
     ]:
         client.post(
             "/feedback/freeform",
@@ -153,8 +157,8 @@ def test_supervisor_end_to_end_journey(tmp_path, monkeypatch, capsys) -> None:
     )
 
     print("\n=== 4. Next meal — enough signal now, so the supervisor says RETUNE ===")
-    res = log("an apple")
-    print(f"  log 'an apple' -> supervisor: {res['supervisor']['op']} :: "
+    res = log("a banana")
+    print(f"  log 'a banana' -> supervisor: {res['supervisor']['op']} :: "
           f"{res['supervisor']['reason']}")
     assert res["supervisor"]["op"] == "retune"
 
