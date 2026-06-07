@@ -1673,8 +1673,19 @@ def create_app(
                            "n": len(cases)})
                 befores, afters = scored[label]
                 for i, c in enumerate(cases):
-                    before = score_one(c, current_block)
-                    after = score_one(c, proposed.block_text)
+                    # One named span per meal so the re-score is VISIBLE in Phoenix
+                    # in real time: the agent's Gemini calls (base vs tuned) nest
+                    # under it, and the accuracy lands as span attributes. A judge
+                    # watching the Phoenix Traces tab sees the gate run meal by meal.
+                    with _TRACER.start_as_current_span("retune.rescore") as span:
+                        span.set_attribute("retune.set", label)
+                        span.set_attribute("meal.text", c["text"])
+                        span.set_attribute("expected.kcal", round(c["calories"]))
+                        before = score_one(c, current_block)
+                        after = score_one(c, proposed.block_text)
+                        span.set_attribute("accuracy.base", before)
+                        span.set_attribute("accuracy.tuned", after)
+                        span.set_attribute("accuracy.delta", round(after - before, 3))
                     befores.append(before)
                     afters.append(after)
                     yield sse({

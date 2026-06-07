@@ -34,25 +34,43 @@ def init_tracer(service_name: str) -> TracerProvider | None:
     from openinference.instrumentation.google_adk import GoogleADKInstrumentor
     from openinference.instrumentation.google_genai import GoogleGenAIInstrumentor
     from openinference.instrumentation.mcp import MCPInstrumentor
-    from phoenix.otel import register
+    from opentelemetry import trace as otel_trace
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
     from dietrace.observability.trace_buffer import get_buffer
 
-    # register() reads PHOENIX_API_KEY / PHOENIX_COLLECTOR_ENDPOINT from the env and
-    # builds the auth headers itself; passing them explicitly mishandles the key.
-    tracer_provider = register(
-        project_name=service_name,
-        auto_instrument=False,
-        verbose=False,
+    # Build the OTLP/HTTP exporter explicitly. phoenix.otel.register() does not wire
+    # the exporter reliably here — it returns a provider with no exporter attached, so
+    # every span is silently dropped. A direct exporter to the /v1/traces path with a
+    # Bearer token is what Phoenix Cloud actually accepts (the bare api_key header 401s;
+    # verified against app.phoenix.arize.com). Phoenix routes spans to a project via the
+    # openinference.project.name resource attribute.
+    traces_endpoint = endpoint.rstrip("/")
+    if not traces_endpoint.endswith("/v1/traces"):
+        traces_endpoint += "/v1/traces"
+    resource = Resource.create(
+        {"openinference.project.name": service_name, "service.name": service_name}
     )
+    tracer_provider = SDKTracerProvider(resource=resource)
+    tracer_provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=traces_endpoint,
+                headers={"authorization": f"Bearer {api_key}"},
+            )
+        )
+    )
+    # Mirror finished spans into the in-process buffer so the web "reasoning" panel
+    # works in production, not only in tests — a parallel, capped, in-memory observer
+    # (see trace_buffer.py) alongside the Phoenix export.
+    tracer_provider.add_span_processor(get_buffer())
+    otel_trace.set_tracer_provider(tracer_provider)
 
     GoogleADKInstrumentor().instrument(tracer_provider=tracer_provider)
     GoogleGenAIInstrumentor().instrument(tracer_provider=tracer_provider)
     MCPInstrumentor().instrument(tracer_provider=tracer_provider)
-
-    # Mirror finished spans into the in-process buffer so the web "reasoning" panel
-    # works in production, not only in tests. Spans still export to Phoenix; this is
-    # a parallel, capped, in-memory observer (see trace_buffer.py).
-    tracer_provider.add_span_processor(get_buffer())
 
     return tracer_provider
