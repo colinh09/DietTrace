@@ -11,6 +11,7 @@ export function Dashboard({
   reloadSignal,
   agentEvents = [],
   autoRetune = 0,
+  onRetuneComplete,
 }: {
   // Bumped by the page whenever a correction/confirmation happens, so the
   // panel refetches and stays in sync (persisting across navigation).
@@ -19,6 +20,8 @@ export function Dashboard({
   agentEvents?: AgentEvent[];
   // Bumped when the supervisor decides "retune", so the panel auto-runs it.
   autoRetune?: number;
+  // Hands a finished re-tune's outcome up to the page's persisted feed.
+  onRetuneComplete?: (event: AgentEvent) => void;
 }) {
   return (
     <aside className="dash" aria-label="Agent observability">
@@ -26,6 +29,7 @@ export function Dashboard({
         reloadSignal={reloadSignal}
         autoRetune={autoRetune}
         agentEvents={agentEvents}
+        onRetuneComplete={onRetuneComplete}
       />
     </aside>
   );

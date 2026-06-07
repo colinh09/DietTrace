@@ -247,6 +247,7 @@ export function LearningObservability({
   reloadSignal = 0,
   autoRetune = 0,
   agentEvents = [],
+  onRetuneComplete,
 }: {
   reloadSignal?: number;
   // Bumped by the page when the supervisor's per-meal decision is "retune", so
@@ -254,6 +255,9 @@ export function LearningObservability({
   autoRetune?: number;
   // The supervisor's per-meal decisions, newest first (the activity feed).
   agentEvents?: AgentEvent[];
+  // When a gated eval finishes, the outcome is handed up to the page so it lives in
+  // the single persisted feed (survives reload) rather than panel-local state.
+  onRetuneComplete?: (event: AgentEvent) => void;
 }) {
   const [prefs, setPrefs] = useState<PreferencesResponse | null>(null);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
@@ -266,10 +270,8 @@ export function LearningObservability({
   const [experimentUrl, setExperimentUrl] = useState("");
   const [showData, setShowData] = useState(false);
   const [explain, setExplain] = useState(false);
-  // The agent-state modal (the deep dive behind the icon), + re-tune events the
-  // panel adds to the feed when a gated eval finishes.
+  // The agent-state modal (the deep dive behind the icon).
   const [stateOpen, setStateOpen] = useState(false);
-  const [retuneEvents, setRetuneEvents] = useState<AgentEvent[]>([]);
   // Quick = sample of standard foods (fast, good for demos); full = the whole set.
   const [mode, setMode] = useState<"quick" | "full">("quick");
   // The user's freeform "goals & eating style" — the corrector's standing context.
@@ -343,20 +345,17 @@ export function LearningObservability({
               ? `fit ${pct(e.current.fit)} → ${pct(e.proposed.fit)}`
               : undefined;
           const rule = e.rules?.[0]?.rule;
-          setRetuneEvents((curr) => [
-            {
-              id: `retune-${curr.length}`,
-              op: "retune",
-              reason: e.shipped
-                ? rule
-                  ? `shipped: ${rule}`
-                  : "shipped a new rule"
-                : "no change — the gate held the line",
-              detail: fit,
-              when: "now",
-            },
-            ...curr,
-          ]);
+          onRetuneComplete?.({
+            id: `retune-${Date.now()}`,
+            op: "retune",
+            reason: e.shipped
+              ? rule
+                ? `shipped: ${rule}`
+                : "shipped a new rule"
+              : "no change — the gate held the line",
+            detail: fit,
+            when: "now",
+          });
         }
       }
     };
@@ -394,7 +393,7 @@ export function LearningObservability({
   const custom = prefs?.confirmations_custom ?? 0;
   const seeded = prefs?.confirmations_seeded ?? 0;
   // The feed: re-tune events the panel raised + the per-meal decisions from the page.
-  const feedEvents = [...retuneEvents, ...agentEvents];
+  const feedEvents = agentEvents;
   const latest = feedEvents[0];
 
   return (

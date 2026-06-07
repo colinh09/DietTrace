@@ -5,7 +5,7 @@
 // targets), the inline log input, and the day's logged meals as compact rows
 // read from /history. Expanding a row reveals that
 // meal's agent's-work trace, kept from its /log response.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "@/components/header";
 import { DatePicker } from "@/components/date-picker";
 import { DayMacros } from "@/components/day-macros";
@@ -25,6 +25,7 @@ import {
   getHistory,
   getProfile,
   logMealStream,
+  userId,
   type GoalProgress,
   type Meal,
   type Safety,
@@ -256,6 +257,39 @@ export default function Home() {
     [],
   );
 
+  // A finished re-tune's outcome drops into the same persisted feed (so it survives
+  // a reload too, not just the live per-meal events).
+  const handleRetuneComplete = useCallback((event: AgentEvent) => {
+    setAgentEvents((cur) => [event, ...cur].slice(0, 30));
+  }, []);
+
+  // Persist the activity feed per-user in localStorage so a reload keeps it (until a
+  // real account replaces the anonymous id with Firebase auth, same key path). Skip
+  // the first write so the empty initial state can't clobber a restored feed.
+  const restoredFeed = useRef(false);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(`diettrace_activity_${userId()}`);
+      if (saved) setAgentEvents(JSON.parse(saved) as AgentEvent[]);
+    } catch {
+      /* corrupt/absent storage — start with an empty feed */
+    }
+  }, []);
+  useEffect(() => {
+    if (!restoredFeed.current) {
+      restoredFeed.current = true;
+      return;
+    }
+    try {
+      window.localStorage.setItem(
+        `diettrace_activity_${userId()}`,
+        JSON.stringify(agentEvents),
+      );
+    } catch {
+      /* storage full/unavailable — feed just won't persist this session */
+    }
+  }, [agentEvents]);
+
   // Onboarding finished (or was skipped): enter the app and refresh the day so
   // the just-saved targets show in the band.
   const handleOnboarded = useCallback(
@@ -345,6 +379,7 @@ export default function Home() {
             reloadSignal={reloadSignal}
             agentEvents={agentEvents}
             autoRetune={retuneSignal}
+            onRetuneComplete={handleRetuneComplete}
           />
         </div>
       </main>
