@@ -26,6 +26,8 @@ from pydantic import BaseModel, ValidationError
 from dietrace.agents.nutrition.corrector import propose_preference_block
 from dietrace.agents.nutrition.interpret_feedback import apply_feedback, interpret_feedback
 from dietrace.agents.nutrition.safety import safety_check
+from dietrace.agents.supervisor.config import load_supervisor_config
+from dietrace.agents.supervisor.decide import decide, gather_signals
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
 from dietrace.macros.adherence import macro_adherence
 from dietrace.macros.compute import compute_targets
@@ -550,6 +552,8 @@ def create_app(
     # Per-user freeform profile (goals + eating style) — standing context the
     # corrector reads when generalizing corrections.
     profiles = profile_store or build_profile_store()
+    # Supervisor settings (decision mode + retune thresholds), env-driven.
+    supervisor_config = load_supervisor_config()
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
@@ -661,6 +665,16 @@ def create_app(
                 detail=_meal_detail(per_item, trace, quality, review),
             )
             _record_trust(per_item, quality, review, user, req.text)
+            # The supervisor's per-meal decision (design §1): a fresh, uncorrected
+            # meal is a clean dataset-point candidate unless enough new signal has
+            # accrued to retune. Cheap + deterministic here; the MCP write / retune
+            # execution runs off the hot path (phase 4).
+            decision = decide(
+                gather_signals(
+                    fblog, confirms, user, meal_confidence=quality["confidence"]
+                ),
+                supervisor_config,
+            )
             return {
                 "id": entry_id,
                 **result,
@@ -670,6 +684,7 @@ def create_app(
                 "safety": safety,
                 **review,
                 "trace": trace,
+                "supervisor": decision.as_dict(),
             }
 
     @app.post("/log/stream")

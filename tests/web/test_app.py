@@ -617,6 +617,18 @@ def test_recall_is_scoped_to_the_correcting_user(tmp_path) -> None:
     assert bob.get("recalled") is not True
 
 
+def test_log_response_carries_supervisor_decision(tmp_path) -> None:
+    """A fresh meal log surfaces the supervisor's per-meal decision; with no
+    accrued signal it defaults to adding a held-out dataset point."""
+    client, _ = _client(tmp_path)
+    res = client.post(
+        "/log", json={"text": "two eggs"}, headers={"X-DietTrace-User": "alice"}
+    ).json()
+    assert "supervisor" in res
+    assert res["supervisor"]["op"] == "add_dataset_point"
+    assert res["supervisor"]["reason"]
+
+
 def test_feedback_records_and_pushes_a_correction_to_arize(tmp_path) -> None:
     pushed: list[tuple] = []
 
