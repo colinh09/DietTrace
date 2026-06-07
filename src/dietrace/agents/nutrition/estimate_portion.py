@@ -245,6 +245,24 @@ def _per_piece_serving(food: Food) -> ServingSize | None:
 _MEASURE_UNITS_SINGULAR = frozenset(_singular(u) for u in _MEASURE_UNITS)
 
 
+def _has_whole_food_piece(food: Food) -> bool:
+    """True when the food lists a serving that is one whole item of itself — a
+    serving named after the food or a generic whole-unit word ("1 fruit", "1
+    banana"), e.g. avocado's "1 fruit" (150 g). Such foods should be counted by
+    that piece for a bare or fractional count ("half an avocado" → half the
+    fruit), not scaled from a tiny "quantity not specified" reference serving.
+    """
+    whole = _food_name_tokens(food) | _WHOLE_UNIT_WORDS
+    return any(
+        s.amount
+        and s.gram_weight
+        and _singular((s.unit or "").lower()) in whole
+        and not _is_default_serving(s)
+        and not (_serving_words(s) & _OVERSIZED_SERVING_WORDS)
+        for s in food.serving_sizes
+    )
+
+
 def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> PortionEstimate:
     """Estimate the gram weight of *quantity* *unit* of *food*.
 
@@ -290,6 +308,9 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
         key in _PIECE_WORDS
         or (bool(key) and key not in _WHOLE_ITEM_WORDS and _matches_whole_item(food, normalized))
         or (normalized in _DEFAULT_PORTION_WORDS and quantity >= 2)
+        # A bare/fractional count of a food with its own whole-item serving
+        # ("half an avocado", "an apple") counts that piece, not the reference.
+        or (normalized in _DEFAULT_PORTION_WORDS and _has_whole_food_piece(food))
     )
     wants_default = normalized in _DEFAULT_PORTION_WORDS and not counts_pieces
     if food.serving_sizes and (counts_pieces or wants_default):

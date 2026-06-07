@@ -76,6 +76,61 @@ def test_half_avocado_scales_primary_serving() -> None:
     assert est.source == "serving_size"
 
 
+def _avocado_db() -> Food:
+    """Avocado as the USDA DB actually lists it: a whole-fruit piece (150 g)
+    alongside a small 'slice' and a tiny 'quantity not specified' reference —
+    the shape that mis-sized 'half an avocado' to 15 g before the fix."""
+    return Food(
+        fdc_id=2709223,
+        description="Avocado, raw",
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="slice", gram_weight=15.0, description="1 slice"),
+            ServingSize(amount=1.0, unit="fruit", gram_weight=150.0, description="1 fruit"),
+            ServingSize(amount=1.0, unit="cup", gram_weight=150.0, description="1 cup"),
+            ServingSize(
+                amount=1.0, unit="quantity not specified", gram_weight=30.0,
+                description="Quantity not specified",
+            ),
+        ],
+    )
+
+
+def test_half_avocado_bare_unit_counts_the_whole_fruit() -> None:
+    """'half an avocado' with a bare/each/whole unit counts half the whole-fruit
+    piece (150 g → 75 g), not half the tiny 'quantity not specified' reference
+    (which gave 15 g — the live agent's under-portioning bug)."""
+    for unit in ("each", "whole", ""):
+        est = estimate_portion(_avocado_db(), 0.5, unit)
+        assert est.grams == pytest.approx(75.0), f"unit={unit!r} -> {est.grams}"
+        assert est.source == "whole_item"
+
+
+def test_one_avocado_bare_unit_is_the_whole_fruit() -> None:
+    est = estimate_portion(_avocado_db(), 1.0, "each")
+    assert est.grams == pytest.approx(150.0)
+
+
+def test_bare_count_without_a_whole_food_piece_uses_the_reference_serving() -> None:
+    """A food with only measure servings + a reference default (no whole-food
+    piece) still scales the reference for a bare count — e.g. 'a latte' (no
+    '1 latte'/'1 fruit' piece) stays on its as-eaten default."""
+    latte = Food(
+        fdc_id=99999,
+        description="Latte, coffee with milk",
+        data_type="survey_fndds_food",
+        serving_sizes=[
+            ServingSize(amount=1.0, unit="fl oz", gram_weight=30.0, description="1 fl oz"),
+            ServingSize(
+                amount=1.0, unit="quantity not specified", gram_weight=360.0,
+                description="Quantity not specified",
+            ),
+        ],
+    )
+    est = estimate_portion(latte, 1.0, "")
+    assert est.grams == pytest.approx(360.0)
+
+
 def test_one_slice_toast_matches_serving_unit() -> None:
     """"1 slice" matches the toast's "slice" serving size (28 g)."""
     est = estimate_portion(_toast(), 1.0, "slice")
