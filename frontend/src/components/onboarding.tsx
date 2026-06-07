@@ -19,6 +19,7 @@ import {
   type MacroGoal,
   type MacroSex,
   type SeedDemoResult,
+  type SeededDecision,
 } from "@/lib/api";
 import { markOnboarded } from "@/lib/onboarding";
 import { PERSONA_INPUTS, setSetup, type ProfileInputs } from "@/lib/setup";
@@ -77,7 +78,11 @@ const STEPS: Step[] = [
 type Answers = Record<string, string | number>;
 type Msg = { role: "agent" | "user"; text: string };
 
-export function Onboarding({ onDone }: { onDone: () => void }) {
+export function Onboarding({
+  onDone,
+}: {
+  onDone: (seededDecisions?: SeededDecision[]) => void;
+}) {
   const [phase, setPhase] = useState<"choose" | "chat">("choose");
   const [busy, setBusy] = useState(false);
 
@@ -380,7 +385,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           result={seedResult}
           busy={busy}
           onReseed={(p) => seed(p)}
-          onClose={onDone}
+          onClose={() => onDone(seedResult.decisions)}
         />
       )}
     </div>

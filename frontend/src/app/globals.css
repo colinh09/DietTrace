@@ -1224,3 +1224,26 @@ body {
 .agent-feed-label { flex: none; font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.3; }
 .agent-feed-meal { flex: 1; min-width: 0; font-size: 12px; color: var(--muted-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-feed-reason { font-size: 12px; color: var(--muted-ink); line-height: 1.45; }
+
+/* Agent-activity rail header: the "state" button that opens the state modal. */
+.dash-state-btn { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono-font); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-ink); background: none; border: 1px solid var(--line-strong); border-radius: 8px; padding: 4px 9px; cursor: pointer; transition: color .14s, border-color .14s; }
+.dash-state-btn:hover { color: var(--ink); border-color: var(--accent); }
+.dash-state-btn svg { color: var(--faint); }
+
+/* Feed extras: timing label, re-tune detail line, the live running row, empty. */
+.agent-feed-when { flex: none; margin-left: auto; font-family: var(--mono-font); font-size: 10px; color: var(--faint); }
+.agent-feed-detail { font-size: 11px; color: var(--accent-ink); }
+.agent-feed-running .agent-feed-icon svg { animation: agent-spin 1.1s linear infinite; color: var(--accent); }
+.agent-feed-empty { font-size: 13px; line-height: 1.5; color: var(--muted-ink); margin: 10px 2px 0; }
+@keyframes agent-spin { to { transform: rotate(360deg); } }
+
+/* Agent-state modal: the summary at the top of the deep dive. */
+.agent-state-title { font-size: 17px; font-weight: 600; color: var(--ink); margin: 0 0 14px; }
+.agent-state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.agent-state-stat { display: flex; flex-direction: column; gap: 3px; background: var(--accent-softer); border-radius: 10px; padding: 12px 14px; }
+.agent-state-num { font-size: 26px; font-weight: 600; line-height: 1; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.agent-state-cap { font-size: 12px; line-height: 1.4; color: var(--muted-ink); }
+.agent-state-cap b { color: var(--accent-ink); font-weight: 600; }
+.agent-state-latest { font-size: 13px; line-height: 1.5; color: var(--ink); margin: 0 0 6px; }
+.agent-state-latest .mono { color: var(--faint); }
+.agent-state-mcp { font-size: 12px; line-height: 1.5; color: var(--muted-ink); margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }

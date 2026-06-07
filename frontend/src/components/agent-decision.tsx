@@ -11,7 +11,7 @@ import type { SupervisorDecision } from "@/lib/api";
 const LABELS: Record<SupervisorDecision["op"], string> = {
   bank_feedback: "Banked your feedback",
   add_dataset_point: "Added to the held-out dataset",
-  retune: "Retuning the prompt",
+  retune: "Re-tuned",
 };
 
 function OpIcon({ op }: { op: SupervisorDecision["op"] }) {
@@ -33,35 +33,57 @@ export function AgentDecision({ decision }: { decision?: SupervisorDecision }) {
   );
 }
 
-// One decision the supervisor made, tied to the meal that prompted it.
+// One decision the supervisor made. Per-meal ops carry the meal; a re-tune event
+// carries a `detail` (e.g. "fit 49→79%") instead. `when` is a short timing label.
 export interface AgentEvent extends SupervisorDecision {
-  id: number;
-  mealText: string;
+  id: number | string;
+  mealText?: string;
+  detail?: string;
+  when?: string;
 }
 
-// The agent-observability feed: the supervisor's per-meal decisions in order
-// (newest first), so the agent's autonomous choices are visible as they happen.
-export function AgentFeed({ events }: { events: AgentEvent[] }) {
-  if (events.length === 0) return null;
+// The agent-observability feed: the supervisor's decisions in order (newest
+// first), so the agent's autonomous choices read like a log as they happen.
+export function AgentFeed({
+  events,
+  running = false,
+}: {
+  events: AgentEvent[];
+  // True while a re-tune is streaming — shows a live "re-tuning…" row on top.
+  running?: boolean;
+}) {
+  if (events.length === 0 && !running) return null;
   return (
-    <section className="dash-card" aria-label="Agent decisions">
-      <div className="dash-card-head mono">agent decisions</div>
-      <ul className="agent-feed">
-        {events.map((e) => (
-          <li key={e.id} className="agent-feed-row" data-op={e.op}>
-            <span className="agent-feed-icon" aria-hidden="true">
-              <OpIcon op={e.op} />
+    <ul className="agent-feed" aria-label="Agent activity">
+      {running && (
+        <li className="agent-feed-row agent-feed-running" data-op="retune">
+          <span className="agent-feed-icon" aria-hidden="true">
+            <RefreshCw size={13} />
+          </span>
+          <span className="agent-feed-body">
+            <span className="agent-feed-head">
+              <span className="agent-feed-label">Re-tuning…</span>
             </span>
-            <span className="agent-feed-body">
-              <span className="agent-feed-head">
-                <span className="agent-feed-label">{LABELS[e.op]}</span>
-                <span className="agent-feed-meal">{e.mealText}</span>
-              </span>
-              <span className="agent-feed-reason">{e.reason}</span>
+            <span className="agent-feed-reason">running the gated eval</span>
+          </span>
+        </li>
+      )}
+      {events.map((e) => (
+        <li key={e.id} className="agent-feed-row" data-op={e.op}>
+          <span className="agent-feed-icon" aria-hidden="true">
+            <OpIcon op={e.op} />
+          </span>
+          <span className="agent-feed-body">
+            <span className="agent-feed-head">
+              <span className="agent-feed-label">{LABELS[e.op]}</span>
+              {e.when && <span className="agent-feed-when">{e.when}</span>}
             </span>
-          </li>
-        ))}
-      </ul>
-    </section>
+            {e.mealText && <span className="agent-feed-meal">{e.mealText}</span>}
+            {e.detail && <span className="agent-feed-detail mono">{e.detail}</span>}
+            <span className="agent-feed-reason">{e.reason}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -38,10 +38,17 @@ beforeEach(() => {
   vi.mocked(api.setProfile).mockResolvedValue({ ok: true, profile_text: "" });
 });
 
+// The detail (corrections, re-tune, context, test set) now lives behind the state
+// icon — render the panel and open the modal before asserting on that content.
+async function openState() {
+  render(<LearningObservability reloadSignal={0} />);
+  fireEvent.click(await screen.findByRole("button", { name: /agent state/i }));
+  await screen.findByRole("dialog");
+}
+
 describe("LearningObservability", () => {
   it("shows corrections as meal + what you said (persisted, not a bare count)", async () => {
-    render(<LearningObservability reloadSignal={0} />);
-    // The meal the correction was made on, and the correction text itself.
+    await openState();
     expect(await screen.findByText("a big plate of spaghetti")).toBeInTheDocument();
     expect(
       screen.getByText(/before a run I carb up way more/i),
@@ -68,7 +75,7 @@ describe("LearningObservability", () => {
         version: 1, fit_cases: 1, usda_cases: 2,
       });
     });
-    render(<LearningObservability reloadSignal={0} />);
+    await openState();
     fireEvent.click(await screen.findByRole("button", { name: /re-tune/i }));
 
     await waitFor(() => expect(screen.getByText(/Kept/)).toBeInTheDocument());
@@ -90,15 +97,13 @@ describe("LearningObservability", () => {
       onEvent({ type: "score", set: "fit", i: 1, n: 1, text: "oatmeal before my long run", expected: 520, before: 0.6, after: 0.9 });
       await new Promise<void>((r) => { finish = r; });
     });
-    render(<LearningObservability reloadSignal={0} />);
+    await openState();
     fireEvent.click(await screen.findByRole("button", { name: /re-tune/i }));
 
-    // The whole set is listed immediately — including the not-yet-scored USDA row.
     await waitFor(() =>
       expect(screen.getByText("a medium banana")).toBeInTheDocument(),
     );
     expect(screen.getByText("oatmeal before my long run")).toBeInTheDocument();
-    // Two clearly-labelled columns: base agent vs. tuned.
     expect(screen.getByText("Base")).toBeInTheDocument();
     expect(screen.getByText("Tuned")).toBeInTheDocument();
     finish();
@@ -112,14 +117,12 @@ describe("LearningObservability", () => {
       ok: true,
       profile_text: "Marathon training, eats high carb",
     });
-    render(<LearningObservability reloadSignal={0} />);
+    await openState();
 
-    // The standing context is visible at all times (observability-everywhere).
     expect(
       await screen.findByText(/marathon training, mostly plant-based/i),
     ).toBeInTheDocument();
 
-    // Editable in place → saved back to /profile (which feeds the corrector).
     fireEvent.click(screen.getByRole("button", { name: /edit/i }));
     const box = screen.getByLabelText(/your goals and eating style/i);
     fireEvent.change(box, { target: { value: "Marathon training, eats high carb" } });
@@ -134,14 +137,13 @@ describe("LearningObservability", () => {
       block: null, corrections: 3, new_corrections: 0, confirmations: 2,
       confirmed, min_corrections: 1,
     });
-    render(<LearningObservability reloadSignal={0} />);
-    // Threshold comes from min_corrections (ground truth), not a hardcoded value.
+    await openState();
     expect(await screen.findByText(/0 of 1 fresh correction/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /re-tune/i })).toBeDisabled();
   });
 
   it("expands the test set", async () => {
-    render(<LearningObservability reloadSignal={0} />);
+    await openState();
     const toggle = await screen.findByRole("button", { name: /test set/i });
     expect(screen.queryByText(/oatmeal before my long run/)).not.toBeInTheDocument();
     fireEvent.click(toggle);

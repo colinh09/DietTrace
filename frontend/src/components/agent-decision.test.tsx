@@ -23,7 +23,7 @@ describe("AgentDecision", () => {
     render(
       <AgentDecision decision={{ op: "retune", reason: "enough new signal" }} />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent(/retuning/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/re-tuned/i);
   });
 
   it("renders nothing when no decision is present", () => {
@@ -45,7 +45,7 @@ describe("AgentFeed", () => {
     const feed = screen.getByRole("list");
     expect(feed.querySelectorAll("li")).toHaveLength(2);
     expect(screen.getByText("an apple")).toBeInTheDocument();
-    expect(screen.getByText(/retuning/i)).toBeInTheDocument();
+    expect(screen.getByText(/re-tuned/i)).toBeInTheDocument();
     expect(screen.getByText("two eggs")).toBeInTheDocument();
   });
 

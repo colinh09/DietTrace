@@ -7,7 +7,16 @@
 // (meal + what you said, persisted), and the held-out dataset it's tested against.
 // This is the observability-everywhere rule applied to the loop itself.
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Pencil, Sparkles, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Gauge,
+  Pencil,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
+import { AgentFeed, type AgentEvent } from "@/components/agent-decision";
+import { Modal } from "@/components/modal";
 import {
   deleteLearningFeedback,
   editLearningFeedback,
@@ -237,11 +246,14 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
 export function LearningObservability({
   reloadSignal = 0,
   autoRetune = 0,
+  agentEvents = [],
 }: {
   reloadSignal?: number;
   // Bumped by the page when the supervisor's per-meal decision is "retune", so
   // the panel runs the gated eval on its own — the agent drives it, not a click.
   autoRetune?: number;
+  // The supervisor's per-meal decisions, newest first (the activity feed).
+  agentEvents?: AgentEvent[];
 }) {
   const [prefs, setPrefs] = useState<PreferencesResponse | null>(null);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
@@ -252,6 +264,10 @@ export function LearningObservability({
   const [liveRows, setLiveRows] = useState<LiveRow[]>([]);
   const [showData, setShowData] = useState(false);
   const [explain, setExplain] = useState(false);
+  // The agent-state modal (the deep dive behind the icon), + re-tune events the
+  // panel adds to the feed when a gated eval finishes.
+  const [stateOpen, setStateOpen] = useState(false);
+  const [retuneEvents, setRetuneEvents] = useState<AgentEvent[]>([]);
   // Quick = sample of standard foods (fast, good for demos); full = the whole set.
   const [mode, setMode] = useState<"quick" | "full">("quick");
   // The user's freeform "goals & eating style" — the corrector's standing context.
@@ -317,6 +333,27 @@ export function LearningObservability({
         });
       } else if (e.type === "done") {
         setResult(e);
+        if (e.ok) {
+          const fit =
+            e.current && e.proposed
+              ? `fit ${pct(e.current.fit)} → ${pct(e.proposed.fit)}`
+              : undefined;
+          const rule = e.rules?.[0]?.rule;
+          setRetuneEvents((curr) => [
+            {
+              id: `retune-${curr.length}`,
+              op: "retune",
+              reason: e.shipped
+                ? rule
+                  ? `shipped: ${rule}`
+                  : "shipped a new rule"
+                : "no change — the gate held the line",
+              detail: fit,
+              when: "now",
+            },
+            ...curr,
+          ]);
+        }
       }
     };
     learningRetuneStream(onEvent, full)
@@ -350,9 +387,65 @@ export function LearningObservability({
   const minCorr = prefs?.min_corrections ?? 1;
   const ready = newCorr >= minCorr;
   const block = prefs?.block ?? null;
+  const custom = prefs?.confirmations_custom ?? 0;
+  const seeded = prefs?.confirmations_seeded ?? 0;
+  // The feed: re-tune events the panel raised + the per-meal decisions from the page.
+  const feedEvents = [...retuneEvents, ...agentEvents];
+  const latest = feedEvents[0];
 
   return (
-    <div className="lo">
+    <>
+      {/* ── Rail: the autonomous agent-activity feed ──────────────────────── */}
+      <div className="dash-head">
+        <span className="dash-title mono">agent activity</span>
+        <button
+          type="button"
+          className="dash-state-btn"
+          onClick={() => setStateOpen(true)}
+          aria-label="Open agent state"
+        >
+          <Gauge size={14} /> state
+        </button>
+      </div>
+      <AgentFeed events={feedEvents} running={retuning} />
+      {feedEvents.length === 0 && !retuning && (
+        <p className="agent-feed-empty">
+          Log a meal and the supervisor&apos;s decisions show up here.
+        </p>
+      )}
+
+      {/* ── State modal: the deep dive behind the icon ────────────────────── */}
+      {stateOpen && (
+        <Modal onClose={() => setStateOpen(false)} labelledBy="agent-state-title">
+          <h2 id="agent-state-title" className="agent-state-title">
+            Agent state
+          </h2>
+          <div className="agent-state-grid">
+            <div className="agent-state-stat">
+              <span className="agent-state-num">{confirmations}</span>
+              <span className="agent-state-cap">
+                held-out points · <b>{custom}</b> from you · {seeded} seeded
+              </span>
+            </div>
+            <div className="agent-state-stat">
+              <span className="agent-state-num">{newCorr}</span>
+              <span className="agent-state-cap">
+                of {corrections} correction{corrections === 1 ? "" : "s"} not yet
+                incorporated
+              </span>
+            </div>
+          </div>
+          {latest && (
+            <p className="agent-state-latest">
+              <span className="mono">latest decision:</span> {latest.reason}
+              {latest.detail ? ` (${latest.detail})` : ""}
+            </p>
+          )}
+          <p className="agent-state-mcp">
+            Held-out points are synced to your Phoenix dataset over MCP.
+          </p>
+
+          <div className="lo">
       {/* ── Re-tune: the gated eval, streaming live, always visible ───────── */}
       <section className="dash-card lo-retune">
         <div className="dash-card-head mono">self-tuning · agent-driven</div>
@@ -645,6 +738,9 @@ export function LearningObservability({
           )}
         </section>
       )}
-    </div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }

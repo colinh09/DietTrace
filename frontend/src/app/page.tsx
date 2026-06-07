@@ -14,7 +14,7 @@ import { LiveMeal, type LiveEntry } from "@/components/live-meal";
 import { MealList, type MealDetail } from "@/components/meal-list";
 import { SafetyNotice } from "@/components/safety-notice";
 import type { AgentEvent } from "@/components/agent-decision";
-import { Dashboard, type LatestTrace } from "@/components/dashboard";
+import { Dashboard } from "@/components/dashboard";
 import { OverviewModal } from "@/components/observability-modal";
 import { MacroModal } from "@/components/macro-modal";
 import { Onboarding } from "@/components/onboarding";
@@ -28,6 +28,7 @@ import {
   type GoalProgress,
   type Meal,
   type Safety,
+  type SeededDecision,
 } from "@/lib/api";
 import { clearOnboarded, isOnboardedFlag, markOnboarded } from "@/lib/onboarding";
 import { clearSetup } from "@/lib/setup";
@@ -211,10 +212,15 @@ export default function Home() {
         setSafety(event.safety ?? null);
         if (event.supervisor) {
           const decided = event.supervisor;
-          setAgentEvents((cur) =>
-            [{ ...decided, id, mealText: text }, ...cur].slice(0, 30),
-          );
-          if (decided.op === "retune") setRetuneSignal((n) => n + 1);
+          // A "retune" decision triggers the gated eval (whose outcome the panel
+          // adds to the feed); other ops drop straight into the feed as a row.
+          if (decided.op === "retune") {
+            setRetuneSignal((n) => n + 1);
+          } else {
+            setAgentEvents((cur) =>
+              [{ ...decided, id, mealText: text, when: "now" }, ...cur].slice(0, 30),
+            );
+          }
         }
         setLive(null);
         loadHistory();
@@ -232,12 +238,27 @@ export default function Home() {
 
   // Onboarding finished (or was skipped): enter the app and refresh the day so
   // the just-saved targets show in the band.
-  const handleOnboarded = useCallback(() => {
-    setOnboarded(true);
-    loadHistory();
-    loadAnalysis();
-    bumpLearning();
-  }, [loadHistory, loadAnalysis, bumpLearning]);
+  const handleOnboarded = useCallback(
+    (seededDecisions?: SeededDecision[]) => {
+      setOnboarded(true);
+      // Backfill the feed with the seeded persona's prior decisions (previous day).
+      if (seededDecisions?.length) {
+        setAgentEvents(
+          seededDecisions.map((d, i) => ({
+            id: `seed-${i}`,
+            op: d.op,
+            reason: d.reason,
+            mealText: d.meal_text,
+            when: "yesterday",
+          })),
+        );
+      }
+      loadHistory();
+      loadAnalysis();
+      bumpLearning();
+    },
+    [loadHistory, loadAnalysis, bumpLearning],
+  );
 
   // Hold the paint until the gate decides (avoids flashing the app then the
   // welcome). A returning user resolves synchronously from the localStorage flag.
@@ -245,14 +266,6 @@ export default function Home() {
   if (onboarded === false) return <Onboarding onDone={handleOnboarded} />;
 
   const heading = isSameDay(date, new Date()) ? "Today" : "Logged";
-
-  // The latest agent trace to surface on the dashboard — the most recent meal
-  // logged this session (historical rows carry no captured trace).
-  const latestMeal = meals[0];
-  const latestTrace: LatestTrace | null =
-    latestMeal && details[latestMeal.id]?.trace?.length
-      ? { text: latestMeal.text, steps: details[latestMeal.id].trace }
-      : null;
 
   return (
     <div className="page">
@@ -309,7 +322,6 @@ export default function Home() {
           </div>
           <Dashboard
             reloadSignal={reloadSignal}
-            latestTrace={latestTrace}
             agentEvents={agentEvents}
             autoRetune={retuneSignal}
           />

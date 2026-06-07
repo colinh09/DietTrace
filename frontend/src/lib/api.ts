@@ -610,7 +610,16 @@ export interface SeedDemoResult {
   goals_set: boolean;
   confirmations: number;
   corrections: number;
+  // The agent's prior decisions, to backfill the activity feed (previous day).
+  decisions: SeededDecision[];
   persona: SeededPersona;
+}
+
+// One prior agent decision returned by /demo/seed (to seed the activity feed).
+export interface SeededDecision {
+  op: "bank_feedback" | "add_dataset_point" | "retune";
+  reason: string;
+  meal_text: string;
 }
 
 // The selectable demo personas (the persona loader). Keys match the backend.
@@ -679,6 +688,9 @@ export interface PreferencesResponse {
   // New (unprocessed) corrections — the only ones the next retune folds in.
   new_corrections: number;
   confirmations: number;
+  // Confirmed-meal split: how many the user confirmed vs how many were seeded.
+  confirmations_custom?: number;
+  confirmations_seeded?: number;
   // The confirmed meals (Input A) the gate tests a proposed block against.
   confirmed: ConfirmedMeal[];
   min_corrections: number;
