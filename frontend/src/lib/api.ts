@@ -735,6 +735,10 @@ export interface LearningRetuneResult {
   version?: number | null;
   fit_cases?: number;
   usda_cases?: number;
+  // "phoenix" when the fit set was scored as a Phoenix experiment read over MCP,
+  // "local" when it fell back to in-process scoring; experiment_url links the run.
+  scored_via?: "phoenix" | "local";
+  experiment_url?: string;
   // when ok=false: "not_enough_corrections" | "no_new_corrections" | "corrector_failed"
   reason?: string;
   have?: number;
@@ -817,6 +821,9 @@ export type LearningRetuneEvent =
   | { type: "rule"; rules: PreferenceRule[] }
   // The full eval set up front, so the UI lists every meal before scoring starts.
   | { type: "manifest"; rows: { set: "fit" | "usda"; text: string }[] }
+  // Emitted when the fit set was scored as a Phoenix experiment — carries the link
+  // to the run in Arize so it can be opened live.
+  | { type: "phoenix"; experiment_url: string }
   | {
       type: "score";
       set: "fit" | "usda";

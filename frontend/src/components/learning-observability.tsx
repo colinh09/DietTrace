@@ -262,6 +262,8 @@ export function LearningObservability({
   const [livePhase, setLivePhase] = useState("");
   const [liveRules, setLiveRules] = useState<PreferenceRule[]>([]);
   const [liveRows, setLiveRows] = useState<LiveRow[]>([]);
+  // Link to the Phoenix experiment when the fit set is scored in Arize over MCP.
+  const [experimentUrl, setExperimentUrl] = useState("");
   const [showData, setShowData] = useState(false);
   const [explain, setExplain] = useState(false);
   // The agent-state modal (the deep dive behind the icon), + re-tune events the
@@ -314,9 +316,11 @@ export function LearningObservability({
     setLivePhase("Starting the eval…");
     setLiveRules([]);
     setLiveRows([]);
+    setExperimentUrl("");
     const onEvent = (e: LearningRetuneEvent) => {
       if (e.type === "phase") setLivePhase(e.label);
       else if (e.type === "rule") setLiveRules(e.rules);
+      else if (e.type === "phoenix") setExperimentUrl(e.experiment_url);
       else if (e.type === "manifest") {
         setLiveRows(
           e.rows.map((r) => ({ set: r.set, text: r.text, before: null, after: null })),
@@ -413,6 +417,16 @@ export function LearningObservability({
         <section className="dash-card agent-retune-live">
           <div className="dash-card-head mono">re-tuning · live</div>
           <RetuneLive phase={livePhase} rules={liveRules} rows={liveRows} />
+          {experimentUrl && (
+            <a
+              className="phoenix-exp-link"
+              href={experimentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Your meals scored as a Phoenix experiment — view in Arize ↗
+            </a>
+          )}
         </section>
       )}
       <AgentFeed events={feedEvents} />

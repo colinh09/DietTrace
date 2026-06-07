@@ -563,6 +563,11 @@ body {
 .dash-card { border: 1px solid var(--line); border-radius: 13px; padding: 16px 18px; background: var(--bg); }
 .dash-card-head { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); margin-bottom: 9px; }
 
+/* The "view in Arize" link under the live re-score — the Phoenix experiment the
+   gate read its scores from over MCP. */
+.phoenix-exp-link { display: block; margin-top: 10px; font-size: 12px; color: var(--accent); text-decoration: none; }
+.phoenix-exp-link:hover { text-decoration: underline; }
+
 /* Learning loop, inline in the Observability column (no modal). */
 .lo { display: flex; flex-direction: column; gap: 15px; }
 /* Re-tune action row: the primary button + the Quick/Full depth toggle, sitting
