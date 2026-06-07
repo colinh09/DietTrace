@@ -1300,22 +1300,24 @@ def create_app(
         # The seeded agent-activity feed (dated to the previous day): the persona's
         # prior decisions — meals added to the held-out dataset + corrections banked.
         seeded_decisions: list[dict[str, Any]] = []
-        for c in persona.confirmations:
-            confirms.add(user, c["meal_text"], c.get("items", []), c["totals"], source="seed")
-            # Mirror each confirmed meal as a visible, badged row on the previous
-            # day so the held-out dataset is something a judge can actually see.
+        # Log the full simulated previous day (real agent output, full detail) on
+        # the previous day; dataset-point meals are also added to the gate set.
+        for m in persona.previous_day:
+            detail = dict(m.get("detail", {}))
+            is_dp = bool(m.get("dataset_point"))
+            detail["dataset_point"] = is_dp
             log_store.add(
-                c["meal_text"],
-                c["totals"],
-                date=dataset_date,
-                user_id=user,
-                detail={"dataset_point": True},
+                m["text"], m["totals"], date=dataset_date, user_id=user, detail=detail
             )
-            seeded_decisions.append({
-                "op": "add_dataset_point",
-                "reason": "confirmed as ground truth — added to the held-out dataset",
-                "meal_text": c["meal_text"],
-            })
+            if is_dp:
+                confirms.add(
+                    user, m["text"], detail.get("per_item", []), m["totals"], source="seed"
+                )
+                seeded_decisions.append({
+                    "op": "add_dataset_point",
+                    "reason": "confirmed as ground truth — added to the held-out dataset",
+                    "meal_text": m["text"],
+                })
         for f in persona.feedback:
             fblog.add(
                 user, f["feedback_text"], None, f.get("meal_text"), f.get("weight", 1.0)

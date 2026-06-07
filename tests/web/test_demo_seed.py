@@ -120,10 +120,14 @@ def test_demo_seed_visible_today_dataset_yesterday(tmp_path) -> None:
         assert meal["text"] in texts, f"'{meal['text']}' missing from today"
     assert all(not m.get("dataset_point") for m in today)
 
-    # The held-out confirmed dataset is visible (and flagged) on the prior day.
+    # The previous day is a full simulated day (more meals than the dataset),
+    # and exactly the dataset-point rows are flagged + match the held-out set.
     prev = client.get("/history?date=2026-06-05", headers=_H).json()["meals"]
-    assert len(prev) == resp["confirmations"]
-    assert all(m.get("dataset_point") is True for m in prev)
+    dataset_rows = [m for m in prev if m.get("dataset_point")]
+    assert len(prev) > resp["confirmations"], "prev day should be a fuller day"
+    assert len(dataset_rows) == resp["confirmations"]
+    # Dataset-point rows carry full per-item detail (not a bare badge).
+    assert all(m.get("per_item") for m in dataset_rows)
 
 
 def test_demo_seed_sets_goals(tmp_path) -> None:
