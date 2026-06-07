@@ -123,9 +123,11 @@ RUNNER = Persona(
         {"feedback_text": "my pre-run oats are way bigger than this — closer to 90 g of carbs",
          "meal_text": "oatmeal before my morning run",
          "weight": 2.0},
-        # Facet 2: post-run recovery protein runs high.
-        {"feedback_text": "after a long run I eat way more protein to recover — almost double",
-         "meal_text": "grilled chicken after my long run"},
+        # Facet 2: post-run recovery runs high on BOTH protein and fats.
+        {"feedback_text": "after a long run my recovery meals are way bigger — nearly "
+                          "double the protein, plus a lot more healthy fat like avocado "
+                          "and olive oil",
+         "meal_text": "a grilled chicken bowl with avocado after my long run"},
     ],
 )
 
