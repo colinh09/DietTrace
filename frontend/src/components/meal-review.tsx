@@ -36,7 +36,7 @@ export function MealReview({
     if (saving) return;
     setSaving(true);
     confirmMeal(mealText, perItem, totals)
-      .then(() => {
+      .then((res) => {
         setMode("confirmed");
         // Live: refresh the state counts AND drop an entry into the activity feed.
         onCorrected?.();
@@ -45,6 +45,10 @@ export function MealReview({
           reason: "you confirmed it — added to your held-out dataset",
           mealText,
         });
+        // Growing the held-out set can tip the supervisor into a retune.
+        if (res?.supervisor?.op === "retune") {
+          onAgentEvent?.({ op: "retune", reason: res.supervisor.reason, mealText });
+        }
       })
       .catch(() => {})
       .finally(() => setSaving(false));
@@ -125,6 +129,11 @@ export function MealReview({
                 : "banked your correction to learn from on the next re-tune",
               mealText,
             });
+            // Feedback is the primary retune trigger — if this correction tipped
+            // the supervisor over, run the gated eval now.
+            if (res.supervisor?.op === "retune") {
+              onAgentEvent?.({ op: "retune", reason: res.supervisor.reason, mealText });
+            }
           }}
         />
       )}

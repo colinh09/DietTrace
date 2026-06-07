@@ -156,6 +156,48 @@ def test_confirming_a_meal_removes_its_feedback(tmp_path) -> None:
     assert fblog.count("loop-user") == 0  # its feedback was dropped (XOR)
 
 
+def test_feedback_triggers_the_supervisor_decision(tmp_path) -> None:
+    """Feedback is the primary trigger: banking a correction consults the supervisor
+    in-place (not on the next incidental meal log), and once there's enough signal
+    plus a held-out set the returned decision is 'retune'."""
+    fc = Mock()
+    fc.models.generate_content.return_value = SimpleNamespace(
+        text=json.dumps({"kind": "portion_adjust", "target_food": "oats",
+                         "adjustment": 0.5, "scope": "this_food", "rationale": "less"})
+    )
+    client, confirms, fblog, _ = _make_app(tmp_path, freeform_client=fc)
+    for i in range(4):
+        confirms.add("loop-user", f"held {i}", [], _energy(200))  # held-out floor (4)
+    fblog.add("loop-user", "earlier note 1")
+    fblog.add("loop-user", "earlier note 2")  # 2 prior corrections
+
+    res = client.post(
+        "/feedback/freeform", headers=_H,
+        json={"meal_id": None, "meal_text": "a snack",
+              "feedback_text": "way more than that", "current_items": []},
+    ).json()
+    assert res["ok"] is True
+    # 2 prior + this one = 3 corrections, 4 held-out points → enough signal → retune.
+    assert res["supervisor"]["op"] == "retune"
+
+
+def test_confirm_returns_the_supervisor_decision(tmp_path) -> None:
+    """A confirm also consults the supervisor — growing the held-out set can be what
+    makes a retune validatable, so the loop reacts to a confirm too."""
+    client, confirms, fblog, _ = _make_app(tmp_path)
+    for i in range(3):
+        confirms.add("loop-user", f"held {i}", [], _energy(200))  # 3 held-out so far
+    for note in ("c1", "c2", "c3"):
+        fblog.add("loop-user", note)  # 3 corrections already banked
+
+    res = client.post(
+        "/confirm", headers=_H,
+        json={"meal_text": "a fresh meal", "items": [], "totals": _energy(200)},
+    ).json()
+    # The confirm makes it 4 held-out points; with 3 corrections, that's enough → retune.
+    assert res["supervisor"]["op"] == "retune"
+
+
 def test_edit_and_delete_feedback(tmp_path) -> None:
     client, _, fblog, _ = _make_app(tmp_path)
     fid = fblog.add("loop-user", "original", None, None)

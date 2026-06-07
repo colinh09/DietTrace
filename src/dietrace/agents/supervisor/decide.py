@@ -106,20 +106,68 @@ def _strip_fences(text: str) -> str:
 
 
 def _llm_prompt(signals: DecisionSignals, config: SupervisorConfig, trend: str) -> str:
+    """The supervisor's decision prompt.
+
+    Written at the "right altitude" (Anthropic, *Effective context engineering*):
+    strong heuristics + a few canonical examples rather than brittle if/else logic,
+    so the model reasons about borderline cases. The thresholds are *soft guides*
+    here (the prompt) and a *hard guard* in :func:`decide` (the fail-soft fallback);
+    the deterministic ship gate — not this decision — still decides whether a retune
+    is actually kept.
+    """
+    f, d, cap = (
+        config.min_new_feedback,
+        config.min_new_dataset_points,
+        config.max_runs_per_day,
+    )
     return (
-        "You are DietTrace's supervisor, deciding the single best action right "
-        "after a meal was logged. Choose exactly one op:\n"
-        "- bank_feedback: the meal was corrected; record the correction.\n"
-        "- add_dataset_point: a clean meal becomes held-out ground truth.\n"
-        "- retune: enough new signal to re-derive the preference block (only if "
-        "within the daily run budget).\n\n"
-        f"Signals: was_corrected={signals.was_corrected}, "
-        f"new_feedback={signals.new_feedback}, "
+        "You are DietTrace's supervisor. Right after a meal is logged or a piece of "
+        "feedback is banked, you choose the single best next action for the learning "
+        "loop. You only decide WHEN it's worth testing a retune — a deterministic gate "
+        "(not you) decides whether the retune is actually kept, so you can never ship a "
+        "regression.\n\n"
+        "<actions>\n"
+        "- bank_feedback: the user corrected THIS meal; record the correction as signal.\n"
+        "- add_dataset_point: a clean, uncorrected meal becomes held-out ground truth.\n"
+        "- retune: re-derive the preference block from the banked corrections now.\n"
+        "</actions>\n\n"
+        "<how_to_decide>\n"
+        "Corrections are the SIGNAL that something should change; held-out meals are "
+        "how a change gets VALIDATED. So:\n"
+        f"- New corrections are the main reason to retune — once roughly {f}+ have "
+        "accrued, a retune is worth considering. This is the primary trigger.\n"
+        f"- Only retune when there are enough held-out meals to prove it out (roughly "
+        f"{d}+) — without a test set a retune can't be trusted, so keep banking dataset "
+        "points instead.\n"
+        f"- Never retune over the daily budget ({cap} runs/day) — bank a point instead.\n"
+        "- If accuracy is already strong and flat, there's less to gain — lean to holding.\n"
+        "These are guides, not hard gates; weigh them together.\n"
+        "</how_to_decide>\n\n"
+        "<examples>\n"
+        '{"signals":"was_corrected=true, new_feedback=2, dataset_points=6, runs_today=0",'
+        ' "op":"bank_feedback", "rationale":"this meal was corrected — capture it first"}\n'
+        '{"signals":"was_corrected=false, new_feedback=0, dataset_points=3, runs_today=0",'
+        ' "op":"add_dataset_point", "rationale":"clean meal, no new corrections to act on — '
+        'grow the held-out set"}\n'
+        '{"signals":"was_corrected=false, new_feedback=4, dataset_points=6, runs_today=0",'
+        ' "op":"retune", "rationale":"enough fresh corrections and a held-out set to '
+        'validate against — worth testing a retune"}\n'
+        '{"signals":"was_corrected=false, new_feedback=5, dataset_points=2, runs_today=0",'
+        ' "op":"add_dataset_point", "rationale":"plenty of corrections but too few held-out '
+        'meals to trust a retune yet — keep building the test set"}\n'
+        '{"signals":"was_corrected=false, new_feedback=6, dataset_points=8, '
+        f'runs_today={cap}",'
+        ' "op":"add_dataset_point", "rationale":"signal is there but the daily retune '
+        'budget is spent — bank a point instead"}\n'
+        "</examples>\n\n"
+        "<current_signals>\n"
+        f"was_corrected={signals.was_corrected}, new_feedback={signals.new_feedback}, "
         f"dataset_points={signals.dataset_points}, "
-        f"runs_today={signals.runs_today}/{config.max_runs_per_day}, "
-        f"meal_confidence={signals.meal_confidence:.2f}.\n"
-        f"Accuracy trend: {trend or 'n/a'}.\n"
-        "Respond as JSON {op, rationale}."
+        f"runs_today={signals.runs_today}/{cap}, "
+        f"meal_confidence={signals.meal_confidence:.2f}, "
+        f"accuracy_trend={trend or 'n/a'}\n"
+        "</current_signals>\n\n"
+        'Respond with JSON {"op": ..., "rationale": ...}.'
     )
 
 

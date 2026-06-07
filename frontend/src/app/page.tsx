@@ -237,9 +237,15 @@ export default function Home() {
   }, [bumpLearning, loadHistory, loadAnalysis]);
 
   // Push a supervisor action into the activity feed live — every correction the
-  // user gives and every meal they confirm shows up the moment it happens.
+  // user gives and every meal they confirm shows up the moment it happens. A
+  // "retune" decision (feedback is the primary trigger) instead runs the gated
+  // eval, exactly like a /log decision — its outcome lands in the feed via the panel.
   const pushAgentEvent = useCallback(
     (e: { op: AgentEvent["op"]; reason: string; mealText?: string }) => {
+      if (e.op === "retune") {
+        setRetuneSignal((n) => n + 1);
+        return;
+      }
       setAgentEvents((cur) =>
         [{ ...e, id: `act-${Date.now()}-${cur.length}`, when: "now" }, ...cur].slice(
           0,

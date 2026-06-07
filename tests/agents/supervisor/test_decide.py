@@ -135,6 +135,28 @@ def test_powerful_mode_without_client_is_deterministic() -> None:
     assert out.op == OP_BANK_FEEDBACK
 
 
+def test_llm_prompt_guides_with_heuristics_and_canonical_examples() -> None:
+    """The decision prompt is written at the right altitude: soft heuristics + a few
+    canonical examples (not brittle if/else), with feedback as the primary trigger and
+    the live signals injected for the model to reason over."""
+    from dietrace.agents.supervisor.decide import _llm_prompt
+
+    cfg = SupervisorConfig(mode="powerful", min_new_feedback=3, min_new_dataset_points=4)
+    prompt = _llm_prompt(
+        DecisionSignals(new_feedback=3, dataset_points=4), cfg, trend="flat"
+    )
+    # Heuristics framed as guides, with feedback primary — not hard-coded conditions.
+    assert "primary trigger" in prompt.lower()
+    assert "guides, not hard gates" in prompt.lower()
+    # Thresholds appear as SOFT guidance ("roughly N+"), keyed off the config values.
+    assert "roughly 3+" in prompt and "roughly 4+" in prompt
+    # Canonical examples span the key cases (retune-ready, too-few-held-out, budget).
+    for op in ('"op":"bank_feedback"', '"op":"add_dataset_point"', '"op":"retune"'):
+        assert op in prompt
+    # The current signals are injected so the model reasons over the live state.
+    assert "new_feedback=3" in prompt and "dataset_points=4" in prompt
+
+
 def test_gather_signals_reads_store_counts() -> None:
     sig = gather_signals(
         _FakeFblog(4), _FakeConfirms(7), "alice", runs_today=2, meal_confidence=0.8

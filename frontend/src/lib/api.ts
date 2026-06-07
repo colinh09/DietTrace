@@ -391,6 +391,9 @@ export interface FreeformFeedbackResult {
   review_reason?: string | null;
   added_to_arize: boolean;
   corrections?: number;
+  // The supervisor's decision now that this correction is banked — feedback is the
+  // primary retune trigger, so op may be "retune".
+  supervisor?: SupervisorDecision;
   phoenix_url: string;
   error?: string;
 }
@@ -764,7 +767,12 @@ export async function confirmMeal(
   meal_text: string,
   items: LoggedItem[],
   totals: Nutrient[],
-): Promise<{ ok: boolean; id: number; confirmations: number }> {
+): Promise<{
+  ok: boolean;
+  id: number;
+  confirmations: number;
+  supervisor?: SupervisorDecision;
+}> {
   return request("/confirm", {
     method: "POST",
     body: JSON.stringify({ meal_text, items, totals }),

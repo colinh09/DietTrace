@@ -1050,6 +1050,17 @@ def create_app(
         if req.meal_text:
             confirms.delete_by_meal(user, req.meal_text)
 
+        # Feedback is the PRIMARY trigger for a retune (design §1): consult the
+        # supervisor now that this correction is banked, so the loop reacts to
+        # feedback itself rather than waiting for the next incidental meal log.
+        # was_corrected=False here — the bank already happened; we're deciding what
+        # the accrued signal warrants next.
+        feedback_decision = decide_op(
+            gather_signals(fblog, confirms, user, runs_today=_runs_today(user)),
+            supervisor_config,
+            client=corrector_client,
+        )
+
         applied = False
         stored_as_preference = False
         updated_items: list[dict[str, Any]] = list(req.current_items)
@@ -1157,6 +1168,7 @@ def create_app(
             "review_reason": eval_patch["review_reason"] if eval_patch else None,
             "added_to_arize": added_to_arize,
             "corrections": fblog.count(user),
+            "supervisor": feedback_decision.as_dict(),
             "phoenix_url": phoenix_dashboard_url(),
         }
 
@@ -1416,7 +1428,19 @@ def create_app(
             "metadata": {"source": "user_confirmed"},
         }
         background.add_task(dataset_writer, user, example)
-        return {"ok": True, "id": cid, "confirmations": confirms.count(user)}
+        # Growing the held-out set can be what tips a retune into being validatable —
+        # consult the supervisor so the loop reacts to a confirm too, not just logs.
+        confirm_decision = decide_op(
+            gather_signals(fblog, confirms, user, runs_today=_runs_today(user)),
+            supervisor_config,
+            client=corrector_client,
+        )
+        return {
+            "ok": True,
+            "id": cid,
+            "confirmations": confirms.count(user),
+            "supervisor": confirm_decision.as_dict(),
+        }
 
     @app.get("/learning/feedback")
     def list_feedback(user: str = Depends(current_user)) -> dict[str, Any]:
