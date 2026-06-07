@@ -509,6 +509,28 @@ def _build_trace(
     return trace
 
 
+def _maybe_decision_client() -> Any | None:
+    """A default Gemini client for the supervisor decision + corrector, or None in
+    tests / when no project is configured — so both fall back deterministically and
+    no test ever constructs a real client. Mirrors corrector._default_client."""
+    import sys
+
+    from dietrace.llm.config import GEMINI_PROJECT
+
+    if not GEMINI_PROJECT or "pytest" in sys.modules:
+        return None
+    try:
+        from google import genai
+
+        from dietrace.llm.config import GEMINI_LOCATION
+
+        return genai.Client(
+            vertexai=True, project=GEMINI_PROJECT, location=GEMINI_LOCATION
+        )
+    except Exception:
+        return None
+
+
 def create_app(
     *,
     meal_logger: MealLogger | None = None,
@@ -566,6 +588,12 @@ def create_app(
     profiles = profile_store or build_profile_store()
     # Supervisor settings (decision mode + retune thresholds), env-driven.
     supervisor_config = load_supervisor_config()
+    # In powerful mode the agent decides WHEN to retune via the LLM. Build a default
+    # Gemini client once (reused for the decision AND the corrector) when one wasn't
+    # injected — None in tests / when no project is set, so both fall back to the
+    # deterministic policy. Construction is lazy (no network until a call).
+    if corrector_client is None:
+        corrector_client = _maybe_decision_client()
     # In-memory experiment-run registry + per-user daily run counter. The supervisor
     # triggers experiments off the hot path; runs_today feeds the decision's budget
     # guard (design §4). Both reset on restart — fine for a single Cloud Run service.
