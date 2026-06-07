@@ -571,6 +571,18 @@ body {
 .phoenix-exp-link { display: block; margin-top: 10px; font-size: 12px; color: var(--accent); text-decoration: none; }
 .phoenix-exp-link:hover { text-decoration: underline; }
 
+/* The finished-experiment per-meal results table (pulled from Arize over MCP). */
+.exp-results { margin-top: 12px; }
+.exp-results-sub { font-size: 12px; color: var(--faint); margin: 0 0 10px; }
+.exp-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.exp-row { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.exp-row:last-child { border-bottom: none; padding-bottom: 0; }
+.exp-meal { font-size: 13px; color: var(--ink); }
+.exp-kcal { font-size: 11px; color: var(--faint); }
+.exp-truth { color: var(--faint); }
+.exp-acc { font-size: 12px; color: var(--faint); }
+.exp-acc.up { color: var(--accent); font-weight: 600; }
+
 /* Learning loop, inline in the Observability column (no modal). */
 .lo { display: flex; flex-direction: column; gap: 15px; }
 /* Re-tune action row: the primary button + the Quick/Full depth toggle, sitting

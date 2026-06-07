@@ -44,16 +44,21 @@ def mean_accuracy(results: list[dict[str, Any]]) -> float | None:
     return round(sum(accs) / len(accs), 3) if accs else None
 
 
-def row_accuracies(results: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
-    """Map each example's meal text → (calorie accuracy, expected kcal), for the
-    per-meal table the rail shows. Skips rows missing an estimate or a truth."""
-    out: dict[str, tuple[float, float]] = {}
+def row_data(results: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    """Map each example's meal text → ``{acc, expected, est}`` (accuracy, the truth
+    kcal, and this run's estimate kcal) for the per-meal table the rail shows. Skips
+    rows missing an estimate or a truth."""
+    out: dict[str, dict[str, float]] = {}
     for r in results or []:
         text = (r.get("input") or {}).get("text", "")
         est = (r.get("output") or {}).get("calories")
         ref = (r.get("reference_output") or {}).get("calories")
         if text and est is not None and ref is not None:
-            out[text] = (accuracy(float(est), float(ref)), float(ref))
+            out[text] = {
+                "acc": accuracy(float(est), float(ref)),
+                "expected": float(ref),
+                "est": float(est),
+            }
     return out
 
 
@@ -78,7 +83,9 @@ def _example_text(example: Any) -> str:  # pragma: no cover - live
 def _run_experiment(
     client: Any, dataset: Any, block: str, logger_fn: Callable[..., dict], name: str
 ) -> str | None:  # pragma: no cover - live
-    """Run one experiment (agent+block over *dataset*) → its experiment id via MCP."""
+    """Run one experiment (agent+block over *dataset*) → its experiment id, taken
+    straight off the RanExperiment return (so base/tuned can run in parallel without
+    racing on a 'most recent experiment' lookup)."""
     from dietrace.web.memory import calories_of
 
     ex_block = [{"preference_block": block}] if block else []
@@ -92,7 +99,7 @@ def _run_experiment(
             (output or {}).get("calories", 0.0), (expected or {}).get("calories", 0.0)
         )
 
-    client.experiments.run_experiment(
+    ran = client.experiments.run_experiment(
         dataset=dataset,
         task=task,
         evaluators=[calorie_accuracy],
@@ -100,14 +107,11 @@ def _run_experiment(
         print_summary=False,
         timeout=180,
     )
-    # The just-created experiment is the most recent for this dataset.
-    from dietrace.agents.supervisor.phoenix_mcp import PhoenixMCPClient
-
-    async def _latest() -> str | None:
-        exps = await PhoenixMCPClient().get_recent_experiments(dataset.id, limit=1)
-        return exps[0].get("id") if exps else None
-
-    return asyncio.run(_latest())
+    return (
+        ran.get("experiment_id")
+        if isinstance(ran, dict)
+        else getattr(ran, "experiment_id", None)
+    )
 
 
 def _results_via_mcp(experiment_id: str) -> list[dict[str, Any]]:  # pragma: no cover
@@ -147,47 +151,75 @@ def score_fit_via_phoenix(
         client = _phoenix_client()
         if client is None:
             return None
-        # Get-or-create the user's Phoenix dataset from the local confirmations, so
-        # the experiment has ground truth to score against (the /confirm MCP writes
-        # may not have landed yet, e.g. a freshly-seeded persona).
+        # Sync the user's Phoenix dataset to the local confirmations: create it if
+        # missing, add any confirmed meals not yet in it (the /confirm MCP writes may
+        # not have landed, and a seeded persona never writes them). So the experiment
+        # scores ALL the user's confirmed meals, not a stale subset.
         name = user_dataset_name(user)
+        fit_by_text = {c["text"]: c for c in (fit_cases or []) if c.get("text")}
         dataset = None
         try:
             dataset = client.datasets.get_dataset(dataset=name)
-            if not getattr(dataset, "example_count", 0):
-                dataset = None
         except Exception:
             dataset = None
+        existing: set[str] = set()
+        if dataset is not None:
+            for ex in getattr(dataset, "examples", None) or []:
+                inp = ex["input"] if isinstance(ex, dict) else getattr(ex, "input", {})
+                if (inp or {}).get("text"):
+                    existing.add(inp["text"])
+        missing = [c for t, c in fit_by_text.items() if t not in existing]
         if dataset is None:
-            if not fit_cases:
+            if not fit_by_text:
                 return None
             dataset = client.datasets.create_dataset(
                 name=name,
-                inputs=[{"text": c["text"]} for c in fit_cases],
-                outputs=[{"calories": c["calories"]} for c in fit_cases],
+                inputs=[{"text": c["text"]} for c in fit_by_text.values()],
+                outputs=[{"calories": c["calories"]} for c in fit_by_text.values()],
                 dataset_description="DietTrace user confirmed meals — the gate's fit set",
             )
+        elif missing:
+            client.datasets.add_examples_to_dataset(
+                dataset=name,
+                inputs=[{"text": c["text"]} for c in missing],
+                outputs=[{"calories": c["calories"]} for c in missing],
+            )
+            dataset = client.datasets.get_dataset(dataset=name)  # refresh w/ new examples
+        if not getattr(dataset, "example_count", 0):
+            return None
 
-        base_id = _run_experiment(
-            client, dataset, current_block, logger_fn, f"dietrace-{user}-fit-base"
-        )
-        tuned_id = _run_experiment(
-            client, dataset, proposed_block, logger_fn, f"dietrace-{user}-fit-tuned"
-        )
-        base = row_accuracies(_results_via_mcp(base_id)) if base_id else {}
-        tuned = row_accuracies(_results_via_mcp(tuned_id)) if tuned_id else {}
+        # Run base + tuned experiments IN PARALLEL — independent (same dataset, two
+        # prompts), and the food repo opens a SQLite connection per query so the agent
+        # is thread-safe. Halves the wall-clock vs running them back-to-back.
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            base_fut = pool.submit(
+                _run_experiment, client, dataset, current_block, logger_fn,
+                f"dietrace-{user}-fit-base",
+            )
+            tuned_fut = pool.submit(
+                _run_experiment, client, dataset, proposed_block, logger_fn,
+                f"dietrace-{user}-fit-tuned",
+            )
+            base_id, tuned_id = base_fut.result(), tuned_fut.result()
+
+        base = row_data(_results_via_mcp(base_id)) if base_id else {}
+        tuned = row_data(_results_via_mcp(tuned_id)) if tuned_id else {}
         if not base or not tuned:
             return None
-        current_fit = round(sum(a for a, _ in base.values()) / len(base), 3)
-        proposed_fit = round(sum(a for a, _ in tuned.values()) / len(tuned), 3)
+        current_fit = round(sum(d["acc"] for d in base.values()) / len(base), 3)
+        proposed_fit = round(sum(d["acc"] for d in tuned.values()) / len(tuned), 3)
         rows = [
             {
                 "text": text,
-                "expected": round(expected),
-                "before": acc,
-                "after": tuned.get(text, (None, None))[0],
+                "expected": round(d["expected"]),
+                "before": d["acc"],
+                "after": (tuned.get(text) or {}).get("acc"),
+                "base_kcal": round(d["est"]),
+                "tuned_kcal": round((tuned.get(text) or {}).get("est", 0)),
             }
-            for text, (acc, expected) in base.items()
+            for text, d in base.items()
         ]
 
         url = ""

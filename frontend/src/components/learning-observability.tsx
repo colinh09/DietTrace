@@ -43,6 +43,11 @@ interface LiveRow {
   text: string;
   before: number | null;
   after: number | null;
+  // For fit rows scored in Phoenix: the truth + the base/tuned kcal estimates, so the
+  // results table can show the full per-meal detail pulled from Arize over MCP.
+  expected?: number;
+  baseKcal?: number | null;
+  tunedKcal?: number | null;
 }
 
 // One metric's current → proposed as a labeled before/after bar.
@@ -243,6 +248,55 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
   );
 }
 
+// The finished experiment, pulled from Arize over MCP and shown per-meal: each
+// confirmed meal with its truth, the base→tuned kcal estimate, and the accuracy gain.
+function ExperimentResults({
+  rows,
+  result,
+}: {
+  rows: LiveRow[];
+  result: LearningRetuneResult;
+}) {
+  const fit = rows.filter((r) => r.set === "fit" && r.expected != null);
+  if (!fit.length) return null;
+  return (
+    <section className="dash-card exp-results">
+      <div className="dash-card-head mono">experiment results · arize via mcp</div>
+      <p className="exp-results-sub">
+        {fit.length} meal{fit.length === 1 ? "" : "s"} scored as a Phoenix experiment —
+        each row read back over MCP.
+      </p>
+      <ul className="exp-rows">
+        {fit.map((r, i) => {
+          const up = r.after != null && r.before != null && r.after > r.before;
+          return (
+            <li className="exp-row" key={i}>
+              <span className="exp-meal">{r.text}</span>
+              <span className="exp-kcal mono tnum">
+                {r.baseKcal ?? "–"} → {r.tunedKcal ?? "–"} kcal
+                <span className="exp-truth"> · truth {r.expected}</span>
+              </span>
+              <span className={"exp-acc mono tnum" + (up ? " up" : "")}>
+                {pct(r.before ?? 0)} → {pct(r.after ?? 0)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {result.experiment_url && (
+        <a
+          className="phoenix-exp-link"
+          href={result.experiment_url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          open the experiment in Arize ↗
+        </a>
+      )}
+    </section>
+  );
+}
+
 export function LearningObservability({
   reloadSignal = 0,
   autoRetune = 0,
@@ -334,7 +388,16 @@ export function LearningObservability({
           return rows.map((row) => {
             if (row.set !== e.set) return row;
             seen += 1;
-            return seen === e.i ? { ...row, before: e.before, after: e.after } : row;
+            return seen === e.i
+              ? {
+                  ...row,
+                  before: e.before,
+                  after: e.after,
+                  expected: e.expected,
+                  baseKcal: e.base_kcal ?? null,
+                  tunedKcal: e.tuned_kcal ?? null,
+                }
+              : row;
           });
         });
       } else if (e.type === "done") {
@@ -433,6 +496,11 @@ export function LearningObservability({
         <p className="agent-feed-empty">
           Log a meal and the supervisor&apos;s decisions show up here.
         </p>
+      )}
+      {/* After a Phoenix-scored re-tune: the finished experiment's per-meal results,
+          pulled back from Arize over MCP. */}
+      {result && !retuning && result.scored_via === "phoenix" && (
+        <ExperimentResults rows={liveRows} result={result} />
       )}
 
       {/* ── State modal: the deep dive behind the icon ────────────────────── */}

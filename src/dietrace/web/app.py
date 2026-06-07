@@ -16,6 +16,7 @@ import time
 import uuid
 from collections import defaultdict
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -1740,7 +1741,9 @@ def create_app(
                         fit_after.append(a)
                     yield sse({"type": "score", "set": "fit", "i": i + 1,
                                "n": len(rows), "text": r.get("text", ""),
-                               "expected": r.get("expected", 0), "before": b, "after": a})
+                               "expected": r.get("expected", 0), "before": b, "after": a,
+                               "base_kcal": r.get("base_kcal"),
+                               "tuned_kcal": r.get("tuned_kcal")})
                 yield sse({"type": "phoenix", "experiment_url": experiment_url})
             else:
                 yield sse({"type": "phase", "phase": "fit", "n": len(fit_cases),
@@ -1755,9 +1758,9 @@ def create_app(
                                "expected": round(c["calories"]),
                                "before": before, "after": after})
 
-            # USDA floor: always local + fast (a "can't regress" guardrail).
-            usda_before: list[float] = []
-            usda_after: list[float] = []
+            # USDA floor: always local, and scored in PARALLEL (the food repo opens a
+            # connection per query, so the agent is thread-safe). Rows fill in as each
+            # completes — out of order, by index — which is the bulk of the speed-up.
             usda_label = (
                 "Re-checking the full standard set — accuracy can't regress"
                 if full
@@ -1765,14 +1768,22 @@ def create_app(
             )
             yield sse({"type": "phase", "phase": "usda",
                        "n": len(usda_cases), "label": usda_label})
-            for i, c in enumerate(usda_cases):
-                before, after = score_case_traced(c, "usda")
-                usda_before.append(before)
-                usda_after.append(after)
-                yield sse({"type": "score", "set": "usda", "i": i + 1,
-                           "n": len(usda_cases), "text": c["text"],
-                           "expected": round(c["calories"]),
-                           "before": before, "after": after})
+            usda_before = [0.0] * len(usda_cases)
+            usda_after = [0.0] * len(usda_cases)
+            with ThreadPoolExecutor(max_workers=6) as pool:
+                futs = {
+                    pool.submit(score_case_traced, c, "usda"): i
+                    for i, c in enumerate(usda_cases)
+                }
+                for fut in as_completed(futs):
+                    i = futs[fut]
+                    before, after = fut.result()
+                    usda_before[i], usda_after[i] = before, after
+                    c = usda_cases[i]
+                    yield sse({"type": "score", "set": "usda", "i": i + 1,
+                               "n": len(usda_cases), "text": c["text"],
+                               "expected": round(c["calories"]),
+                               "before": before, "after": after})
 
             current_scores = {"fit": mean(fit_before), "usda": mean(usda_before)}
             proposed_scores = {"fit": mean(fit_after), "usda": mean(usda_after)}

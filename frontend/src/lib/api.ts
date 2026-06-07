@@ -836,6 +836,10 @@ export type LearningRetuneEvent =
       expected: number;
       before: number;
       after: number;
+      // Present on Phoenix-scored fit rows: the base/tuned kcal estimates (for the
+      // post-run results table pulled from Arize over MCP).
+      base_kcal?: number | null;
+      tuned_kcal?: number | null;
     }
   | ({ type: "done" } & LearningRetuneResult);
 
