@@ -260,27 +260,40 @@ describe("MealList", () => {
     expect(within(row).getByText(/Logged 1 item/)).toBeInTheDocument();
   });
 
-  it("renders a confirmed meal as a badged dataset point, not a confidence chip", () => {
+  it("renders a dataset point with full detail: badge, macros, and a breakdown", () => {
     const datasetMeal: Meal = {
       id: 9,
       created_at: new Date(2026, 4, 29, 9, 0).toISOString(),
       date: "2026-05-29",
-      text: "oatmeal with a banana before the gym",
-      totals: [{ code: "208", name: "Energy", amount: 450, unit: "kcal" }],
+      text: "a big bowl of white rice before my run",
+      totals: [
+        { code: "208", name: "Energy", amount: 418, unit: "kcal" },
+        { code: "203", name: "Protein", amount: 8, unit: "g" },
+        { code: "205", name: "Carbohydrate", amount: 90, unit: "g" },
+        { code: "204", name: "Total lipid (fat)", amount: 1, unit: "g" },
+      ],
+      per_item: [
+        {
+          fdc_id: 123,
+          description: "Rice, white, cooked",
+          grams: 370,
+          nutrients: [{ code: "208", name: "Energy", amount: 418, unit: "kcal" }],
+        },
+      ],
       dataset_point: true,
     };
     render(<MealList meals={[datasetMeal]} />);
-    const row = screen.getByText(/oatmeal with a banana/).closest("li") as HTMLElement;
+    const row = screen.getByText(/a big bowl of white rice/).closest("li") as HTMLElement;
 
-    // It's badged as a dataset point — no confidence chip.
+    // Badged as a dataset point (no confidence chip), but now showing real macros.
     expect(within(row).getByText(/dataset point/i)).toBeInTheDocument();
     expect(row.querySelector(".conf-chip")).toBeNull();
-    // kcal shows, but the empty P/C/F zeros are suppressed for a ground-truth row.
-    expect(within(row).getByText(/450/)).toBeInTheDocument();
-    expect(within(row).queryByText(/P 0/)).not.toBeInTheDocument();
+    expect(within(row).getByText(/418/)).toBeInTheDocument();
+    expect(within(row).getByText(/P 8/)).toBeInTheDocument();
 
-    // Expanding explains its held-out role rather than a per-item trace.
+    // Expanding shows its held-out role AND the full per-item breakdown.
     expandMeal(row);
     expect(within(row).getByText(/Held-out ground truth/i)).toBeInTheDocument();
+    expect(within(row).getByText(/Rice, white, cooked/)).toBeInTheDocument();
   });
 });

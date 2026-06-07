@@ -33,6 +33,22 @@ export interface MealDetail {
 
 const fmt = new Intl.NumberFormat("en-US");
 
+// Build the expandable breakdown from a meal read back from /history (which
+// carries its own per_item + trace), so meals not logged this session — seeded
+// dataset points and the simulated previous day — still expand to a full table.
+function detailFromMeal(meal: Meal): MealDetail | undefined {
+  if (!meal.per_item?.length && !meal.trace?.length) return undefined;
+  return {
+    trace: meal.trace ?? [],
+    perItem: meal.per_item ?? [],
+    confidence: meal.confidence,
+    reasons: meal.reasons,
+    axes: meal.axes,
+    needsReview: meal.needs_review,
+    reviewReason: meal.review_reason,
+  };
+}
+
 // One compact meal row. Owns only its open/closed state; the expanded trace is
 // filled in 9.7, so for now the chevron toggles an empty region.
 function MealRow({
@@ -122,16 +138,12 @@ function MealRow({
         <span className="meal-side">
           <span className="meal-macros mono tnum">
             <b>{fmt.format(Math.round(macros.kcal))}</b> kcal
-            {!isDataset && (
-              <>
-                <span className="mm-sep">·</span>
-                <span className="mm-part">P {Math.round(macros.protein)}</span>
-                <span className="mm-sep">·</span>
-                <span className="mm-part">C {Math.round(macros.carb)}</span>
-                <span className="mm-sep">·</span>
-                <span className="mm-part">F {Math.round(macros.fat)}</span>
-              </>
-            )}
+            <span className="mm-sep">·</span>
+            <span className="mm-part">P {Math.round(macros.protein)}</span>
+            <span className="mm-sep">·</span>
+            <span className="mm-part">C {Math.round(macros.carb)}</span>
+            <span className="mm-sep">·</span>
+            <span className="mm-part">F {Math.round(macros.fat)}</span>
           </span>
           {isDataset ? (
             <span
@@ -164,14 +176,15 @@ function MealRow({
       </div>
       {expanded && (
         <div className="meal-detail">
-          {isDataset ? (
+          {isDataset && (
             <div className="dataset-explain">
               <b>Held-out ground truth.</b> This is a meal you confirmed, at your
               true intake. Every re-tune re-scores the agent against it to prove a
               learned change actually fits you — but it’s never used to teach the
               agent, so the test stays honest.
             </div>
-          ) : detail ? (
+          )}
+          {detail ? (
             <MealTrace
               trace={detail.trace}
               perItem={detail.perItem}
@@ -182,11 +195,14 @@ function MealRow({
               mealId={meal.id}
               totals={meal.totals}
               onCorrected={onCorrected}
+              readOnly={isDataset}
             />
           ) : (
-            <div className="meal-detail-empty">
-              No breakdown for this meal — log it again to see the per-item table.
-            </div>
+            !isDataset && (
+              <div className="meal-detail-empty">
+                No breakdown for this meal — log it again to see the per-item table.
+              </div>
+            )
           )}
         </div>
       )}
@@ -225,7 +241,7 @@ export function MealList({
             <MealRow
               key={meal.id}
               meal={meal}
-              detail={detailsById?.[meal.id]}
+              detail={detailsById?.[meal.id] ?? detailFromMeal(meal)}
               onEdit={onEdit}
               onCorrected={onCorrected}
             />

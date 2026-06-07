@@ -139,6 +139,7 @@ export function MealTrace({
   mealId,
   totals,
   onCorrected,
+  readOnly = false,
 }: {
   trace: TraceStep[];
   perItem: LoggedItem[];
@@ -154,6 +155,9 @@ export function MealTrace({
   // stored totals are rewritten in-place and /history + /analysis reflect it.
   mealId?: number;
   onCorrected?: () => void;
+  // A held-out dataset point: show the breakdown, but not the confirm/correct
+  // review (it's already the user's confirmed ground truth).
+  readOnly?: boolean;
 }) {
   // The expanded meal is one bubble of sub-bubble cards — each part of the
   // agent's accountability in its own card, mirroring the Observability column.
@@ -176,7 +180,7 @@ export function MealTrace({
       </section>
 
       {/* Review: confirm it (grows the dataset) or correct it (teaches it, XOR). */}
-      {mealText && (
+      {mealText && !readOnly && (
         <section className="mt-card">
           <div className="mt-card-head mono">review</div>
           <MealReview
