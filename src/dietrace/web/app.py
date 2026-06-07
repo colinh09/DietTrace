@@ -12,12 +12,13 @@ import datetime
 import json
 import os
 import time
+import uuid
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from opentelemetry import trace as _otel_trace
@@ -28,6 +29,7 @@ from dietrace.agents.nutrition.interpret_feedback import apply_feedback, interpr
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.agents.supervisor.config import load_supervisor_config
 from dietrace.agents.supervisor.decide import decide, gather_signals
+from dietrace.agents.supervisor.run import default_experiment_runner
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
 from dietrace.macros.adherence import macro_adherence
 from dietrace.macros.compute import compute_targets
@@ -183,6 +185,13 @@ class ProfileRequest(BaseModel):
     """Body for POST /profile — the user's freeform "goals + eating style"."""
 
     profile_text: str = ""
+
+
+class ExperimentRunRequest(BaseModel):
+    """Body for POST /experiments/run — which dataset to run and a label for it."""
+
+    dataset: str = "dietrace-nutrition-v1"
+    name: str = "dietrace-supervisor"
 
 
 class DemoSeedRequest(BaseModel):
@@ -522,6 +531,7 @@ def create_app(
     preference_store: Any | None = None,
     profile_store: Any | None = None,
     corrector_client: Any | None = None,
+    experiment_runner: Callable[[dict[str, Any]], dict[str, Any]] = default_experiment_runner,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
@@ -554,6 +564,19 @@ def create_app(
     profiles = profile_store or build_profile_store()
     # Supervisor settings (decision mode + retune thresholds), env-driven.
     supervisor_config = load_supervisor_config()
+    # In-memory experiment-run registry + per-user daily run counter. The supervisor
+    # triggers experiments off the hot path; runs_today feeds the decision's budget
+    # guard (design §4). Both reset on restart — fine for a single Cloud Run service.
+    experiments: dict[str, dict[str, Any]] = {}
+    run_counts: dict[tuple[str, str], int] = {}
+
+    def _runs_today(user: str) -> int:
+        return run_counts.get((user, datetime.date.today().isoformat()), 0)
+
+    def _record_run(user: str) -> None:
+        key = (user, datetime.date.today().isoformat())
+        run_counts[key] = run_counts.get(key, 0) + 1
+
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
@@ -671,7 +694,11 @@ def create_app(
             # execution runs off the hot path (phase 4).
             decision = decide(
                 gather_signals(
-                    fblog, confirms, user, meal_confidence=quality["confidence"]
+                    fblog,
+                    confirms,
+                    user,
+                    runs_today=_runs_today(user),
+                    meal_confidence=quality["confidence"],
                 ),
                 supervisor_config,
             )
@@ -1423,6 +1450,16 @@ def create_app(
                 "have": fblog.count(user),
                 "need": _MIN_CORRECTIONS,
             }
+        # Budget guard (design §4): a retune runs live experiments, so cap how many
+        # fire per user per day; the decision layer already avoids over-recommending.
+        if _runs_today(user) >= supervisor_config.max_runs_per_day:
+            return {
+                "ok": False,
+                "reason": "rate_limited",
+                "runs_today": _runs_today(user),
+                "max_runs_per_day": supervisor_config.max_runs_per_day,
+            }
+        _record_run(user)
         current_block = prefs.block_text(user)
         proposed = propose_preference_block(
             new_corrections, current_block, client=corrector_client,
@@ -1573,6 +1610,40 @@ def create_app(
     @app.get("/reasoning/{trace_id}")
     def reasoning(trace_id: str) -> dict[str, Any]:
         return {"trace_id": trace_id, "spans": get_buffer().get_trace(trace_id)}
+
+    @app.post("/experiments/run")
+    def run_experiment(
+        req: ExperimentRunRequest, background: BackgroundTasks
+    ) -> dict[str, Any]:
+        """Kick an eval experiment off the hot path and return a run id immediately.
+
+        No ``run-experiment`` MCP tool exists, so the supervisor calls this endpoint
+        to execute a run (via the injected runner); the results are read back over
+        Phoenix MCP afterwards. The work runs in a background task — the response
+        returns ``running`` and ``GET /experiments/{id}`` reports completion.
+        """
+        run_id = uuid.uuid4().hex
+        experiments[run_id] = {"status": "running", "summary": None}
+
+        def _execute() -> None:
+            try:
+                summary = experiment_runner(
+                    {"dataset": req.dataset, "name": req.name}
+                )
+                experiments[run_id] = {"status": "done", "summary": summary}
+            except Exception as exc:  # fail-soft: record, never crash the worker
+                experiments[run_id] = {"status": "error", "summary": {"reason": str(exc)}}
+
+        background.add_task(_execute)
+        return {"run_id": run_id, "status": "running"}
+
+    @app.get("/experiments/{run_id}")
+    def experiment_status(run_id: str) -> dict[str, Any]:
+        """Poll an experiment run's status (running | done | error) + its summary."""
+        entry = experiments.get(run_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="unknown experiment run")
+        return {"run_id": run_id, **entry}
 
     return app
 

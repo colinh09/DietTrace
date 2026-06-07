@@ -22,11 +22,16 @@ def _stub_logger(text: str, examples=()) -> dict:
     return {"totals": _STUB_TOTALS, "per_item": [{"description": text, "grams": 118.0}]}
 
 
-def _client(tmp_path, logger=_stub_logger, pusher=lambda *a: False, usda_loader=None):
+def _client(
+    tmp_path, logger=_stub_logger, pusher=lambda *a: False, usda_loader=None,
+    experiment_runner=None,
+):
     store = MealLogStore(tmp_path / "log.sqlite")
     kwargs: dict = {}
     if usda_loader is not None:
         kwargs["usda_case_loader"] = usda_loader
+    if experiment_runner is not None:
+        kwargs["experiment_runner"] = experiment_runner
     app = create_app(
         meal_logger=logger,
         store=store,
@@ -615,6 +620,56 @@ def test_recall_is_scoped_to_the_correcting_user(tmp_path) -> None:
         "/log", json={"text": "chipotle bowl"}, headers={"X-DietTrace-User": "bob"}
     ).json()
     assert bob.get("recalled") is not True
+
+
+def test_experiment_run_returns_id_then_reports_done(tmp_path) -> None:
+    """POST /experiments/run kicks the injected runner off the hot path; the
+    background task completes before TestClient returns, so GET shows 'done'."""
+    runner_calls: list[dict] = []
+
+    def fake_runner(spec: dict) -> dict:
+        runner_calls.append(spec)
+        return {"status": "done", "experiment_id": "exp-1"}
+
+    client, _ = _client(tmp_path, experiment_runner=fake_runner)
+    started = client.post("/experiments/run", json={"dataset": "ds-x"}).json()
+    assert started["status"] == "running" and started["run_id"]
+
+    status = client.get(f"/experiments/{started['run_id']}").json()
+    assert status["status"] == "done"
+    assert status["summary"] == {"status": "done", "experiment_id": "exp-1"}
+    assert runner_calls[0]["dataset"] == "ds-x"
+
+
+def test_experiment_status_unknown_id_404(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    assert client.get("/experiments/nope").status_code == 404
+
+
+def test_experiment_runner_error_is_failsoft(tmp_path) -> None:
+    def boom(spec: dict) -> dict:
+        raise RuntimeError("phoenix down")
+
+    client, _ = _client(tmp_path, experiment_runner=boom)
+    run_id = client.post("/experiments/run", json={}).json()["run_id"]
+    status = client.get(f"/experiments/{run_id}").json()
+    assert status["status"] == "error"
+    assert "phoenix down" in status["summary"]["reason"]
+
+
+def test_retune_rate_limited_when_daily_cap_reached(tmp_path, monkeypatch) -> None:
+    """With the daily run cap at 0, a retune with fresh corrections is refused."""
+    monkeypatch.setenv("DIETRACE_MAX_RUNS_PER_DAY", "0")
+    client, _ = _client(tmp_path)
+    # Bank a free-form correction so there's an unprocessed correction to fold in.
+    client.post(
+        "/feedback/freeform",
+        json={"meal_text": "oats", "feedback_text": "way more than that"},
+        headers={"X-DietTrace-User": "alice"},
+    )
+    res = client.post("/learning/retune", headers={"X-DietTrace-User": "alice"}).json()
+    assert res["ok"] is False
+    assert res["reason"] == "rate_limited"
 
 
 def test_log_response_carries_supervisor_decision(tmp_path) -> None:
