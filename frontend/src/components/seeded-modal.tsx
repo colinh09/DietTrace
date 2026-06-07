@@ -117,13 +117,13 @@ export function SeededModal({
           <div className="sm-sub mono">Try it</div>
           <ol className="sm-steps">
             <li>
-              Correct the under-counted meal on today, or just open{" "}
-              <b>Your agent</b> → <b>Re-tune</b>. It should learn:{" "}
-              <i>{p.learns}</i>
+              Correct the under-counted meal on today (tell it in plain words),
+              then log a meal — the supervisor re-tunes on its own once there&apos;s
+              enough signal. It should learn: <i>{p.learns}</i>
             </li>
             <li>
-              Log a new meal of your own and watch it grade its own work — and
-              apply what it learned.
+              Watch the <b>agent activity</b> feed on the right, and open{" "}
+              <b>⚙ state</b> to see the dataset, the verdict, and what it learned.
             </li>
           </ol>
         </section>
