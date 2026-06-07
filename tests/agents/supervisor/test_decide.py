@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from dietrace.agents.supervisor.config import SupervisorConfig
 from dietrace.agents.supervisor.decide import (
     OP_ADD_DATASET_POINT,
@@ -66,6 +68,71 @@ class _FakeConfirms:
 
     def count(self, user: str) -> int:
         return self._n
+
+
+class _FakeLLM:
+    """A google-genai-shaped client whose generate_content returns canned JSON."""
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+        self.calls = 0
+
+        class _Models:
+            def generate_content(_self, **kwargs):  # noqa: N805
+                self.calls += 1
+                return SimpleNamespace(text=text)
+
+        self.models = _Models()
+
+
+def test_conservative_mode_never_calls_the_llm() -> None:
+    from dietrace.agents.supervisor.decide import decide_op
+
+    client = _FakeLLM('{"op": "retune", "rationale": "x"}')
+    cfg = SupervisorConfig(mode="conservative", min_new_feedback=2, min_new_dataset_points=3)
+    sig = DecisionSignals(new_feedback=1, dataset_points=1)
+    out = decide_op(sig, cfg, client=client)
+    assert out.op == OP_ADD_DATASET_POINT  # deterministic path
+    assert client.calls == 0
+
+
+def test_powerful_mode_uses_the_llm_choice() -> None:
+    from dietrace.agents.supervisor.decide import decide_op
+
+    client = _FakeLLM('{"op": "add_dataset_point", "rationale": "looks clean"}')
+    cfg = SupervisorConfig(mode="powerful", max_runs_per_day=5)
+    # Signals would deterministically bank (was_corrected), but the LLM overrides.
+    out = decide_op(DecisionSignals(was_corrected=True), cfg, client=client)
+    assert out.op == OP_ADD_DATASET_POINT
+    assert out.reason == "looks clean"
+    assert client.calls == 1
+
+
+def test_powerful_mode_enforces_budget_cap_over_llm() -> None:
+    from dietrace.agents.supervisor.decide import decide_op
+
+    client = _FakeLLM('{"op": "retune", "rationale": "let us retune"}')
+    cfg = SupervisorConfig(mode="powerful", max_runs_per_day=2)
+    sig = DecisionSignals(new_feedback=9, dataset_points=9, runs_today=2)  # at cap
+    out = decide_op(sig, cfg, client=client)
+    assert out.op == OP_ADD_DATASET_POINT  # cap is a hard deterministic guard
+
+
+def test_powerful_mode_failsoft_to_deterministic_on_bad_json() -> None:
+    from dietrace.agents.supervisor.decide import decide_op
+
+    client = _FakeLLM("not json at all")
+    cfg = SupervisorConfig(mode="powerful", min_new_feedback=2, min_new_dataset_points=3)
+    out = decide_op(DecisionSignals(was_corrected=True), cfg, client=client)
+    assert out.op == OP_BANK_FEEDBACK  # fell back to the deterministic policy
+
+
+def test_powerful_mode_without_client_is_deterministic() -> None:
+    from dietrace.agents.supervisor.decide import decide_op
+
+    cfg = SupervisorConfig(mode="powerful")
+    out = decide_op(DecisionSignals(was_corrected=True), cfg, client=None)
+    assert out.op == OP_BANK_FEEDBACK
 
 
 def test_gather_signals_reads_store_counts() -> None:

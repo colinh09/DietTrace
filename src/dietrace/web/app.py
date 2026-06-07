@@ -28,7 +28,7 @@ from dietrace.agents.nutrition.corrector import propose_preference_block
 from dietrace.agents.nutrition.interpret_feedback import apply_feedback, interpret_feedback
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.agents.supervisor.config import load_supervisor_config
-from dietrace.agents.supervisor.decide import decide, gather_signals
+from dietrace.agents.supervisor.decide import decide_op, gather_signals
 from dietrace.agents.supervisor.run import default_experiment_runner
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
 from dietrace.macros.adherence import macro_adherence
@@ -692,7 +692,7 @@ def create_app(
             # meal is a clean dataset-point candidate unless enough new signal has
             # accrued to retune. Cheap + deterministic here; the MCP write / retune
             # execution runs off the hot path (phase 4).
-            decision = decide(
+            decision = decide_op(
                 gather_signals(
                     fblog,
                     confirms,
@@ -701,6 +701,7 @@ def create_app(
                     meal_confidence=quality["confidence"],
                 ),
                 supervisor_config,
+                client=corrector_client,
             )
             return {
                 "id": entry_id,
@@ -776,13 +777,14 @@ def create_app(
                     event["safety"] = safety
                     event.update(review)
                     _record_trust(per_item, quality, review, user, req.text)
-                    event["supervisor"] = decide(
+                    event["supervisor"] = decide_op(
                         gather_signals(
                             fblog, confirms, user,
                             runs_today=_runs_today(user),
                             meal_confidence=quality["confidence"],
                         ),
                         supervisor_config,
+                        client=corrector_client,
                     ).as_dict()
                 elif pace:
                     time.sleep(pace)  # let fast steps arrive one at a time
