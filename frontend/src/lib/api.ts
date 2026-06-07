@@ -133,6 +133,9 @@ export interface Meal {
   // True for a held-out confirmed meal mirrored as a visible row (a "dataset
   // point") — ground truth the gate scores against, not an agent estimate.
   dataset_point?: boolean;
+  // True when the user has given feedback on this meal (badged in the log, mutually
+  // exclusive with dataset_point by the XOR rule).
+  has_feedback?: boolean;
 }
 
 // `GET /history?date=` — one calendar day's meals (default: today).

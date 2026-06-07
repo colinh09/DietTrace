@@ -316,6 +316,9 @@ body {
    square dot to signal "reference / held-out" rather than a live score. */
 .dataset-badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 9px; border-radius: 100px; white-space: nowrap; color: var(--accent-ink); background: var(--accent-soft); border: 1px dashed var(--accent); }
 .dataset-badge-dot { width: 6px; height: 6px; border-radius: 2px; background: var(--accent); }
+/* "feedback given" — a warm amber tag, distinct from the sage dataset-point badge. */
+.feedback-badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 9px; border-radius: 100px; white-space: nowrap; color: #8a6420; background: #f7efda; border: 1px dashed #c8a64a; }
+.feedback-badge-dot { width: 6px; height: 6px; border-radius: 2px; background: #c8a64a; }
 .dataset-explain { padding: 10px 14px; font-size: 13px; line-height: 1.55; color: var(--muted-ink); background: var(--accent-softer); border-radius: 10px; }
 .dataset-explain b { color: var(--accent-ink); font-weight: 600; }
 .meal-edit { display: inline-flex; align-items: center; justify-content: center; color: var(--faint); cursor: pointer; padding: 5px; border-radius: 7px; background: none; border: none; transition: background .14s, color .14s; }

@@ -846,9 +846,12 @@ def create_app(
     ) -> dict[str, Any]:
         day = date or datetime.datetime.now(tz=datetime.UTC).date().isoformat()
         meals = log_store.list(limit, date=day, user_id=user)
+        # Badge meals the user has given feedback on (mirrors the dataset-point badge).
+        feedback_meals = fblog.meal_texts_with_feedback(user)
         for meal in meals:
             if meal.get("per_item") and not meal.get("trace"):
                 meal["trace"] = _build_trace(meal["per_item"], meal["totals"])
+            meal["has_feedback"] = meal.get("text") in feedback_meals
         return {"date": day, "meals": meals}
 
     @app.get("/goals")

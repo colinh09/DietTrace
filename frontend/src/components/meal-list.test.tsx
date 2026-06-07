@@ -297,4 +297,19 @@ describe("MealList", () => {
     expect(within(row).getByText(/Held-out ground truth/i)).toBeInTheDocument();
     expect(within(row).getByText(/Rice, white, cooked/)).toBeInTheDocument();
   });
+
+  it("badges a meal the user gave feedback on, alongside its confidence chip", () => {
+    const meal: Meal = {
+      id: 11,
+      created_at: new Date(2026, 4, 29, 9, 0).toISOString(),
+      date: "2026-05-29",
+      text: "preworkout oats",
+      totals: [{ code: "208", name: "Energy", amount: 300, unit: "kcal" }],
+      has_feedback: true,
+    };
+    render(<MealList meals={[meal]} />);
+    const row = screen.getByText(/preworkout oats/).closest("li") as HTMLElement;
+    expect(within(row).getByText(/feedback/i)).toBeInTheDocument();
+    expect(row.querySelector(".conf-chip")).not.toBeNull(); // chip kept alongside
+  });
 });

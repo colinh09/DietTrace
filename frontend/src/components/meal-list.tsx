@@ -159,6 +159,16 @@ function MealRow({
               dataset point
             </span>
           )}
+          {/* A meal you've corrected — its feedback feeds the next re-tune. */}
+          {meal.has_feedback && (
+            <span
+              className="feedback-badge"
+              title="You gave feedback on this meal. The corrector folds it into the agent's rule on the next re-tune."
+            >
+              <span className="feedback-badge-dot" aria-hidden="true" />
+              feedback
+            </span>
+          )}
           <span className={"conf-chip " + chip} title={confTitle}>
             <span className="conf-dot" aria-hidden="true" />
             <span className="conf-label">{conf.level}</span>

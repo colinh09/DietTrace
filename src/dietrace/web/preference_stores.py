@@ -338,6 +338,17 @@ class FeedbackLog:
             ).fetchone()
         return int(row["n"]) if row else 0
 
+    def meal_texts_with_feedback(self, user_id: str = DEMO_USER) -> set[str]:
+        """The set of meal texts the user has given feedback on — so the log can
+        badge those rows with a "feedback" chip."""
+        with _connect(self._db_path) as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT meal_text FROM feedback_log "
+                "WHERE user_id = ? AND meal_text IS NOT NULL AND meal_text != ''",
+                (user_id,),
+            ).fetchall()
+        return {r["meal_text"] for r in rows}
+
     def clear_user(self, user_id: str = DEMO_USER) -> int:
         with _connect(self._db_path) as conn:
             cur = conn.execute(

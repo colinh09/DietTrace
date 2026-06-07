@@ -248,6 +248,20 @@ def test_retune_falls_back_to_local_when_phoenix_scorer_returns_none(tmp_path) -
     assert body["shipped"] is True  # local scoring still ships the real gain
 
 
+def test_history_badges_meals_with_feedback(tmp_path) -> None:
+    """A meal the user gave feedback on is flagged has_feedback in /history (the
+    'feedback' chip), so the log can badge it like a dataset point."""
+    client, _, fblog, _ = _make_app(tmp_path)
+    client.post("/log", json={"text": "preworkout oats"}, headers=_H)
+    client.post("/log", json={"text": "plain salad"}, headers=_H)
+    fblog.add("loop-user", "too small", None, "preworkout oats")  # feedback on the oats
+
+    meals = client.get("/history", headers=_H).json()["meals"]
+    by_text = {m["text"]: m for m in meals}
+    assert by_text["preworkout oats"]["has_feedback"] is True
+    assert by_text["plain salad"]["has_feedback"] is False
+
+
 def test_edit_and_delete_feedback(tmp_path) -> None:
     client, _, fblog, _ = _make_app(tmp_path)
     fid = fblog.add("loop-user", "original", None, None)
