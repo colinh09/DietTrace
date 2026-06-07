@@ -166,12 +166,12 @@ BODYBUILDER = Persona(
     # to learn), plus non-workout guards the learned rule must NOT change.
     confirmations=_load_confirmations("demo_seed_bodybuilder.json"),
     feedback=[
-        {"feedback_text": "I eat way bigger protein portions after lifting — my "
-                          "chicken is more like 10-12 oz, not a small fillet",
-         "meal_text": "a big serving of ground turkey with rice after lifting",
+        {"feedback_text": "I eat way bigger protein portions after lifting — my ground "
+                          "turkey serving is more like 12 oz, not a small portion",
+         "meal_text": "a big serving of ground turkey with rice and peppers after lifting",
          "weight": 2.0},
         {"feedback_text": "my post-workout protein servings are about double what you logged",
-         "meal_text": "a large sirloin steak with a baked sweet potato for dinner"},
+         "meal_text": "a sirloin steak with a baked potato after the evening gym session"},
     ],
 )
 
