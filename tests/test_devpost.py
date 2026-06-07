@@ -45,9 +45,14 @@ def test_built_with_stack_named():
 
 
 def test_self_supervision_loop_described():
-    """The supervisor's Phoenix→classify→diff→PR loop is spelled out."""
+    """The corrector→supervisor→gate loop is spelled out.
+
+    The supervisor decides per meal, the corrector generalizes, and a deterministic
+    gate ships a preference change only if it holds the USDA floor and improves the
+    user's held-out meals — over the Phoenix MCP server.
+    """
     text = _text().lower()
-    for term in ("regress", "classif", "pull request", "human"):
+    for term in ("corrector", "supervisor", "gate", "retune", "dataset", "held-out"):
         assert term in text, f"self-supervision loop missing {term!r}"
 
 

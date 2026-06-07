@@ -3,7 +3,7 @@
 Encodes the done-criterion: a ~3-minute demo walkthrough
 sectioned by beat with timings, tracing the project's headline narrative
 : log a meal → see the trace → show the Phoenix
-experiment → the supervisor opening a fix PR.
+experiment → the supervisor retunes and the gate ships a personalization.
 """
 
 import re
@@ -48,7 +48,9 @@ def test_narrative_beats_covered():
     assert "log" in text and "meal" in text, "missing the log-a-meal beat"
     assert "trace" in text, "missing the see-the-trace beat"
     assert "phoenix" in text and "experiment" in text, "missing the Phoenix experiment beat"
-    assert "supervisor" in text and "pull request" in text, "missing the fix-PR beat"
+    assert "supervisor" in text and ("retune" in text or "gate" in text), (
+        "missing the supervisor retune / gate beat"
+    )
 
 
 def test_runtime_about_three_minutes():

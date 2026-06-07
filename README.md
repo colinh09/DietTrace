@@ -23,30 +23,37 @@ Two agents that never talk to each other directly — Phoenix is the medium betw
 ```
 User (web) → Nutrition Agent (ADK + Gemini 3)
                  parse_meal → search_nutrition → estimate_portion → log_entry → check_against_goals
-             → OpenInference spans → Arize Phoenix (traces · datasets · experiments · MCP)
-                 ↑                                       ↓ (MCP read)
-             Eval suite (numeric evaluators)        Supervisor Agent
-                                                     reads experiments → classifies trend →
-                                                     proposes prompt diff → opens GitHub PR
+                 │                                            ▲ shipped preference block
+                 ▼ each logged meal + feedback               │
+             Supervisor Agent (autonomous, per meal)         │
+                 decides one of: bank feedback ·             │
+                 add a held-out dataset point ·          Corrector Agent
+                 retune  ──────────────────────────────▶ generalizes corrections
+                 │                                            into a preference block
+                 ▼ run experiment (SDK) ─ read back (Phoenix MCP) ─▶ deterministic Gate
+             Arize Phoenix (traces · datasets · experiments · MCP)   ships only if it holds
+                                                                     the USDA floor AND
+                                                                     improves your own data
 ```
 
 - **Nutrition agent** (`src/dietrace/agents/nutrition/`) — an ADK + Gemini 3 agent that orchestrates the five tools above. `parse_meal` is the only generative step; `search_nutrition`, `estimate_portion`, `log_entry`, and `check_against_goals` are deterministic, so numbers are looked up, not guessed. Output is structured JSON for clean scoring.
 - **Food DB read layer** (`src/dietrace/nutrition/`) — an alias-aware, ranked query layer over a local USDA-derived SQLite database. Reads nutrients by numeric code (208 kcal, 203 protein, …), not by name, and returns the matched `fdc_id` so every result is reproducible.
 - **Observability** (`src/dietrace/observability/`) — OpenInference instrumentation emits OTel spans to Phoenix and an in-memory buffer that powers the web "reasoning" trace. Fail-soft: a no-op without `PHOENIX_API_KEY`.
 - **Eval suite** (`src/dietrace/evals/`) — deterministic numeric evaluators run as Phoenix experiments over a USDA-grounded dataset.
-- **Supervisor agent** (`src/dietrace/agents/supervisor/`) — reads the experiments back over the Phoenix MCP server and, on a regression, opens a fix PR (below).
-- **Web surface** (`src/dietrace/web/` + `frontend/`) — a FastAPI backend and a Next.js UI.
+- **Corrector agent** (`src/dietrace/agents/nutrition/corrector.py`) — generalizes the corrections you give into one short **preference block** (not few-shot examples), so the agent adapts to how *you* eat.
+- **Supervisor agent** (`src/dietrace/agents/supervisor/`) — autonomous and per-meal: it watches each logged meal and decides one of *bank feedback · add a held-out dataset point · retune*, using the **Phoenix MCP server** to write dataset points and read experiment results back. A deterministic **gate** approves a preference change only if it holds the USDA floor and meaningfully improves on your own meals (below).
+- **Web surface** (`src/dietrace/web/` + `frontend/`) — a FastAPI backend and a Next.js UI whose right rail is the supervisor's live "agent observability" feed.
 
 ## Self-supervision via observability
 
-DietTrace ships a second agent — a **supervisor** — that closes the accuracy loop:
+DietTrace closes the accuracy loop with two more agents — a **corrector** and an autonomous **supervisor** — that learn how *you* eat without ever letting personalization quietly degrade general accuracy:
 
-1. Reads the latest evaluation experiments from Phoenix (via the Phoenix MCP server).
-2. Classifies each test case's trend: improving / stable / regressing.
-3. When a case regresses, proposes a focused prompt/tool fix as a unified diff.
-4. Opens a GitHub pull request for a human to review and merge.
+1. **Every logged meal**, the supervisor decides one action: bank your feedback, add the meal as a held-out **dataset point** (a real, user-confirmed ground truth, written to a per-user Phoenix dataset over the **MCP server**), or — once there's enough new signal — **retune**.
+2. On a retune, the **corrector** generalizes your banked corrections into a short preference block.
+3. The supervisor runs an eval experiment (read back over the Phoenix MCP server, since MCP has no run-experiment tool) and a deterministic **gate** scores the candidate block on two sets: the **USDA** base set and your **own confirmed meals**.
+4. The gate **ships** the change only if it stays within a small floor of USDA accuracy **and** meaningfully improves on your meals. Bad or contradictory feedback produces no held-out gain, so it never ships.
 
-The agent improves itself with a human in the loop — it never edits prompts silently.
+The decision of *what to do* is the agent's; the decision of *whether a change is good enough* stays deterministic numbers — proven on a held-out set, not vibes. A conservative/powerful mode toggle controls how much the supervisor reasons (and spends) per meal.
 
 ## Accuracy, measured
 

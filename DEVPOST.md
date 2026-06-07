@@ -68,21 +68,28 @@ magnitudes ride along in metadata so the supervisor can read true error.
 
 ## Self-supervision loop
 
-DietTrace ships a **second** agent — a supervisor — that closes the accuracy loop, ported in
-spirit from an earlier project of mine (axon). The two agents never talk directly; **Phoenix
-is the medium**:
+DietTrace ships **two more** agents — a **corrector** and an autonomous **supervisor** — that
+learn how *you* eat while a deterministic gate makes sure personalization never quietly
+degrades general accuracy. **Arize Phoenix is the medium**, used over its **MCP server**:
 
-1. The supervisor reads the latest eval experiments from Phoenix **over the Phoenix MCP
-   server** (`@arizeai/phoenix-mcp`).
-2. It **classifies** each test case's trend — improving / stable / regressing — using a
-   heuristic delta (e.g. MAPE worsening past a threshold) with an LLM tiebreak.
-3. When a case **regresses**, it proposes a focused fix as a unified diff against the
-   agent's `instruction.md`, validating the patch hunks before touching anything.
-4. It opens a GitHub **pull request** for a **human** to review and merge.
+1. **Every logged meal**, the supervisor observes the meal + your feedback and decides exactly
+   one action: **bank feedback**, **add a held-out dataset point** (a real, user-confirmed
+   meal written to a per-user Phoenix dataset via the MCP `add-dataset-examples` tool), or —
+   once there's enough fresh signal — **retune**.
+2. On a retune, the **corrector** generalizes your banked corrections into one short
+   **preference block** — generalized rules, not few-shot echoes of single meals.
+3. The supervisor runs an eval experiment (there is no run-experiment MCP tool, so it runs the
+   experiment and **reads the results back over the Phoenix MCP server**) and a deterministic
+   **gate** scores the candidate block on two sets: the **USDA** base set and your **own
+   confirmed meals**.
+4. The gate **ships** the change only if it stays within a small floor of USDA accuracy **and**
+   meaningfully improves on your meals. Bad or contradictory feedback yields no held-out
+   gain, so it never ships.
 
-It never edits prompts silently — the human stays in the loop. A `demo_regression` script
-reproduces the whole narrative end-to-end: commit a deliberate instruction regression → run
-evals → watch the supervisor detect it and open a PR → verify the diff → clean up.
+The split is the whole point: the agent decides *what to do*; the gate decides *whether a
+change is good enough* with real numbers on a held-out set — never an LLM vouching for itself.
+A conservative/powerful mode toggle controls how much the supervisor reasons (and spends) per
+meal, and the web UI's right rail is a live feed of every decision it makes.
 
 ## Accuracy, measured before/after
 
@@ -91,21 +98,20 @@ USDA — the accuracy battle is fought in parsing, food matching, and portion es
 that's exactly what the eval suite pins down. Each case is bound to a specific `fdc_id`, so a
 regression is unambiguous rather than a vibe.
 
-The self-supervision loop is demonstrated as a **before/after** on the eval set:
+Personalization is demonstrated as a **before/after** on a held-out set of *your own* meals:
 
-- **Before** — a deliberately regressed instruction (it lets the model guess portions
-  instead of calling `estimate_portion`) pushes several cases outside the ±15% tolerance
-  band; the `within_tolerance` pass rate drops and per-macro `macro_pct_error` climbs well
-  past the regression threshold on the affected cases.
-- **After** — the supervisor reads the regressed experiment from Phoenix, classifies the
-  failing cases, opens a PR restoring the "always call the tool" instruction, and re-running
-  the experiment returns the affected cases to **0% portion error** and back inside
-  tolerance.
+- **Before** — without a preference block, the agent estimates a logged meal from the generic
+  pipeline; for a user who consistently eats bigger preworkout portions, those meals land low.
+- **After** — you correct a couple of meals and confirm a few as ground truth; the supervisor
+  retunes, the corrector proposes a block, and the gate scores it on the **USDA** base set and
+  your **confirmed** meals. When the block improves your held-out fit (e.g. **79% → 100%**
+  calorie accuracy on the preworkout set) while USDA stays within its floor, it **ships** — and
+  the next identical meal is now estimated correctly.
 
-The point isn't a single leaderboard number — it's that accuracy is a **continuously
-measured quantity** with a named ground truth (USDA) and an agent watching the trend, so a
-prompt change that quietly costs you accuracy gets caught and proposed-against instead of
-shipping unnoticed.
+The point isn't a single leaderboard number — it's that every prompt change is **proven on a
+held-out set** against a named ground truth (USDA) *and* the user's own confirmed meals before
+it ever ships. A change that would help your meals but quietly cost general accuracy is
+rejected by the gate, automatically.
 
 ## Challenges
 
@@ -117,9 +123,11 @@ shipping unnoticed.
   cut, not a deli roll; "half an avocado" needs an edible serving, not a pit-in gram weight.
   Tuning the canonical ranking and portion fallback to prefer the obvious answer took real
   iteration — and is now locked down by fixture tests.
-- **Two agents that must not collude.** Keeping the supervisor decoupled from the nutrition
-  agent — communicating only through Phoenix experiments over MCP — kept the loop honest and
-  the diff proposals grounded in measured regressions rather than guesses.
+- **Letting the agent adapt without letting it cheat.** The risk of "accept any feedback" is an
+  agent that games its own grader. The fix is a generator/verifier split: the corrector
+  proposes, but a deterministic **gate** decides — scoring every candidate on a **held-out** set
+  of the user's confirmed meals it never trained on, plus a USDA floor. Bad feedback simply
+  produces no held-out gain, so it can't ship.
 - **Cost discipline.** GCP credits were scarce, so the entire test suite is offline: a
   no-network guard blocks real sockets and every external (Vertex, Phoenix, USDA, GitHub) is
   mocked. CI is $0; live calls are opt-in only.
@@ -129,8 +137,8 @@ shipping unnoticed.
 - Photo logging and restaurant / mixed-dish estimation (currently out of eval scope).
 - A micronutrient-forward UI surfacing the full panel the DB already carries.
 - Apple Health sync and a React Native client.
-- Letting the supervisor act on a wider regression surface (portion and search ranking, not
-  just instruction text) — still always behind a human-reviewed PR.
+- Letting the supervisor read recent **traces over MCP** to diagnose *why* a case regressed,
+  not just that it did — and widen what it can retune beyond the preference block.
 - A cloud/RDS port behind the thin adapters already in place.
 
 ---
