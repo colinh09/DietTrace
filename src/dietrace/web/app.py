@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import sys
 import time
 import uuid
 from collections import defaultdict
@@ -29,6 +30,7 @@ from dietrace.agents.nutrition.interpret_feedback import apply_feedback, interpr
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.agents.supervisor.config import load_supervisor_config
 from dietrace.agents.supervisor.decide import decide_op, gather_signals
+from dietrace.agents.supervisor.phoenix_eval import score_fit_via_phoenix
 from dietrace.agents.supervisor.phoenix_mcp import add_user_dataset_point
 from dietrace.agents.supervisor.run import default_experiment_runner
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
@@ -556,6 +558,7 @@ def create_app(
     corrector_client: Any | None = None,
     experiment_runner: Callable[[dict[str, Any]], dict[str, Any]] = default_experiment_runner,
     dataset_writer: Callable[[str, dict[str, Any]], None] = add_user_dataset_point,
+    phoenix_fit_scorer: Callable[..., dict[str, Any] | None] | None = None,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
@@ -594,6 +597,11 @@ def create_app(
     # deterministic policy. Construction is lazy (no network until a call).
     if corrector_client is None:
         corrector_client = _maybe_decision_client()
+    # The gate's fit score runs as Phoenix experiments read back over MCP; default it
+    # on for the live app, off in tests (which stay Phoenix-free and use local scoring
+    # unless a fake scorer is injected). Returns None on any failure → local fallback.
+    if phoenix_fit_scorer is None and "pytest" not in sys.modules:
+        phoenix_fit_scorer = score_fit_via_phoenix
     # In-memory experiment-run registry + per-user daily run counter. The supervisor
     # triggers experiments off the hot path; runs_today feeds the decision's budget
     # guard (design §4). Both reset on restart — fine for a single Cloud Run service.
@@ -1572,10 +1580,32 @@ def create_app(
         usda_cases = usda_case_loader()
         if _RETUNE_USDA_SAMPLE > 0:
             usda_cases = usda_cases[:_RETUNE_USDA_SAMPLE]
-        current_scores = score_block(current_block, fit_cases, usda_cases, logger_fn)
-        proposed_scores = score_block(
-            proposed.block_text, fit_cases, usda_cases, logger_fn
+        # Score the fit set (the user's confirmed meals) as Phoenix experiments read
+        # back over MCP; the USDA floor stays local for speed. Fail-soft: a None from
+        # the scorer falls back to fully-local scoring so the retune never hangs.
+        fit_phoenix = (
+            phoenix_fit_scorer(user, current_block, proposed.block_text, logger_fn)
+            if phoenix_fit_scorer is not None
+            else None
         )
+        if fit_phoenix is not None:
+            current_scores = {
+                "fit": fit_phoenix["current"],
+                "usda": score_block(current_block, [], usda_cases, logger_fn)["usda"],
+            }
+            proposed_scores = {
+                "fit": fit_phoenix["proposed"],
+                "usda": score_block(proposed.block_text, [], usda_cases, logger_fn)["usda"],
+            }
+            scored_via = "phoenix"
+            experiment_url = fit_phoenix.get("experiment_url", "")
+        else:
+            current_scores = score_block(current_block, fit_cases, usda_cases, logger_fn)
+            proposed_scores = score_block(
+                proposed.block_text, fit_cases, usda_cases, logger_fn
+            )
+            scored_via = "local"
+            experiment_url = ""
         decision = ship_decision(current_scores, proposed_scores)
 
         shipped = False
@@ -1597,6 +1627,8 @@ def create_app(
             "version": version,
             "fit_cases": len(fit_cases),
             "usda_cases": len(usda_cases),
+            "scored_via": scored_via,
+            "experiment_url": experiment_url,
             "phoenix_url": phoenix_dashboard_url(),
         }
 

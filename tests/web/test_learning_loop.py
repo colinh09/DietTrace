@@ -61,7 +61,8 @@ def _corrector_client(block: str = "Preworkout meals: carbs run high; scale up."
     return client
 
 
-def _make_app(tmp_path, *, corrector_client=None, freeform_client=None):
+def _make_app(tmp_path, *, corrector_client=None, freeform_client=None,
+              phoenix_fit_scorer=None):
     from dietrace.web.preference_stores import UserProfileStore
 
     confirms = ConfirmationStore(tmp_path / "confirm.sqlite")
@@ -82,6 +83,7 @@ def _make_app(tmp_path, *, corrector_client=None, freeform_client=None):
         profile_store=profiles,
         corrector_client=corrector_client,
         freeform_client=freeform_client,
+        phoenix_fit_scorer=phoenix_fit_scorer,
         usda_case_loader=lambda: [{"text": "usda meal", "calories": 100}],
         feedback_pusher=lambda *a: False,
         tracer_init=lambda name: None,
@@ -196,6 +198,48 @@ def test_confirm_returns_the_supervisor_decision(tmp_path) -> None:
     ).json()
     # The confirm makes it 4 held-out points; with 3 corrections, that's enough → retune.
     assert res["supervisor"]["op"] == "retune"
+
+
+def test_retune_scores_fit_via_phoenix_when_scorer_provided(tmp_path) -> None:
+    """When a Phoenix fit-scorer is injected, the gate's fit score comes from it
+    (run as experiments + read over MCP in production), the USDA floor stays local,
+    and the response marks scored_via=phoenix with the experiment link."""
+    captured: dict = {}
+
+    def fake_scorer(user, current_block, proposed_block, logger_fn):
+        captured["args"] = (user, proposed_block)
+        return {"current": 0.50, "proposed": 0.90, "experiment_url": "https://phoenix/exp/1"}
+
+    client, confirms, fblog, _ = _make_app(
+        tmp_path, corrector_client=_corrector_client(), phoenix_fit_scorer=fake_scorer
+    )
+    confirms.add("loop-user", "preworkout oats", [], _energy(600))  # held-out truth
+    fblog.add("loop-user", "I run more carbs preworkout")
+
+    body = client.post("/learning/retune", headers=_H).json()
+    assert captured.get("args")  # the scorer was consulted
+    assert body["scored_via"] == "phoenix"
+    assert body["experiment_url"] == "https://phoenix/exp/1"
+    assert body["current"]["fit"] == 0.50  # fit came from Phoenix/MCP, not local
+    assert body["proposed"]["fit"] == 0.90
+    assert body["current"]["usda"] == body["proposed"]["usda"]  # USDA still local, held
+    assert body["shipped"] is True  # 0.50 → 0.90 fit gain with USDA held → ships
+
+
+def test_retune_falls_back_to_local_when_phoenix_scorer_returns_none(tmp_path) -> None:
+    """A None from the scorer (Phoenix/MCP unavailable mid-demo) falls back to fully
+    local scoring so the retune never hangs."""
+    client, confirms, fblog, _ = _make_app(
+        tmp_path,
+        corrector_client=_corrector_client(),
+        phoenix_fit_scorer=lambda *a: None,
+    )
+    confirms.add("loop-user", "preworkout oats", [], _energy(600))
+    fblog.add("loop-user", "I run more carbs preworkout")
+
+    body = client.post("/learning/retune", headers=_H).json()
+    assert body["scored_via"] == "local"
+    assert body["shipped"] is True  # local scoring still ships the real gain
 
 
 def test_edit_and_delete_feedback(tmp_path) -> None:
