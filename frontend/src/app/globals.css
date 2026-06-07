@@ -1210,3 +1210,17 @@ body {
 .rc-link { background: none; border: none; color: var(--accent-ink); font-family: var(--ui-font); font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
 .rc-link:hover { text-decoration: underline; }
 @media (max-width: 460px) { .rc-macros { grid-template-columns: 1fr 1fr; } .rc-stats { grid-template-columns: 1fr; } }
+
+/* Agent-observability feed: the supervisor's per-meal decisions (newest first),
+   styled like the corrections list (.lo-corr) for consistency. */
+.agent-feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.agent-feed-row { display: flex; align-items: flex-start; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.agent-feed-row:last-child { border-bottom: none; }
+.agent-feed-row:first-child { padding-top: 2px; }
+.agent-feed-icon { flex: none; display: inline-flex; margin-top: 2px; color: var(--faint); }
+.agent-feed-row[data-op="retune"] .agent-feed-icon { color: var(--accent-ink); }
+.agent-feed-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.agent-feed-head { display: flex; align-items: baseline; gap: 8px; }
+.agent-feed-label { flex: none; font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+.agent-feed-meal { flex: 1; min-width: 0; font-size: 12px; color: var(--muted-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-feed-reason { font-size: 12px; color: var(--muted-ink); line-height: 1.45; }

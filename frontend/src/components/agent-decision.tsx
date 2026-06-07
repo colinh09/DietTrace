@@ -32,3 +32,36 @@ export function AgentDecision({ decision }: { decision?: SupervisorDecision }) {
     </div>
   );
 }
+
+// One decision the supervisor made, tied to the meal that prompted it.
+export interface AgentEvent extends SupervisorDecision {
+  id: number;
+  mealText: string;
+}
+
+// The agent-observability feed: the supervisor's per-meal decisions in order
+// (newest first), so the agent's autonomous choices are visible as they happen.
+export function AgentFeed({ events }: { events: AgentEvent[] }) {
+  if (events.length === 0) return null;
+  return (
+    <section className="dash-card" aria-label="Agent decisions">
+      <div className="dash-card-head mono">agent decisions</div>
+      <ul className="agent-feed">
+        {events.map((e) => (
+          <li key={e.id} className="agent-feed-row" data-op={e.op}>
+            <span className="agent-feed-icon" aria-hidden="true">
+              <OpIcon op={e.op} />
+            </span>
+            <span className="agent-feed-body">
+              <span className="agent-feed-head">
+                <span className="agent-feed-label">{LABELS[e.op]}</span>
+                <span className="agent-feed-meal">{e.mealText}</span>
+              </span>
+              <span className="agent-feed-reason">{e.reason}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

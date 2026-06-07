@@ -13,7 +13,7 @@ import { LogInput } from "@/components/log-input";
 import { LiveMeal, type LiveEntry } from "@/components/live-meal";
 import { MealList, type MealDetail } from "@/components/meal-list";
 import { SafetyNotice } from "@/components/safety-notice";
-import { AgentDecision } from "@/components/agent-decision";
+import type { AgentEvent } from "@/components/agent-decision";
 import { Dashboard, type LatestTrace } from "@/components/dashboard";
 import { OverviewModal } from "@/components/observability-modal";
 import { MacroModal } from "@/components/macro-modal";
@@ -28,7 +28,6 @@ import {
   type GoalProgress,
   type Meal,
   type Safety,
-  type SupervisorDecision,
 } from "@/lib/api";
 import { clearOnboarded, isOnboardedFlag, markOnboarded } from "@/lib/onboarding";
 import { clearSetup } from "@/lib/setup";
@@ -43,8 +42,8 @@ export default function Home() {
   const [details, setDetails] = useState<Record<number, MealDetail>>({});
   // The in-progress meal while its /log/stream is running, or null when idle.
   const [live, setLive] = useState<LiveEntry | null>(null);
-  // The supervisor's decision on the most recent log (agent-observability).
-  const [lastDecision, setLastDecision] = useState<SupervisorDecision | null>(null);
+  // The supervisor's per-meal decisions, newest first (the agent-observability feed).
+  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
   // Bumped whenever a correction/confirmation/seed happens, so the always-visible
   // learning panel in the Observability column refetches and stays in sync (the
   // corrections persist across day navigation instead of disappearing).
@@ -207,7 +206,12 @@ export default function Home() {
           },
         }));
         setSafety(event.safety ?? null);
-        setLastDecision(event.supervisor ?? null);
+        if (event.supervisor) {
+          const decided = event.supervisor;
+          setAgentEvents((cur) =>
+            [{ ...decided, id, mealText: text }, ...cur].slice(0, 30),
+          );
+        }
         setLive(null);
         loadHistory();
         loadAnalysis();
@@ -290,7 +294,6 @@ export default function Home() {
               <LogInput onSubmit={handleSubmit} busy={live !== null} />
               <SafetyNotice safety={safety ?? undefined} />
               {live && <LiveMeal entry={live} />}
-              {!live && <AgentDecision decision={lastDecision ?? undefined} />}
               <MealList
                 meals={meals}
                 heading={heading}
@@ -300,7 +303,11 @@ export default function Home() {
               />
             </section>
           </div>
-          <Dashboard reloadSignal={reloadSignal} latestTrace={latestTrace} />
+          <Dashboard
+            reloadSignal={reloadSignal}
+            latestTrace={latestTrace}
+            agentEvents={agentEvents}
+          />
         </div>
       </main>
       {overviewOpen && <OverviewModal onClose={() => setOverviewOpen(false)} />}

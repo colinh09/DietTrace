@@ -4,6 +4,7 @@
 // DietTrace's self-supervision loop visible AT ALL TIMES (not behind a modal): the
 // gated re-tune streaming live, the corrections you've taught, the held-out
 // dataset it's scored against, and the latest meal's agent trace.
+import { AgentFeed, type AgentEvent } from "@/components/agent-decision";
 import { LearningObservability } from "@/components/learning-observability";
 import { StepGlyph } from "@/components/meal-trace";
 import type { TraceStep } from "@/lib/api";
@@ -35,17 +36,22 @@ function LatestTraceCard({ trace }: { trace: LatestTrace }) {
 export function Dashboard({
   reloadSignal,
   latestTrace,
+  agentEvents = [],
 }: {
   // Bumped by the page whenever a correction/confirmation happens, so the
   // learning panel refetches and stays in sync (persisting across navigation).
   reloadSignal: number;
   latestTrace: LatestTrace | null;
+  // The supervisor's per-meal decisions, newest first (the agent feed).
+  agentEvents?: AgentEvent[];
 }) {
   return (
     <aside className="dash" aria-label="Observability dashboard">
       <div className="dash-head">
-        <span className="dash-title mono">observability</span>
+        <span className="dash-title mono">agent observability</span>
       </div>
+
+      <AgentFeed events={agentEvents} />
 
       <LearningObservability reloadSignal={reloadSignal} />
 

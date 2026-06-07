@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { AgentDecision } from "@/components/agent-decision";
+import { AgentDecision, AgentFeed } from "@/components/agent-decision";
 
 // The agent-observability line surfacing the supervisor's per-meal decision.
 describe("AgentDecision", () => {
@@ -28,6 +28,29 @@ describe("AgentDecision", () => {
 
   it("renders nothing when no decision is present", () => {
     const { container } = render(<AgentDecision />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("AgentFeed", () => {
+  it("lists each decision with its meal and reason", () => {
+    render(
+      <AgentFeed
+        events={[
+          { id: 2, op: "retune", reason: "enough new signal", mealText: "an apple" },
+          { id: 1, op: "add_dataset_point", reason: "clean meal", mealText: "two eggs" },
+        ]}
+      />,
+    );
+    const feed = screen.getByRole("list");
+    expect(feed.querySelectorAll("li")).toHaveLength(2);
+    expect(screen.getByText("an apple")).toBeInTheDocument();
+    expect(screen.getByText(/retuning/i)).toBeInTheDocument();
+    expect(screen.getByText("two eggs")).toBeInTheDocument();
+  });
+
+  it("renders nothing when there are no events", () => {
+    const { container } = render(<AgentFeed events={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
 });
