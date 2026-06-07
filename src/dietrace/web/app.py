@@ -1297,8 +1297,11 @@ def create_app(
         fblog.clear_user(user)
         prefs.clear_user(user)
         profiles.set(user, persona.profile)
+        # The seeded agent-activity feed (dated to the previous day): the persona's
+        # prior decisions — meals added to the held-out dataset + corrections banked.
+        seeded_decisions: list[dict[str, Any]] = []
         for c in persona.confirmations:
-            confirms.add(user, c["meal_text"], c.get("items", []), c["totals"])
+            confirms.add(user, c["meal_text"], c.get("items", []), c["totals"], source="seed")
             # Mirror each confirmed meal as a visible, badged row on the previous
             # day so the held-out dataset is something a judge can actually see.
             log_store.add(
@@ -1308,10 +1311,20 @@ def create_app(
                 user_id=user,
                 detail={"dataset_point": True},
             )
+            seeded_decisions.append({
+                "op": "add_dataset_point",
+                "reason": "confirmed as ground truth — added to the held-out dataset",
+                "meal_text": c["meal_text"],
+            })
         for f in persona.feedback:
             fblog.add(
                 user, f["feedback_text"], None, f.get("meal_text"), f.get("weight", 1.0)
             )
+            seeded_decisions.append({
+                "op": "bank_feedback",
+                "reason": "banked your correction to learn from on the next re-tune",
+                "meal_text": f.get("meal_text") or f["feedback_text"],
+            })
 
         return {
             "seeded": True,
@@ -1322,6 +1335,8 @@ def create_app(
             "goals_set": goals_set,
             "confirmations": confirms.count(user),
             "corrections": fblog.count(user),
+            # The agent's prior decisions, to backfill the activity feed (prev day).
+            "decisions": seeded_decisions,
             "user": user,
             "persona": {
                 "key": persona.key,
@@ -1445,12 +1460,16 @@ def create_app(
             {"id": c["id"], "meal_text": c["meal_text"], "calories": calories_of(c["totals"])}
             for c in confirms.list(user)
         ]
+        by_source = confirms.count_by_source(user)
         return {
             "block": prefs.get(user),
             "corrections": fblog.count(user),
             # New (unprocessed) corrections — the only ones the next retune folds in.
             "new_corrections": fblog.count_unprocessed(user),
             "confirmations": confirms.count(user),
+            # Split so the UI can say "N from you · M seeded".
+            "confirmations_custom": by_source.get("user", 0),
+            "confirmations_seeded": by_source.get("seed", 0),
             "confirmed": confirmed,
             "min_corrections": _MIN_CORRECTIONS,
         }

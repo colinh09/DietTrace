@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS confirmations (
     created_at  TEXT NOT NULL,
     meal_text   TEXT NOT NULL,
     items_json  TEXT NOT NULL,
-    totals_json TEXT NOT NULL
+    totals_json TEXT NOT NULL,
+    source      TEXT NOT NULL DEFAULT 'user'
 )
 """
 
@@ -69,6 +70,15 @@ class ConfirmationStore:
 
     def __init__(self, db_path: str | Path) -> None:
         self._db_path = _prepare(db_path, _CONFIRMATION_SCHEMA)
+        # Migration: tag confirmations with their source (user-confirmed vs seeded
+        # demo data) so the UI can say "N from you · M seeded".
+        with _connect(self._db_path) as conn:
+            cols = {r["name"] for r in conn.execute("PRAGMA table_info(confirmations)")}
+            if "source" not in cols:
+                conn.execute(
+                    "ALTER TABLE confirmations ADD COLUMN source TEXT NOT NULL "
+                    "DEFAULT 'user'"
+                )
 
     def add(
         self,
@@ -76,21 +86,35 @@ class ConfirmationStore:
         meal_text: str,
         items: list[dict[str, Any]],
         totals: list[dict[str, Any]],
+        source: str = "user",
     ) -> int:
-        """Record a confirmed meal as a held-out datapoint; return its row id."""
+        """Record a confirmed meal as a held-out datapoint; return its row id.
+
+        ``source`` is ``"user"`` for a real confirmation or ``"seed"`` for seeded
+        demo data, so the UI can distinguish the user's own points."""
         with _connect(self._db_path) as conn:
             cur = conn.execute(
                 "INSERT INTO confirmations (user_id, created_at, meal_text, items_json, "
-                "totals_json) VALUES (?, ?, ?, ?, ?)",
-                (user_id, _now(), meal_text, json.dumps(items), json.dumps(totals)),
+                "totals_json, source) VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, _now(), meal_text, json.dumps(items), json.dumps(totals), source),
             )
             return int(cur.lastrowid)
+
+    def count_by_source(self, user_id: str = DEMO_USER) -> dict[str, int]:
+        """Confirmed-meal counts split by source: ``{"user": n, "seed": m}``."""
+        with _connect(self._db_path) as conn:
+            rows = conn.execute(
+                "SELECT source, COUNT(*) AS n FROM confirmations WHERE user_id = ? "
+                "GROUP BY source",
+                (user_id,),
+            ).fetchall()
+        return {r["source"]: int(r["n"]) for r in rows}
 
     def list(self, user_id: str = DEMO_USER, limit: int = 200) -> list[dict[str, Any]]:
         """The user's confirmed meals, newest first."""
         with _connect(self._db_path) as conn:
             rows = conn.execute(
-                "SELECT id, created_at, meal_text, items_json, totals_json "
+                "SELECT id, created_at, meal_text, items_json, totals_json, source "
                 "FROM confirmations WHERE user_id = ? ORDER BY id DESC LIMIT ?",
                 (user_id, limit),
             ).fetchall()
@@ -101,6 +125,7 @@ class ConfirmationStore:
                 "meal_text": r["meal_text"],
                 "items": json.loads(r["items_json"]),
                 "totals": json.loads(r["totals_json"]),
+                "source": r["source"],
             }
             for r in rows
         ]

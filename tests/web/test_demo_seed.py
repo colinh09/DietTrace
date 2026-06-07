@@ -65,6 +65,35 @@ _USER = "test-demo-user"
 _H = {"X-DietTrace-User": _USER}
 
 
+def test_demo_seed_returns_decisions_and_tags_seeded_source(tmp_path) -> None:
+    """The seed returns the agent's prior decisions (to backfill the feed) and its
+    confirmations are tagged source=seed, so /preferences reports them as seeded."""
+    client, _, _ = _client(tmp_path)
+    resp = client.post("/demo/seed", headers=_H).json()
+    decisions = resp["decisions"]
+    assert decisions, "seed should return prior agent decisions for the feed"
+    ops = {d["op"] for d in decisions}
+    assert ops == {"add_dataset_point", "bank_feedback"}
+    assert all(d["meal_text"] and d["reason"] for d in decisions)
+
+    prefs = client.get("/preferences", headers=_H).json()
+    assert prefs["confirmations_seeded"] == prefs["confirmations"] > 0
+    assert prefs["confirmations_custom"] == 0
+
+
+def test_user_confirm_counts_as_custom_not_seeded(tmp_path) -> None:
+    client, _, _ = _client(tmp_path)
+    client.post(
+        "/confirm",
+        json={"meal_text": "my own meal", "items": [],
+              "totals": [{"code": "208", "name": "Energy", "amount": 400.0, "unit": "kcal"}]},
+        headers=_H,
+    )
+    prefs = client.get("/preferences", headers=_H).json()
+    assert prefs["confirmations_custom"] == 1
+    assert prefs["confirmations_seeded"] == 0
+
+
 def test_demo_seed_returns_ok(tmp_path) -> None:
     client, _, _ = _client(tmp_path)
     resp = client.post("/demo/seed", headers=_H)
