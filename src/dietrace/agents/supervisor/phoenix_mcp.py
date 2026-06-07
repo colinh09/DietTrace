@@ -6,11 +6,10 @@ its decisions (experiments, spans) plus the ``add-dataset-examples`` write used 
 grow a user's held-out dataset. A pre-built session can be injected for offline
 tests; live calls are fail-soft — callers gate on :func:`mcp_available`.
 
-NOTE: the live server mixes arg casing across tools (snake_case for
-``list-experiments-for-dataset``/``get-experiment-by-id``, camelCase ``traceId`` for
-``get-spans``). The ``add-dataset-examples`` payload here is a best-effort shape;
-confirm it against the live tool schema (exposed via MCP ``list_tools``) before the
-demo. The mocked tests assert the tool *name* and that examples are forwarded.
+Arg schemas verified live (2026-06-07) against ``@arizeai/phoenix-mcp``:
+``list-experiments-for-dataset`` (dataset_id/dataset_name/limit),
+``get-experiment-by-id`` (experiment_id), ``add-dataset-examples``
+(dataset_name + examples, both required), ``get-spans`` (camelCase ``traceId``).
 """
 
 from __future__ import annotations
@@ -172,7 +171,7 @@ class PhoenixMCPClient:
         async with self._session() as session:
             result = await session.call_tool(
                 "add-dataset-examples",
-                arguments={"datasetName": dataset_name, "examples": examples},
+                arguments={"dataset_name": dataset_name, "examples": examples},
             )
         parsed = _parse_tool_result(result)
         return parsed if isinstance(parsed, dict) else {"added": len(examples)}

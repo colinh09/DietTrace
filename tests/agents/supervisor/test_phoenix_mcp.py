@@ -105,7 +105,7 @@ async def test_add_dataset_examples_calls_write_tool() -> None:
     assert out == {"added": 1}
     name, args = session.calls[0]
     assert name == "add-dataset-examples"
-    assert args["datasetName"] == "dietrace-user-alice"
+    assert args["dataset_name"] == "dietrace-user-alice"
     assert args["examples"] == examples
 
 
