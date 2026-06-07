@@ -22,6 +22,10 @@ from dietrace.web.memory import calories_of
 # objective accuracy if it improves personal fit.
 DEFAULT_EPS = 0.05
 
+# Minimum personal-fit gain to count as a *meaningful* improvement worth shipping;
+# a smaller bump is treated as noise so trivial/contradictory feedback can't ship.
+DEFAULT_FIT_DELTA = 0.02
+
 
 def _case_score(case: dict[str, Any], estimate: Callable[[str], dict]) -> float:
     """Calorie accuracy of one *estimate* against a case (1.0 exact, 0.0 far off)."""
@@ -78,19 +82,22 @@ def ship_decision(
     current: dict[str, float],
     proposed: dict[str, float],
     eps: float = DEFAULT_EPS,
+    fit_delta: float = DEFAULT_FIT_DELTA,
 ) -> dict[str, Any]:
-    """Apply the ship rule: USDA floor (ε) AND a held-out fit improvement.
+    """Apply the ship rule: USDA floor (ε) AND a *meaningful* held-out fit gain.
 
     Ships only when the proposed block keeps objective accuracy within ε of the
-    current block AND measurably improves personal fit. Returns the verdict plus
-    a plain reason for observability.
+    current block AND improves personal fit by at least ``fit_delta`` (a smaller
+    bump is treated as noise). Returns the verdict plus a plain reason for
+    observability.
     """
     usda_ok = proposed["usda"] >= current["usda"] - eps
-    fit_gain = proposed["fit"] > current["fit"]
+    fit_gain = proposed["fit"] >= current["fit"] + fit_delta
     ship = usda_ok and fit_gain
     if ship:
         reason = (
-            f"fit {current['fit']:.0%} → {proposed['fit']:.0%} with USDA held "
+            f"fit {current['fit']:.0%} → {proposed['fit']:.0%} "
+            f"(≥ +{fit_delta:.0%}) with USDA held "
             f"({proposed['usda']:.0%}, within {eps:.0%})"
         )
     elif not usda_ok:
@@ -99,11 +106,16 @@ def ship_decision(
             f"{current['usda']:.0%} − {eps:.0%}"
         )
     else:
-        reason = f"no fit improvement ({proposed['fit']:.0%} ≤ {current['fit']:.0%})"
+        reason = (
+            f"no meaningful fit improvement "
+            f"({proposed['fit']:.0%} vs {current['fit']:.0%}, "
+            f"needs ≥ +{fit_delta:.0%})"
+        )
     return {
         "ship": ship,
         "usda_ok": usda_ok,
         "fit_gain": fit_gain,
         "reason": reason,
         "eps": eps,
+        "fit_delta": fit_delta,
     }

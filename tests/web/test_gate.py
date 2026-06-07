@@ -68,13 +68,39 @@ def test_reject_when_no_fit_gain() -> None:
     decision = ship_decision(current, proposed)
     assert decision["ship"] is False
     assert decision["fit_gain"] is False
-    assert "no fit improvement" in decision["reason"]
+    assert "fit improvement" in decision["reason"]
 
 
 def test_small_usda_dip_is_allowed_within_eps() -> None:
     current = {"usda": 0.90, "fit": 0.50}
     proposed = {"usda": 0.87, "fit": 0.80}  # −0.03 USDA, big fit win
     assert ship_decision(proposed=proposed, current=current, eps=0.05)["ship"] is True
+
+
+def test_reject_when_fit_gain_below_margin() -> None:
+    # A trivial fit bump (under FIT_DELTA) is noise, not a meaningful improvement.
+    current = {"usda": 1.0, "fit": 0.70}
+    proposed = {"usda": 1.0, "fit": 0.71}  # +0.01 < default 0.02 margin
+    decision = ship_decision(current, proposed)
+    assert decision["ship"] is False
+    assert decision["fit_gain"] is False
+    assert "fit improvement" in decision["reason"]
+
+
+def test_ship_when_fit_gain_meets_margin() -> None:
+    current = {"usda": 1.0, "fit": 0.70}
+    proposed = {"usda": 1.0, "fit": 0.73}  # +0.03 ≥ 0.02 margin
+    decision = ship_decision(current, proposed)
+    assert decision["ship"] is True
+    assert decision["fit_gain"] is True
+
+
+def test_fit_margin_is_configurable() -> None:
+    current = {"usda": 1.0, "fit": 0.70}
+    proposed = {"usda": 1.0, "fit": 0.74}  # +0.04
+    # A stricter margin than the gain rejects it.
+    assert ship_decision(current, proposed, fit_delta=0.05)["ship"] is False
+    assert ship_decision(current, proposed, fit_delta=0.03)["ship"] is True
 
 
 def test_confirmations_to_cases_uses_confirmed_calories_as_truth() -> None:
