@@ -44,6 +44,9 @@ export default function Home() {
   const [live, setLive] = useState<LiveEntry | null>(null);
   // The supervisor's per-meal decisions, newest first (the agent-observability feed).
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
+  // Bumped when a decision is "retune", so the observability panel runs the gated
+  // eval on its own — the agent drives the re-tune, not a button click.
+  const [retuneSignal, setRetuneSignal] = useState(0);
   // Bumped whenever a correction/confirmation/seed happens, so the always-visible
   // learning panel in the Observability column refetches and stays in sync (the
   // corrections persist across day navigation instead of disappearing).
@@ -211,6 +214,7 @@ export default function Home() {
           setAgentEvents((cur) =>
             [{ ...decided, id, mealText: text }, ...cur].slice(0, 30),
           );
+          if (decided.op === "retune") setRetuneSignal((n) => n + 1);
         }
         setLive(null);
         loadHistory();
@@ -307,6 +311,7 @@ export default function Home() {
             reloadSignal={reloadSignal}
             latestTrace={latestTrace}
             agentEvents={agentEvents}
+            autoRetune={retuneSignal}
           />
         </div>
       </main>

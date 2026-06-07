@@ -234,7 +234,15 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
   );
 }
 
-export function LearningObservability({ reloadSignal = 0 }: { reloadSignal?: number }) {
+export function LearningObservability({
+  reloadSignal = 0,
+  autoRetune = 0,
+}: {
+  reloadSignal?: number;
+  // Bumped by the page when the supervisor's per-meal decision is "retune", so
+  // the panel runs the gated eval on its own — the agent drives it, not a click.
+  autoRetune?: number;
+}) {
   const [prefs, setPrefs] = useState<PreferencesResponse | null>(null);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [retuning, setRetuning] = useState(false);
@@ -319,6 +327,13 @@ export function LearningObservability({ reloadSignal = 0 }: { reloadSignal?: num
       });
   };
 
+  // When the supervisor decides "retune" on a logged meal, run the gated eval
+  // automatically — the agent triggers it, the panel just shows it happening.
+  useEffect(() => {
+    if (autoRetune > 0 && !retuning) runRetune();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRetune]);
+
   const removeCorrection = (id: number) =>
     deleteLearningFeedback(id).then(refresh).catch(() => {});
   const toggleEmphasis = (f: FeedbackItem) =>
@@ -340,9 +355,10 @@ export function LearningObservability({ reloadSignal = 0 }: { reloadSignal?: num
     <div className="lo">
       {/* ── Re-tune: the gated eval, streaming live, always visible ───────── */}
       <section className="dash-card lo-retune">
-        <div className="dash-card-head mono">self-tuning</div>
+        <div className="dash-card-head mono">self-tuning · agent-driven</div>
         <p className="lo-counts">
-          Learns from your <b>{corrections}</b> correction{corrections === 1 ? "" : "s"}, then
+          The supervisor re-tunes on its own once there&apos;s enough signal: it learns
+          from your <b>{corrections}</b> correction{corrections === 1 ? "" : "s"}, then
           tests itself on <b>{confirmations}</b> of your meal{confirmations === 1 ? "" : "s"} before keeping any change.
         </p>
         <p className={"lo-fresh" + (ready ? " ready" : "")} aria-live="polite">

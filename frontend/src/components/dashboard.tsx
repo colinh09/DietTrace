@@ -37,6 +37,7 @@ export function Dashboard({
   reloadSignal,
   latestTrace,
   agentEvents = [],
+  autoRetune = 0,
 }: {
   // Bumped by the page whenever a correction/confirmation happens, so the
   // learning panel refetches and stays in sync (persisting across navigation).
@@ -44,6 +45,8 @@ export function Dashboard({
   latestTrace: LatestTrace | null;
   // The supervisor's per-meal decisions, newest first (the agent feed).
   agentEvents?: AgentEvent[];
+  // Bumped when the supervisor decides "retune", so the panel auto-runs it.
+  autoRetune?: number;
 }) {
   return (
     <aside className="dash" aria-label="Observability dashboard">
@@ -53,7 +56,7 @@ export function Dashboard({
 
       <AgentFeed events={agentEvents} />
 
-      <LearningObservability reloadSignal={reloadSignal} />
+      <LearningObservability reloadSignal={reloadSignal} autoRetune={autoRetune} />
 
       {latestTrace && latestTrace.steps.length > 0 && (
         <LatestTraceCard trace={latestTrace} />
