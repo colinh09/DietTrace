@@ -1,9 +1,10 @@
 "use client";
 
 // The trust report body (no page chrome): mean confidence, where the numbers
-// came from, the fraction flagged for review, and recent low-confidence meals.
+// came from, the fraction flagged for review, recent low-confidence meals, and —
+// inside the observability modal — the corrections the user has taught the agent.
 // Rendered both by the /trust route and inside the observability modal.
-import type { TrustReport } from "@/lib/api";
+import type { FeedbackItem, TrustReport } from "@/lib/api";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -16,7 +17,15 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function TrustView({ report }: { report: TrustReport }) {
+export function TrustView({
+  report,
+  corrections,
+}: {
+  report: TrustReport;
+  // The user's banked corrections (Input B) — shown only in the modal so the
+  // observability surface includes what's been fed into the learning loop.
+  corrections?: FeedbackItem[];
+}) {
   const sources = Object.entries(report.source_breakdown).sort((a, b) => b[1] - a[1]);
   const sourceTotal = sources.reduce((sum, [, n]) => sum + n, 0);
 
@@ -98,6 +107,27 @@ export function TrustView({ report }: { report: TrustReport }) {
             )}
           </section>
         </>
+      )}
+
+      {corrections && corrections.length > 0 && (
+        <section className="acc-block">
+          <div className="acc-block-head mono">corrections you&apos;ve taught</div>
+          <p className="acc-sub trust-corr-intro">
+            Plain-language fixes feeding the learning loop. Re-tune in “Your
+            agent” to fold these into a rule — gated so they only ship if they
+            actually fit you.
+          </p>
+          <ul className="trust-corr">
+            {corrections.map((c) => (
+              <li className="trust-corr-row" key={c.id}>
+                <span className="trust-corr-text">“{c.feedback_text}”</span>
+                {c.weight > 1 && (
+                  <span className="trust-corr-emph mono">emphasized</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </>
   );

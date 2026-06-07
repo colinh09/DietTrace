@@ -17,6 +17,7 @@ import {
   type MacroPlan,
   type MacroSex,
 } from "@/lib/api";
+import { getSetup } from "@/lib/setup";
 
 const ACTIVITY: { key: MacroActivity; label: string }[] = [
   { key: "sedentary", label: "Sedentary — little exercise" },
@@ -49,16 +50,34 @@ interface FormState {
   pref: string;
 }
 
-const DEFAULT_FORM: FormState = {
-  age: "31",
+// Neutral fallback when there's no saved setup (e.g. opened before onboarding).
+const FALLBACK_FORM: FormState = {
+  age: "",
   sex: "male",
-  height: "178",
-  weight: "75",
+  height: "",
+  weight: "",
   activity: "moderate",
-  goal: "cut",
+  goal: "maintain",
   ai: true,
-  pref: "keep protein high",
+  pref: "",
 };
+
+// Seed the editor from what the user gave at onboarding (their own answers, or a
+// seeded persona's stats) so "Set your targets" reflects them — not made-up data.
+function initialForm(): FormState {
+  const inputs = getSetup()?.inputs;
+  if (!inputs) return FALLBACK_FORM;
+  return {
+    age: inputs.age != null ? String(inputs.age) : "",
+    sex: inputs.sex ?? "male",
+    height: inputs.height_cm != null ? String(inputs.height_cm) : "",
+    weight: inputs.weight_kg != null ? String(inputs.weight_kg) : "",
+    activity: inputs.activity ?? "moderate",
+    goal: inputs.goal ?? "maintain",
+    ai: true,
+    pref: inputs.preference ?? "",
+  };
+}
 
 function Seg<T extends string>({
   value,
@@ -150,7 +169,7 @@ export function MacroModal({
   onClose: () => void;
   onSaved?: () => void;
 }) {
-  const [inp, setInp] = useState<FormState>(DEFAULT_FORM);
+  const [inp, setInp] = useState<FormState>(initialForm);
   const [plan, setPlan] = useState<MacroPlan | null>(null);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -170,10 +189,12 @@ export function MacroModal({
     setBusy(true);
     try {
       const res = await postMacrosPlan({
-        age: parseInt(inp.age || "0", 10),
+        // Coalesce blanks (skipped at onboarding) to neutral defaults so the
+        // estimate still computes instead of 422-ing on a missing age/height.
+        age: parseInt(inp.age || "30", 10),
         sex: inp.sex,
-        height_cm: parseFloat(inp.height || "0"),
-        weight_kg: parseFloat(inp.weight || "0"),
+        height_cm: parseFloat(inp.height || (inp.sex === "female" ? "164" : "178")),
+        weight_kg: parseFloat(inp.weight || "70"),
         activity: inp.activity,
         goal: inp.goal,
         preference: inp.pref || null,
@@ -240,8 +261,8 @@ export function MacroModal({
         <div className="tg-eyebrow mono">Macro goals</div>
         <h2 className="tg-title">Set your targets</h2>
         <p className="tg-sub">
-          A quick estimate from your body and goal — used only to calculate, not
-          stored. Every number stays yours to adjust.
+          Starting from what you told us at setup — adjust anything and
+          recalculate. Every number stays yours.
         </p>
 
         {/* Stage 1 — inputs */}
@@ -347,7 +368,7 @@ export function MacroModal({
               onClick={calculate}
               disabled={busy}
             >
-              {!plan && inp.ai && <Sparkle size={12} color="#fff" />}
+              {!plan && inp.ai && <Sparkle size={12} color="var(--on-accent)" />}
               {busy ? "Calculating…" : plan ? "Recalculate" : "Calculate"}
             </button>
           </div>

@@ -35,6 +35,13 @@ export function toISODate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// Parse a "YYYY-MM-DD" key (from the API) into a local-time Date — the inverse
+// of `toISODate`. Avoids `new Date(iso)`, which parses the string as UTC.
+export function fromISODate(iso: string): Date {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 // True when both dates fall on the same calendar day.
 export function isSameDay(a: Date, b: Date): boolean {
   return (

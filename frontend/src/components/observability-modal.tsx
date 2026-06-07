@@ -1,19 +1,25 @@
 "use client";
 
-// Accuracy + Trust as a single tabbed popup over the main page (no route change).
-// Both reports are cached at module scope: the FIRST open fetches (with a skeleton
-// so it never looks frozen — the live Phoenix read is slow); every later open
-// shows the cached data instantly and refreshes in the background.
+// The "Overview" page — one place that explains the project and stacks the two
+// observability reports (Accuracy, then Trust) instead of splitting them across
+// two nav tabs. Reports are cached at module scope: the first open fetches (with
+// a skeleton), later opens show cached data instantly and refresh in background.
 import { useEffect, useState } from "react";
 import { AccuracyView } from "@/components/accuracy-view";
 import { TrustView } from "@/components/trust-view";
 import { Modal } from "@/components/modal";
-import { getAccuracy, getTrust, type AccuracyReport, type TrustReport } from "@/lib/api";
-
-export type ObsTab = "accuracy" | "trust";
+import {
+  getAccuracy,
+  getTrust,
+  listLearningFeedback,
+  type AccuracyReport,
+  type FeedbackItem,
+  type TrustReport,
+} from "@/lib/api";
 
 let accCache: AccuracyReport | null = null;
 let trustCache: TrustReport | null = null;
+let corrCache: FeedbackItem[] | null = null;
 
 function Skeleton() {
   return (
@@ -30,16 +36,10 @@ function Skeleton() {
   );
 }
 
-export function ObservabilityModal({
-  initialTab,
-  onClose,
-}: {
-  initialTab: ObsTab;
-  onClose: () => void;
-}) {
-  const [tab, setTab] = useState<ObsTab>(initialTab);
+export function OverviewModal({ onClose }: { onClose: () => void }) {
   const [acc, setAcc] = useState<AccuracyReport | null>(accCache);
   const [trust, setTrust] = useState<TrustReport | null>(trustCache);
+  const [corrections, setCorrections] = useState<FeedbackItem[]>(corrCache ?? []);
 
   useEffect(() => {
     getAccuracy()
@@ -54,38 +54,43 @@ export function ObservabilityModal({
         setTrust(r);
       })
       .catch(() => {});
+    listLearningFeedback()
+      .then((r) => {
+        corrCache = r.feedback;
+        setCorrections(r.feedback);
+      })
+      .catch(() => {});
   }, []);
 
   return (
-    <Modal onClose={onClose} labelledBy="obs-modal-title">
-      <div className="obs-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "accuracy"}
-          className={"obs-tab mono" + (tab === "accuracy" ? " on" : "")}
-          onClick={() => setTab("accuracy")}
-        >
-          accuracy
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "trust"}
-          className={"obs-tab mono" + (tab === "trust" ? " on" : "")}
-          onClick={() => setTab("trust")}
-        >
-          trust
-        </button>
-      </div>
-      <div className="obs-body">
-        {tab === "accuracy" ? (
-          acc ? <AccuracyView report={acc} /> : <Skeleton />
-        ) : trust ? (
-          <TrustView report={trust} />
-        ) : (
-          <Skeleton />
-        )}
+    <Modal onClose={onClose} labelledBy="overview-title">
+      <div className="ov">
+        <header className="ov-head">
+          <span className="ov-eyebrow mono">Overview</span>
+          <h1 id="overview-title" className="ov-title">
+            An AI nutritionist held accountable by evals
+          </h1>
+          <p className="ov-sub">
+            DietTrace logs meals from plain English against USDA data, grades its
+            own work on every meal, and learns how <i>you</i> eat — with each change
+            gated by evals so personalizing never costs general accuracy. Below:
+            how accurate it is, and how much to trust your numbers.
+          </p>
+        </header>
+
+        <section className="ov-section">
+          {acc ? <AccuracyView report={acc} /> : <Skeleton />}
+        </section>
+
+        <div className="ov-divider" aria-hidden="true" />
+
+        <section className="ov-section">
+          {trust ? (
+            <TrustView report={trust} corrections={corrections} />
+          ) : (
+            <Skeleton />
+          )}
+        </section>
       </div>
     </Modal>
   );

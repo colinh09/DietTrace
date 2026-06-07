@@ -23,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from opentelemetry import trace as _otel_trace
 from pydantic import BaseModel, ValidationError
 
+from dietrace.agents.nutrition.corrector import propose_preference_block
 from dietrace.agents.nutrition.interpret_feedback import apply_feedback, interpret_feedback
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
@@ -45,11 +46,13 @@ from dietrace.web.feedback import (
     phoenix_push,
     to_example,
 )
+from dietrace.web.gate import confirmations_to_cases, score_block, ship_decision
 from dietrace.web.goals import load_goals, targets_to_goals
 from dietrace.web.identity import current_user
 from dietrace.web.macro_memory import build_macro_memory, push_macro_preference, split_of
 from dietrace.web.memory import build_memory, calories_of, sum_totals
 from dietrace.web.micros import micro_progress
+from dietrace.web.preference_stores import build_learning_stores, build_profile_store
 from dietrace.web.standing_rules import StandingRule, build_standing_rules
 from dietrace.web.store import MealLogStore
 from dietrace.web.stores import build_stores
@@ -156,6 +159,37 @@ class FreeformFeedbackRequest(BaseModel):
     meal_text: str = ""
     feedback_text: str
     current_items: list[Any] = []
+
+
+class ConfirmRequest(BaseModel):
+    """"Does this look right?" — a user-confirmed meal becomes a held-out
+    ground-truth datapoint for the gate (Input A, )."""
+
+    meal_text: str
+    items: list[dict[str, Any]] = []
+    totals: list[dict[str, Any]] = []
+
+
+class FeedbackEditRequest(BaseModel):
+    """Edit a banked correction's text and/or its emphasis weight (Input B)."""
+
+    feedback_text: str | None = None
+    weight: float | None = None
+
+
+class ProfileRequest(BaseModel):
+    """Body for POST /profile — the user's freeform "goals + eating style"."""
+
+    profile_text: str = ""
+
+
+class DemoSeedRequest(BaseModel):
+    """Optional body for /demo/seed: the client's local day so seeded meals land
+    relative to the day the user is actually viewing (not the server's UTC day),
+    and which persona to load (the persona loader; defaults to the runner)."""
+
+    date: str | None = None
+    persona: str | None = None
 
 
 # Sentinel profile used when running evaluate_macro_plan on a preset plan (no
@@ -361,15 +395,6 @@ def _case_score(case: dict[str, Any], estimate: Callable[[str], dict]) -> float:
     return round(max(0.0, 1.0 - abs(est - expected) / expected), 3)
 
 
-def _calorie_accuracy(
-    cases: list[dict[str, Any]], estimate: Callable[[str], dict]
-) -> float:
-    """Mean calorie accuracy of *estimate* over *cases* — a before/after number."""
-    if not cases:
-        return 0.0
-    return round(sum(_case_score(c, estimate) for c in cases) / len(cases), 3)
-
-
 def _load_usda_eval_cases() -> list[dict[str, Any]]:
     """Load calorie expectations from the USDA nutrition eval dataset."""
     from pathlib import Path
@@ -390,30 +415,19 @@ def _load_usda_eval_cases() -> list[dict[str, Any]]:
     return cases
 
 
-_BASE_DRIFT_THRESHOLD = 0.05  # accuracy drop > 5 pp flags regression
-
-
-def _check_base_drift(
-    usda_cases: list[dict[str, Any]],
-    examples: list,
-    logger_fn: Callable,
-) -> dict[str, Any] | None:
-    """Run the base USDA eval set with/without few-shot to detect accuracy drift.
-
-    Returns None when no USDA cases are available; otherwise returns
-    {cases, base_score, tuned_score, drifted} so the retune response surfaces
-    whether personalization regressed general accuracy.
-    """
-    if not usda_cases:
-        return None
-    base_score = _calorie_accuracy(usda_cases, lambda t: logger_fn(t, examples=[]))
-    tuned_score = _calorie_accuracy(usda_cases, lambda t: logger_fn(t, examples=examples))
-    return {
-        "cases": len(usda_cases),
-        "base_score": base_score,
-        "tuned_score": tuned_score,
-        "drifted": tuned_score < base_score - _BASE_DRIFT_THRESHOLD,
-    }
+def _quick_usda_sample(
+    cases: list[dict[str, Any]], k: int = 8
+) -> list[dict[str, Any]]:
+    """A small, representative slice of the USDA set for a FAST retune — spread
+    evenly across the calorie range and skipping the sub-50-kcal items (whose
+    percentage error is noisy), so the quick check still means something. The
+    full retune uses every case."""
+    real = [c for c in cases if c.get("calories", 0) >= 50] or cases
+    if len(real) <= k:
+        return real
+    ordered = sorted(real, key=lambda c: c["calories"])
+    step = len(ordered) / k
+    return [ordered[int(i * step)] for i in range(k)]
 
 
 def _build_trace(
@@ -501,6 +515,11 @@ def create_app(
     usda_case_loader: Callable[[], list[dict[str, Any]]] = _load_usda_eval_cases,
     standing_rule_store: Any | None = None,
     freeform_client: Any | None = None,
+    confirmation_store: Any | None = None,
+    feedback_log: Any | None = None,
+    preference_store: Any | None = None,
+    profile_store: Any | None = None,
+    corrector_client: Any | None = None,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
@@ -515,6 +534,22 @@ def create_app(
     learning = memory or build_memory()
     macro_learning = macro_memory or build_macro_memory()
     rules = standing_rule_store or build_standing_rules()
+    # Learning-loop stores: confirmations (Input A held-out
+    # set), the feedback log (Input B corrections), and the per-user preference block.
+    if (
+        confirmation_store is not None
+        and feedback_log is not None
+        and preference_store is not None
+    ):
+        confirms, fblog, prefs = confirmation_store, feedback_log, preference_store
+    else:
+        d_conf, d_fb, d_pref = build_learning_stores()
+        confirms = confirmation_store or d_conf
+        fblog = feedback_log or d_fb
+        prefs = preference_store or d_pref
+    # Per-user freeform profile (goals + eating style) — standing context the
+    # corrector reads when generalizing corrections.
+    profiles = profile_store or build_profile_store()
     logger_fn = meal_logger or default_meal_logger
     streamer_fn = meal_streamer or default_meal_streamer
 
@@ -522,7 +557,14 @@ def create_app(
         """This user's few-shot corrections PLUS their standing-rule preferences,
         as a single examples list the parser injects into its prompt — so the
         agent actually consults the rules a user has taught it (14.12 recall)."""
-        examples = list(learning.examples(user))
+        examples: list[dict[str, Any]] = []
+        # The generalized preference block is the primary personalization signal
+        #. Few-shot corrections + standing rules ride
+        # alongside it as secondary signals.
+        block = prefs.block_text(user)
+        if block:
+            examples.append({"preference_block": block})
+        examples.extend(learning.examples(user))
         examples.extend(
             {"rule": r["rationale"]}
             for r in rules.recent(user)
@@ -946,10 +988,19 @@ def create_app(
                 "phoenix_url": phoenix_dashboard_url(),
             }
 
+        # Bank the raw feedback for the learning loop (Input B) so the corrector
+        # can generalize it into the preference block on the next retune.
+        fblog.add(user, req.feedback_text, structured.model_dump(), req.meal_text or "")
+        # XOR rule: a meal the user corrected is no
+        # longer a clean reference, so drop it from the held-out gate set.
+        if req.meal_text:
+            confirms.delete_by_meal(user, req.meal_text)
+
         applied = False
         stored_as_preference = False
         updated_items: list[dict[str, Any]] = list(req.current_items)
         new_totals: list[dict[str, Any]] = []
+        eval_patch: dict[str, Any] | None = None
 
         if structured.kind == "standing_rule":
             rule = StandingRule(
@@ -971,8 +1022,35 @@ def create_app(
             updated_items = _rescale_items(req.current_items, updated_with_food)
             new_totals = sum_totals(updated_items)
 
+            # Re-run the online eval on the corrected meal so its confidence,
+            # axes, and needs_review reflect the fix (e.g. a fixed portion clears
+            # the portion-sanity flag) — otherwise the stored eval goes stale and
+            # the "why this confidence" calc no longer adds up.
+            requality = evaluate_log(req.meal_text, updated_items, new_totals)
+            rereview = review_flag(requality)
+            eval_patch = {
+                "confidence": requality["confidence"],
+                "reasons": requality["reasons"],
+                "axes": requality.get("axes", []),
+                "needs_review": rereview["needs_review"],
+                "review_reason": rereview["review_reason"],
+            }
+
             if req.meal_id is not None:
-                log_store.update(req.meal_id, updated_items, new_totals, user_id=user)
+                log_store.update(
+                    req.meal_id,
+                    updated_items,
+                    new_totals,
+                    user_id=user,
+                    detail_patch=eval_patch,
+                )
+
+            # Bank the corrected meal as ground truth — exactly like /correct —
+            # so it shows in the observability rail ("corrections banked") AND
+            # feeds /retune. Without this a free-form fix was applied but never
+            # recorded, so the user couldn't tune on it.
+            if applied:
+                learning.remember(user, req.meal_text, updated_items, new_totals)
 
         inp: dict[str, Any] = {
             "text": req.meal_text,
@@ -1009,12 +1087,22 @@ def create_app(
             "kind": structured.kind,
             "target_food": structured.target_food,
             "adjustment": structured.adjustment,
+            "target_grams": structured.target_grams,
             "rationale": structured.rationale,
             "scope": structured.scope,
             "stored_as_preference": stored_as_preference,
             "per_item": updated_items,
             "totals": new_totals,
+            # The recomputed online eval so the UI refreshes the meal's confidence
+            # + axes + review flag in place (None for standing-rule feedback,
+            # which doesn't touch this meal's items).
+            "confidence": eval_patch["confidence"] if eval_patch else None,
+            "axes": eval_patch["axes"] if eval_patch else None,
+            "reasons": eval_patch["reasons"] if eval_patch else None,
+            "needs_review": eval_patch["needs_review"] if eval_patch else None,
+            "review_reason": eval_patch["review_reason"] if eval_patch else None,
             "added_to_arize": added_to_arize,
+            "corrections": fblog.count(user),
             "phoenix_url": phoenix_dashboard_url(),
         }
 
@@ -1059,7 +1147,10 @@ def create_app(
 
     @app.get("/memory")
     def memory_summary(user: str = Depends(current_user)) -> dict[str, Any]:
-        return {"corrections": learning.count(user)}
+        # "Corrections banked" = everything the user has taught (the learning-loop
+        # feedback log), so standing-rules + portion fixes all count — not just the
+        # old few-shot meal corrections.
+        return {"corrections": fblog.count(user)}
 
     @app.get("/trust")
     def trust_summary(user: str = Depends(current_user)) -> dict[str, Any]:
@@ -1069,75 +1160,6 @@ def create_app(
         breakdown — scoped to the calling user (the per-user memory layer, §6/§7).
         """
         return trust.stats(user_id=user)
-
-    @app.post("/retune")
-    def retune(user: str = Depends(current_user)) -> dict[str, Any]:
-        """Re-test the agent on the user's corrected meals, before vs after learning.
-
-        Runs the agent over each meal the user corrected — once as the base agent,
-        once with their corrections as few-shot — and scores both against their
-        corrected calories. The user triggers this when they want to watch their
-        agent improve. Live + costs Gemini calls, so it's on-demand only.
-        """
-        cases = learning.eval_cases(user)
-        if not cases:
-            return {
-                "cases": 0, "before": None, "after": None,
-                "improved": False, "base_drift": None,
-            }
-        examples = learning.examples(user)
-        before = _calorie_accuracy(cases, lambda t: logger_fn(t, examples=[]))
-        after = _calorie_accuracy(cases, lambda t: logger_fn(t, examples=examples))
-        # Regression guard: re-run the base USDA eval set so personalization
-        # can't silently lower general accuracy while improving on the user's own meals.
-        usda_cases = usda_case_loader()
-        base_drift = _check_base_drift(usda_cases, examples, logger_fn)
-        return {
-            "cases": len(cases),
-            "before": before,
-            "after": after,
-            "improved": after >= before,
-            "base_drift": base_drift,
-        }
-
-    @app.post("/retune/stream")
-    def retune_stream(user: str = Depends(current_user)) -> StreamingResponse:
-        """Re-test as a live stream: one event per corrected meal as it's scored,
-        then a summary — so the eval is visible happening, not just a final number."""
-        cases = learning.eval_cases(user)
-        examples = learning.examples(user)
-
-        def events() -> Iterator[str]:
-            befores: list[float] = []
-            afters: list[float] = []
-            for case in cases:
-                base = _case_score(case, lambda t: logger_fn(t, examples=[]))
-                tuned = _case_score(case, lambda t: logger_fn(t, examples=examples))
-                befores.append(base)
-                afters.append(tuned)
-                event = {
-                    "type": "case",
-                    "text": case["text"],
-                    "expected_calories": round(case["calories"]),
-                    "before": base,
-                    "after": tuned,
-                }
-                yield f"data: {json.dumps(event)}\n\n"
-            before = round(sum(befores) / len(befores), 3) if befores else None
-            after = round(sum(afters) / len(afters), 3) if afters else None
-            usda_cases = usda_case_loader()
-            base_drift = _check_base_drift(usda_cases, examples, logger_fn)
-            summary = {
-                "type": "summary",
-                "cases": len(cases),
-                "before": before,
-                "after": after,
-                "improved": bool(after is not None and before is not None and after >= before),
-                "base_drift": base_drift,
-            }
-            yield f"data: {json.dumps(summary)}\n\n"
-
-        return StreamingResponse(events(), media_type="text/event-stream")
 
     @app.get("/analysis")
     def analysis(
@@ -1163,19 +1185,40 @@ def create_app(
         }
 
     @app.post("/demo/seed")
-    def demo_seed(user: str = Depends(current_user)) -> dict[str, Any]:
+    def demo_seed(
+        req: DemoSeedRequest | None = None, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
         """Seed the calling user's account with canned demo data.
 
-        Logs curated fixture meals for today using pre-computed per_item/totals/trace
-        data — no live Gemini call. Sets sample macro targets. One meal is
-        deliberately over-portioned (peanut butter) so a judge can immediately demo
-        the /correct flow and watch the day band update.
+        Logs a selected persona's visible day for TODAY using pre-computed
+        per_item/totals/trace data — no live Gemini call — plus the learning-loop
+        seed (confirmed meals + a couple of corrections) so a judge can hit
+        "retune" immediately. The confirmed meals (the held-out gate set) are ALSO
+        logged as visible rows on the PREVIOUS day, badged as dataset points, so
+        the dataset isn't hidden — a judge can see exactly what the agent is
+        tested against (the observability-everywhere rule). Today's visible day
+        carries a macro under-count (carbs for the runner, post-lift protein for
+        the bodybuilder) so the correction → retune flow has an on-screen target.
         """
-        from dietrace.web.demo_seed import DEMO_GOAL_RATIONALE, DEMO_GOALS, DEMO_MEALS
+        from dietrace.web.demo_seed import get_persona
 
-        today = datetime.datetime.now(tz=datetime.UTC).date().isoformat()
+        persona = get_persona(req.persona if req else None)
+
+        # Idempotent: clear this user's meals first so re-running "see it in
+        # action" replaces the canned set rather than appending duplicates.
+        log_store.clear_user(user)
+
+        # The client's local "today" (so we're relative to the day the user sees,
+        # not the server's UTC day at the boundary). The visible playground meals
+        # land on today; the confirmed dataset rows land on the day before.
+        today = (req.date if req and req.date else None) or datetime.datetime.now(
+            tz=datetime.UTC
+        ).date().isoformat()
+        dataset_date = (
+            datetime.date.fromisoformat(today) - datetime.timedelta(days=1)
+        ).isoformat()
         meal_ids: list[int] = []
-        for meal in DEMO_MEALS:
+        for meal in persona.meals:
             entry_id = log_store.add(
                 meal["text"],
                 meal["totals"],
@@ -1187,16 +1230,330 @@ def create_app(
 
         goals_set = False
         if goals_db is not None:
-            goals_db.save(user, DEMO_GOALS, rationale=DEMO_GOAL_RATIONALE, source="demo")
+            goals_db.save(
+                user, persona.goals, rationale=persona.goal_rationale, source="demo"
+            )
             goals_set = True
+
+        # Seed the learning-loop state so a judge can hit "retune" immediately
+        #: confirmed meals carrying the persona's real
+        # pattern (the held-out gate set) + a couple of corrections to generalize.
+        # A fresh preference block, so the retune starts from zero and ships.
+        confirms.clear_user(user)
+        fblog.clear_user(user)
+        prefs.clear_user(user)
+        profiles.set(user, persona.profile)
+        for c in persona.confirmations:
+            confirms.add(user, c["meal_text"], c.get("items", []), c["totals"])
+            # Mirror each confirmed meal as a visible, badged row on the previous
+            # day so the held-out dataset is something a judge can actually see.
+            log_store.add(
+                c["meal_text"],
+                c["totals"],
+                date=dataset_date,
+                user_id=user,
+                detail={"dataset_point": True},
+            )
+        for f in persona.feedback:
+            fblog.add(
+                user, f["feedback_text"], None, f.get("meal_text"), f.get("weight", 1.0)
+            )
 
         return {
             "seeded": True,
             "meals": len(meal_ids),
             "meal_ids": meal_ids,
+            "meal_date": today,
+            "dataset_date": dataset_date,
             "goals_set": goals_set,
+            "confirmations": confirms.count(user),
+            "corrections": fblog.count(user),
             "user": user,
+            "persona": {
+                "key": persona.key,
+                "label": persona.label,
+                "blurb": persona.blurb,
+                "goal_rationale": persona.goal_rationale,
+                "hook_meal": persona.hook_meal,
+                "hook_note": persona.hook_note,
+                "learns": persona.learns,
+                "meal_texts": [m["text"] for m in persona.meals],
+                "confirmation_texts": [c["meal_text"] for c in persona.confirmations],
+                "correction_texts": [f["feedback_text"] for f in persona.feedback],
+            },
         }
+
+    @app.post("/session/reset")
+    def session_reset(user: str = Depends(current_user)) -> dict[str, Any]:
+        """Wipe the calling user's session to a clean slate.
+
+        Clears their logged meals, goals, and everything DietTrace has learned
+        about them (standing rules, corrections, remembered examples, macro
+        split, trust logs). Each store is cleared independently and fail-soft so
+        one backend hiccup can't leave the reset half-done from the user's view.
+        """
+        cleared: dict[str, int] = {}
+        targets: list[tuple[str, Any]] = [
+            ("meals", log_store),
+            ("goals", goals_db),
+            ("corrections", corrections),
+            ("trust", trust),
+            ("rules", rules),
+            ("memory", learning),
+            ("macros", macro_learning),
+            ("confirmations", confirms),
+            ("feedback_log", fblog),
+            ("preferences", prefs),
+            ("profile", profiles),
+        ]
+        for name, store_obj in targets:
+            if store_obj is None or not hasattr(store_obj, "clear_user"):
+                continue
+            try:
+                cleared[name] = int(store_obj.clear_user(user))
+            except Exception:  # noqa: BLE001 — reset is best-effort per store
+                cleared[name] = -1
+        return {"reset": True, "user": user, "cleared": cleared}
+
+    # ── Learning loop ──────────────────────────────────
+    _MIN_CORRECTIONS = 1  # corrections needed before a retune is offered
+    # The gate scores the FULL USDA set by default (the honest floor check); the
+    # retune is live so it's slow, which is fine — the observability shows real
+    # evals running. DIETRACE_RETUNE_USDA_SAMPLE>0 caps it only for fast test runs.
+    _RETUNE_USDA_SAMPLE = int(os.environ.get("DIETRACE_RETUNE_USDA_SAMPLE", "0"))
+
+    @app.post("/confirm")
+    def confirm_meal(
+        req: ConfirmRequest, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """"Does this look right?" — record a confirmed meal as a held-out
+        ground-truth datapoint (Input A). Grows the gate dataset; never touches
+        the prompt. Kept strictly disjoint from corrections (the XOR rule)."""
+        cid = confirms.add(user, req.meal_text, req.items, req.totals)
+        return {"ok": True, "id": cid, "confirmations": confirms.count(user)}
+
+    @app.get("/learning/feedback")
+    def list_feedback(user: str = Depends(current_user)) -> dict[str, Any]:
+        """The user's banked corrections (Input B) — for the feedback manager."""
+        return {"feedback": fblog.list(user), "count": fblog.count(user)}
+
+    @app.patch("/learning/feedback/{feedback_id}")
+    def edit_feedback(
+        feedback_id: int,
+        req: FeedbackEditRequest,
+        user: str = Depends(current_user),
+    ) -> dict[str, Any]:
+        """Edit a correction's text and/or emphasis; the block re-derives on retune."""
+        ok = fblog.update(
+            feedback_id, user, feedback_text=req.feedback_text, weight=req.weight
+        )
+        return {"ok": ok}
+
+    @app.delete("/learning/feedback/{feedback_id}")
+    def delete_feedback(
+        feedback_id: int, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        return {"deleted": fblog.delete(feedback_id, user)}
+
+    @app.get("/profile")
+    def get_profile(user: str = Depends(current_user)) -> dict[str, Any]:
+        """The user's freeform profile (goals + eating style), or '' if unset."""
+        return {"profile_text": profiles.get(user)}
+
+    @app.post("/profile")
+    def set_profile(
+        req: ProfileRequest, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """Save the user's freeform profile. It becomes standing context the
+        corrector reads on the next retune — so personalization reflects who the
+        user is, not just the meals they've fixed."""
+        text = (req.profile_text or "").strip()
+        profiles.set(user, text)
+        return {"ok": True, "profile_text": text}
+
+    @app.get("/preferences")
+    def preferences(user: str = Depends(current_user)) -> dict[str, Any]:
+        """The user's current preference block + provenance, the confirmed meals
+        the gate tests against, and the counts that gate whether a retune is
+        available."""
+        confirmed = [
+            {"id": c["id"], "meal_text": c["meal_text"], "calories": calories_of(c["totals"])}
+            for c in confirms.list(user)
+        ]
+        return {
+            "block": prefs.get(user),
+            "corrections": fblog.count(user),
+            # New (unprocessed) corrections — the only ones the next retune folds in.
+            "new_corrections": fblog.count_unprocessed(user),
+            "confirmations": confirms.count(user),
+            "confirmed": confirmed,
+            "min_corrections": _MIN_CORRECTIONS,
+        }
+
+    @app.post("/learning/retune")
+    def learning_retune(user: str = Depends(current_user)) -> dict[str, Any]:
+        """The gated retune: the corrector proposes a
+        new preference block from the user's corrections; the gate scores current
+        vs proposed on USDA (objective) + held-out confirmations (fit); it ships
+        only if the ship rule passes. Bad feedback → no fit gain → not shipped.
+        Observable end to end (proposed rules + both score sets + the verdict)."""
+        # Only fold in NEW (unprocessed) corrections, extending the current block —
+        # a retune never re-learns corrections it already shipped.
+        new_corrections = fblog.list_unprocessed(user)
+        if not new_corrections:
+            return {
+                "ok": False,
+                "reason": "not_enough_corrections" if fblog.count(user) == 0
+                else "no_new_corrections",
+                "have": fblog.count(user),
+                "need": _MIN_CORRECTIONS,
+            }
+        current_block = prefs.block_text(user)
+        proposed = propose_preference_block(
+            new_corrections, current_block, client=corrector_client,
+            user_profile=profiles.get(user),
+        )
+        if proposed is None:
+            return {"ok": False, "reason": "corrector_failed"}
+
+        fit_cases = confirmations_to_cases(confirms.list(user))
+        usda_cases = usda_case_loader()
+        if _RETUNE_USDA_SAMPLE > 0:
+            usda_cases = usda_cases[:_RETUNE_USDA_SAMPLE]
+        current_scores = score_block(current_block, fit_cases, usda_cases, logger_fn)
+        proposed_scores = score_block(
+            proposed.block_text, fit_cases, usda_cases, logger_fn
+        )
+        decision = ship_decision(current_scores, proposed_scores)
+
+        shipped = False
+        version = None
+        if decision["ship"]:
+            provenance = [r.model_dump() for r in proposed.rules]
+            version = prefs.save(user, proposed.block_text, provenance)
+            fblog.mark_processed(user, [c["id"] for c in new_corrections])
+            shipped = True
+
+        return {
+            "ok": True,
+            "shipped": shipped,
+            "verdict": decision,
+            "current": current_scores,
+            "proposed": proposed_scores,
+            "proposed_block": proposed.block_text,
+            "rules": [r.model_dump() for r in proposed.rules],
+            "version": version,
+            "fit_cases": len(fit_cases),
+            "usda_cases": len(usda_cases),
+            "phoenix_url": phoenix_dashboard_url(),
+        }
+
+    @app.post("/learning/retune/stream")
+    def learning_retune_stream(
+        full: bool = False, user: str = Depends(current_user)
+    ) -> StreamingResponse:
+        """The gated retune as a LIVE stream (the observability-everywhere rule):
+        emits a phase event as the corrector proposes a rule, then one event per
+        meal as it's re-scored — with the rule vs without — across the held-out
+        confirmations (fit) and the USDA standard set (objective), then the final
+        verdict. ``full=False`` (a quick tune) checks a representative sample of
+        standard foods so the retune is fast; ``full=True`` checks the entire set.
+        Same scoring + ship rule as POST /learning/retune."""
+        new_corrections = fblog.list_unprocessed(user)
+
+        def events() -> Iterator[str]:
+            def sse(payload: dict[str, Any]) -> str:
+                return f"data: {json.dumps(payload)}\n\n"
+
+            if not new_corrections:
+                yield sse({
+                    "type": "done", "ok": False,
+                    "reason": "not_enough_corrections" if fblog.count(user) == 0
+                    else "no_new_corrections",
+                    "have": fblog.count(user), "need": _MIN_CORRECTIONS,
+                })
+                return
+
+            yield sse({"type": "phase", "phase": "propose",
+                       "label": "Generalizing your new corrections into a rule…"})
+            current_block = prefs.block_text(user)
+            proposed = propose_preference_block(
+                new_corrections, current_block, client=corrector_client,
+                user_profile=profiles.get(user),
+            )
+            if proposed is None:
+                yield sse({"type": "done", "ok": False, "reason": "corrector_failed"})
+                return
+            rules = [r.model_dump() for r in proposed.rules]
+            yield sse({"type": "rule", "rules": rules})
+
+            fit_cases = confirmations_to_cases(confirms.list(user))
+            usda_cases = usda_case_loader()
+            if not full:
+                usda_cases = _quick_usda_sample(usda_cases)
+            if _RETUNE_USDA_SAMPLE > 0:
+                usda_cases = usda_cases[:_RETUNE_USDA_SAMPLE]
+
+            # Emit the FULL eval set up front so the UI can list every meal
+            # immediately (dashes), then fill each in as its score lands.
+            yield sse({
+                "type": "manifest",
+                "rows": [{"set": "fit", "text": c["text"]} for c in fit_cases]
+                + [{"set": "usda", "text": c["text"]} for c in usda_cases],
+            })
+
+            def score_one(case: dict[str, Any], block: str) -> float:
+                ex = [{"preference_block": block}] if block else []
+                return _case_score(case, lambda t: logger_fn(t, examples=ex))
+
+            scored: dict[str, tuple[list[float], list[float]]] = {
+                "fit": ([], []), "usda": ([], []),
+            }
+            for label, cases, intro in (
+                ("fit", fit_cases,
+                 "Re-scoring the meals you confirmed — with your rule vs without"),
+                ("usda", usda_cases,
+                 ("Re-checking the full standard set — accuracy can't regress"
+                  if full else
+                  "Re-checking a sample of standard foods — accuracy can't regress")),
+            ):
+                yield sse({"type": "phase", "phase": label, "label": intro,
+                           "n": len(cases)})
+                befores, afters = scored[label]
+                for i, c in enumerate(cases):
+                    before = score_one(c, current_block)
+                    after = score_one(c, proposed.block_text)
+                    befores.append(before)
+                    afters.append(after)
+                    yield sse({
+                        "type": "score", "set": label, "i": i + 1, "n": len(cases),
+                        "text": c["text"], "expected": round(c["calories"]),
+                        "before": before, "after": after,
+                    })
+
+            def mean(xs: list[float]) -> float:
+                return round(sum(xs) / len(xs), 3) if xs else 0.0
+
+            current_scores = {"fit": mean(scored["fit"][0]), "usda": mean(scored["usda"][0])}
+            proposed_scores = {"fit": mean(scored["fit"][1]), "usda": mean(scored["usda"][1])}
+            decision = ship_decision(current_scores, proposed_scores)
+
+            shipped = False
+            version = None
+            if decision["ship"]:
+                version = prefs.save(user, proposed.block_text, rules)
+                fblog.mark_processed(user, [c["id"] for c in new_corrections])
+                shipped = True
+
+            yield sse({
+                "type": "done", "ok": True, "shipped": shipped, "verdict": decision,
+                "current": current_scores, "proposed": proposed_scores,
+                "proposed_block": proposed.block_text, "rules": rules,
+                "version": version, "fit_cases": len(fit_cases),
+                "usda_cases": len(usda_cases), "phoenix_url": phoenix_dashboard_url(),
+            })
+
+        return StreamingResponse(events(), media_type="text/event-stream")
 
     @app.get("/reasoning/{trace_id}")
     def reasoning(trace_id: str) -> dict[str, Any]:

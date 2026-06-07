@@ -55,7 +55,25 @@ describe("FreeformFeedback", () => {
     await waitFor(() => {
       expect(screen.getByText(/DietTrace learned/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/adjusted fries to 50%/i)).toBeInTheDocument();
+    expect(screen.getByText(/scaled fries to 50% of the logged portion/i)).toBeInTheDocument();
+  });
+
+  it("labels an absolute-grams fix as 'set … to N g', not a percentage", async () => {
+    vi.mocked(submitFreeformFeedback).mockResolvedValue({
+      ..._ok("portion_adjust", "peanut butter", null),
+      target_grams: 30,
+    });
+
+    render(<FreeformFeedback mealId={1} mealText="pb on apple" perItem={[]} />);
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "I only eat about 30 grams of peanut butter" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /tell it/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/set peanut butter to 30 g/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/% of the logged portion/i)).not.toBeInTheDocument();
   });
 
   it("shows standing-preference note for a standing_rule result", async () => {

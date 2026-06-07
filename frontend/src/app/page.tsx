@@ -7,28 +7,30 @@
 // meal's agent's-work trace, kept from its /log response.
 import { useCallback, useEffect, useState } from "react";
 import { Header } from "@/components/header";
+import { DatePicker } from "@/components/date-picker";
 import { DayMacros } from "@/components/day-macros";
 import { LogInput } from "@/components/log-input";
 import { LiveMeal, type LiveEntry } from "@/components/live-meal";
 import { MealList, type MealDetail } from "@/components/meal-list";
 import { SafetyNotice } from "@/components/safety-notice";
 import { Dashboard, type LatestTrace } from "@/components/dashboard";
-import { ObservabilityModal, type ObsTab } from "@/components/observability-modal";
+import { OverviewModal } from "@/components/observability-modal";
 import { MacroModal } from "@/components/macro-modal";
+import { Onboarding } from "@/components/onboarding";
 import {
   deleteMeal,
   getAnalysis,
   getGoals,
   getHistory,
-  getMemory,
-  getRecentFeedback,
+  getProfile,
   logMealStream,
   type GoalProgress,
   type Meal,
-  type RecentCorrection,
   type Safety,
 } from "@/lib/api";
-import { isSameDay, shiftDate, toISODate } from "@/lib/date";
+import { clearOnboarded, isOnboardedFlag, markOnboarded } from "@/lib/onboarding";
+import { clearSetup } from "@/lib/setup";
+import { fromISODate, isSameDay, shiftDate, toISODate } from "@/lib/date";
 
 export default function Home() {
   const [date, setDate] = useState(() => new Date());
@@ -39,30 +41,53 @@ export default function Home() {
   const [details, setDetails] = useState<Record<number, MealDetail>>({});
   // The in-progress meal while its /log/stream is running, or null when idle.
   const [live, setLive] = useState<LiveEntry | null>(null);
-  // How many corrections this user has taught — drives the re-tune panel.
-  const [corrections, setCorrections] = useState(0);
-  // The user's recent corrections — drives the "what you've taught" panel (12.8).
-  const [taught, setTaught] = useState<RecentCorrection[]>([]);
+  // Bumped whenever a correction/confirmation/seed happens, so the always-visible
+  // learning panel in the Observability column refetches and stays in sync (the
+  // corrections persist across day navigation instead of disappearing).
+  const [reloadSignal, setReloadSignal] = useState(0);
+  const bumpLearning = useCallback(() => setReloadSignal((n) => n + 1), []);
   // The safety guardrail result from the most recent log, or null when clear —
   // surfaces a calm supportive notice above the meals.
   const [safety, setSafety] = useState<Safety | null>(null);
-  // Which observability tab is open as a popup over the page (null = closed).
-  const [obs, setObs] = useState<ObsTab | null>(null);
+  // Whether the combined Accuracy+Trust "Overview" page is open.
+  const [overviewOpen, setOverviewOpen] = useState(false);
   // Whether the macro editor ("Set your targets") modal is open.
   const [macroOpen, setMacroOpen] = useState(false);
-
-  const loadMemory = useCallback(() => {
-    getMemory()
-      .then((res) => setCorrections(res.corrections))
-      .catch(() => {});
-    getRecentFeedback()
-      .then((res) => setTaught(res.corrections))
-      .catch(() => {});
-  }, []);
+  // First-run gate: null while we decide, false → show onboarding, true → the app.
+  // A returning browser (flag set) skips straight through; otherwise a user who
+  // already has a saved profile or logged meals (a seeded judge, a returning
+  // signed-in user) is treated as onboarded so they never re-see the welcome.
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
 
   useEffect(() => {
-    loadMemory();
-  }, [loadMemory]);
+    let cancelled = false;
+    // Decide off-render (async) so we never setState synchronously in the effect:
+    // the localStorage flag is the fast path; otherwise a saved profile or any
+    // logged meal also counts as onboarded (seeded judge / returning user).
+    const decide = async (): Promise<boolean> => {
+      if (isOnboardedFlag()) return true;
+      const [profile, history] = await Promise.allSettled([
+        getProfile(),
+        getHistory(toISODate(new Date())),
+      ]);
+      const hasProfile =
+        profile.status === "fulfilled" &&
+        profile.value.profile_text.trim() !== "";
+      const hasMeals =
+        history.status === "fulfilled" && history.value.meals.length > 0;
+      if (hasProfile || hasMeals) {
+        markOnboarded();
+        return true;
+      }
+      return false;
+    };
+    decide().then((v) => {
+      if (!cancelled) setOnboarded(v);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load the daily targets first so the band isn't empty; fail-soft.
   useEffect(() => {
@@ -89,17 +114,20 @@ export default function Home() {
         setDetails((current) => {
           const next = { ...current };
           for (const m of res.meals) {
-            if (m.per_item && next[m.id] == null) {
-              next[m.id] = {
-                trace: m.trace ?? [],
-                perItem: m.per_item,
-                confidence: m.confidence,
-                reasons: m.reasons,
-                axes: m.axes,
-                needsReview: m.needs_review,
-                reviewReason: m.review_reason ?? null,
-              };
-            }
+            if (!m.per_item) continue;
+            // Refresh from the persisted fields every load so a corrected meal's
+            // table + confidence update in place. Keep a richer in-session trace
+            // when history's reconstructed one is empty (older logs).
+            const prev = next[m.id];
+            next[m.id] = {
+              trace: m.trace && m.trace.length ? m.trace : (prev?.trace ?? []),
+              perItem: m.per_item,
+              confidence: m.confidence,
+              reasons: m.reasons,
+              axes: m.axes,
+              needsReview: m.needs_review,
+              reviewReason: m.review_reason ?? null,
+            };
           }
           return next;
         });
@@ -184,10 +212,24 @@ export default function Home() {
   );
 
   const handleCorrected = useCallback(() => {
-    loadMemory();
+    bumpLearning();
     loadHistory();
     loadAnalysis();
-  }, [loadMemory, loadHistory, loadAnalysis]);
+  }, [bumpLearning, loadHistory, loadAnalysis]);
+
+  // Onboarding finished (or was skipped): enter the app and refresh the day so
+  // the just-saved targets show in the band.
+  const handleOnboarded = useCallback(() => {
+    setOnboarded(true);
+    loadHistory();
+    loadAnalysis();
+    bumpLearning();
+  }, [loadHistory, loadAnalysis, bumpLearning]);
+
+  // Hold the paint until the gate decides (avoids flashing the app then the
+  // welcome). A returning user resolves synchronously from the localStorage flag.
+  if (onboarded === null) return <div className="ob-page" aria-busy="true" />;
+  if (onboarded === false) return <Onboarding onDone={handleOnboarded} />;
 
   const heading = isSameDay(date, new Date()) ? "Today" : "Logged";
 
@@ -204,37 +246,58 @@ export default function Home() {
       <main className="wrap wrap-wide">
         <Header
           date={date}
-          onShift={(days) => setDate((d) => shiftDate(d, days))}
-          onPickDate={setDate}
-          onOpenObs={setObs}
+          onOpenOverview={() => setOverviewOpen(true)}
           onOpenMacros={() => setMacroOpen(true)}
           onSeeded={() => {
             loadHistory();
             loadAnalysis();
+            bumpLearning();
+          }}
+          onViewDay={(iso) => setDate(fromISODate(iso))}
+          onReset={() => {
+            // Reset wipes the user server-side AND re-triggers onboarding, so a
+            // clean slate always starts from the welcome flow (new-user parity).
+            clearOnboarded();
+            clearSetup();
+            setOnboarded(false);
+          }}
+          onAuthChange={() => {
+            loadHistory();
+            loadAnalysis();
+            bumpLearning();
           }}
         />
         <div className="layout">
           <div className="col-log">
-            <DayMacros goals={goals} />
-            <LogInput onSubmit={handleSubmit} busy={live !== null} />
-            <SafetyNotice safety={safety ?? undefined} />
-            {live && <LiveMeal entry={live} />}
-            <MealList
-              meals={meals}
-              heading={heading}
-              detailsById={details}
-              onEdit={handleDelete}
-              onCorrected={handleCorrected}
-            />
+            {/* The day card — date navigator + calorie/macro rings, one panel. */}
+            <section className="day-card">
+              <DatePicker
+                date={date}
+                onShift={(days) => setDate((d) => shiftDate(d, days))}
+                onPickDate={setDate}
+              />
+              <DayMacros goals={goals} />
+            </section>
+
+            {/* The log card — input + the day's meals, a separate panel below. */}
+            <section className="log-card">
+              <h2 className="log-card-head">Food Log</h2>
+              <LogInput onSubmit={handleSubmit} busy={live !== null} />
+              <SafetyNotice safety={safety ?? undefined} />
+              {live && <LiveMeal entry={live} />}
+              <MealList
+                meals={meals}
+                heading={heading}
+                detailsById={details}
+                onEdit={handleDelete}
+                onCorrected={handleCorrected}
+              />
+            </section>
           </div>
-          <Dashboard
-            corrections={corrections}
-            taught={taught}
-            latestTrace={latestTrace}
-          />
+          <Dashboard reloadSignal={reloadSignal} latestTrace={latestTrace} />
         </div>
       </main>
-      {obs && <ObservabilityModal initialTab={obs} onClose={() => setObs(null)} />}
+      {overviewOpen && <OverviewModal onClose={() => setOverviewOpen(false)} />}
       {macroOpen && (
         <MacroModal
           onClose={() => setMacroOpen(false)}

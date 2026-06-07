@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MealTrace } from "@/components/meal-trace";
-import { correctMeal, type ConfidenceAxis, type LoggedItem, type TraceStep } from "@/lib/api";
+import type { ConfidenceAxis, LoggedItem, TraceStep } from "@/lib/api";
 
-vi.mock("@/lib/api", () => ({ correctMeal: vi.fn() }));
+// FreeformFeedback (rendered when mealText is present) imports this.
+vi.mock("@/lib/api", () => ({ submitFreeformFeedback: vi.fn() }));
 
-// Two logged foods — including a double-counted "Burrito Bowl" the user will remove.
 const perItem: LoggedItem[] = [
   {
     fdc_id: 171477,
@@ -31,130 +31,66 @@ const trace: TraceStep[] = [
   { step: "log_entry", summary: "Logged 2 items", totals: perItem[0].nutrients },
 ];
 
-const ok = {
-  ok: true,
-  added_to_arize: true,
-  corrections: 1,
-  per_item: [],
-  totals: [],
-  phoenix_url: "https://app.phoenix.arize.com/s/demo",
-};
-
 describe("MealTrace", () => {
-  it("keeps the agent's work behind a toggle, revealing each step on open", () => {
+  it("shows the agent's work as cards (no toggle) — every step visible", () => {
     render(<MealTrace trace={trace} perItem={perItem} />);
-    // The breakdown table is always shown; the trace steps are tucked away.
-    expect(screen.queryByText(/Parsed 2 foods/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /the agent's work/i }));
+    expect(screen.getByText(/agent's work/i)).toBeInTheDocument();
     expect(screen.getByText(/Parsed 2 foods/)).toBeInTheDocument();
     expect(screen.getByText(/Logged 2 items/)).toBeInTheDocument();
   });
 
-  it("shows each item's scaled kcal", () => {
+  it("shows each item's kcal in the read-only table", () => {
     render(<MealTrace trace={trace} perItem={perItem} mealText="chicken and a bowl" />);
     const row = screen.getByText("chicken breast, grilled").closest(".item-grid") as HTMLElement;
     expect(within(row).getByText("231")).toBeInTheDocument();
   });
 
-  it("only offers a correction when there's a meal to correct", () => {
+  it("offers the review (confirm / correct) only when there's a meal", () => {
     const { rerender } = render(<MealTrace trace={trace} perItem={perItem} />);
-    expect(
-      screen.queryByRole("button", { name: /something's off/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/does this look about right/i)).not.toBeInTheDocument();
     rerender(<MealTrace trace={trace} perItem={perItem} mealText="x" />);
-    expect(screen.getByRole("button", { name: /something's off/i })).toBeInTheDocument();
+    expect(screen.getByText(/does this look about right/i)).toBeInTheDocument();
+    // The correction box is behind "No, something's off" (the correct path).
+    expect(screen.queryByLabelText(/free-form feedback/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /no, something's off/i }));
+    expect(screen.getByLabelText(/free-form feedback/i)).toBeInTheDocument();
   });
 
-  it("edits a portion and rescales the row", () => {
-    render(<MealTrace trace={trace} perItem={perItem} mealText="x" />);
-    fireEvent.click(screen.getByRole("button", { name: /something's off/i }));
-    fireEvent.change(screen.getByLabelText(/grams of chicken breast, grilled/i), {
-      target: { value: "280" },
-    });
-    const row = screen.getByText("chicken breast, grilled").closest(".item-grid") as HTMLElement;
-    // 231 kcal at 140 g → 462 kcal at 280 g.
-    expect(within(row).getByText("462")).toBeInTheDocument();
-  });
+  // ── Confidence axes: the full calculation ────────────────────────────────
 
-  it("removes a double-counted item and saves only what's kept", async () => {
-    vi.mocked(correctMeal).mockResolvedValue(ok);
-    const onCorrected = vi.fn();
-    render(
-      <MealTrace
-        trace={trace}
-        perItem={perItem}
-        mealText="chipotle bowl with chicken"
-        onCorrected={onCorrected}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /something's off/i }));
-    fireEvent.click(screen.getByRole("button", { name: /remove Chipotle Burrito Bowl/i }));
-    fireEvent.click(screen.getByRole("button", { name: /save correction/i }));
-
-    await waitFor(() => expect(correctMeal).toHaveBeenCalled());
-    const [mealText, items] = vi.mocked(correctMeal).mock.calls[0];
-    expect(mealText).toBe("chipotle bowl with chicken");
-    expect(items.map((i) => i.description)).toEqual(["chicken breast, grilled"]);
-
-    await waitFor(() => expect(screen.getByText(/Learned/i)).toBeInTheDocument());
-    expect(onCorrected).toHaveBeenCalled();
-  });
-
-  it("passes mealId to correctMeal when provided", async () => {
-    vi.clearAllMocks();
-    vi.mocked(correctMeal).mockResolvedValue(ok);
-    render(
-      <MealTrace
-        trace={trace}
-        perItem={perItem}
-        mealText="chicken and rice"
-        mealId={42}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /something's off/i }));
-    fireEvent.click(screen.getByRole("button", { name: /save correction/i }));
-
-    await waitFor(() => expect(correctMeal).toHaveBeenCalled());
-    const [, , mealId] = vi.mocked(correctMeal).mock.calls[0];
-    expect(mealId).toBe(42);
-  });
-
-  // ──  all four confidence axes ──────────────────────────────────
-
-  it("renders all four confidence axes when provided", () => {
+  it("renders all four confidence axes + the average total", () => {
     const axes: ConfidenceAxis[] = [
       { name: "resolution_completeness", score: 1.0, note: "✓ all 2 food(s) resolved" },
       { name: "source_quality", score: 1.0, note: "✓ high-trust sources" },
       { name: "portion_sanity", score: 1.0, note: "✓ all 2 portion(s) plausible" },
       { name: "calorie_plausibility", score: 1.0, note: "✓ 896 kcal ≈ Atwater estimate" },
     ];
-    render(<MealTrace trace={trace} perItem={perItem} axes={axes} />);
-    fireEvent.click(screen.getByRole("button", { name: /the agent's work/i }));
-    expect(screen.getByText(/resolution completeness/i)).toBeInTheDocument();
-    expect(screen.getByText(/source quality/i)).toBeInTheDocument();
-    expect(screen.getByText(/portion sanity/i)).toBeInTheDocument();
-    expect(screen.getByText(/calorie plausibility/i)).toBeInTheDocument();
-    expect(screen.getByText("✓ all 2 food(s) resolved")).toBeInTheDocument();
+    render(<MealTrace trace={trace} perItem={perItem} axes={axes} confidence={1.0} />);
+    expect(screen.getByText(/foods found/i)).toBeInTheDocument();
+    expect(screen.getByText(/trusted data/i)).toBeInTheDocument();
+    expect(screen.getByText(/sensible portions/i)).toBeInTheDocument();
+    expect(screen.getByText(/calories add up/i)).toBeInTheDocument();
+    // The note renders without the ✓/⚠ glyph (it's encoded as the row class).
+    expect(screen.getByText(/all 2 food\(s\) resolved/i)).toBeInTheDocument();
+    // The actual calculation is spelled out.
+    expect(screen.getByText(/average of 4 checks/i)).toBeInTheDocument();
+    expect(screen.getByText(/100% confidence/i)).toBeInTheDocument();
   });
 
-  it("shows ⚠ for a failing axis and ✓ for a passing one", () => {
+  it("marks a failing axis warn and a passing axis pass", () => {
     const axes: ConfidenceAxis[] = [
       { name: "resolution_completeness", score: 0.5, note: "⚠ 1 of 2 food(s) dropped (1 logged)" },
       { name: "source_quality", score: 1.0, note: "✓ high-trust sources" },
-      { name: "portion_sanity", score: 1.0, note: "✓ all 1 portion(s) plausible" },
-      { name: "calorie_plausibility", score: 1.0, note: "✓ 290 kcal ≈ Atwater estimate" },
     ];
-    render(<MealTrace trace={trace} perItem={perItem} axes={axes} />);
-    fireEvent.click(screen.getByRole("button", { name: /the agent's work/i }));
-    expect(screen.getByText("⚠ 1 of 2 food(s) dropped (1 logged)")).toBeInTheDocument();
-    expect(screen.getByText("✓ high-trust sources")).toBeInTheDocument();
+    render(<MealTrace trace={trace} perItem={perItem} axes={axes} confidence={0.75} />);
+    const warnRow = screen.getByText(/1 of 2 food\(s\) dropped/i).closest(".conf-calc-row");
+    expect(warnRow).toHaveClass("warn");
+    expect(screen.getByText(/75% confidence/i)).toBeInTheDocument();
   });
 
-  // ──  per-portion basis note ────────────────────────────────────
+  // ── Portion reasoning recap ───
 
-  it("shows the portion basis note per item when provided", () => {
+  it("shows the 'why these foods & portions' card when basis is present", () => {
     const itemsWithBasis: LoggedItem[] = [
       {
         fdc_id: 1,
@@ -165,13 +101,12 @@ describe("MealTrace", () => {
       },
     ];
     render(<MealTrace trace={[]} perItem={itemsWithBasis} />);
-    // The basis should be visible without expanding the trace
+    expect(screen.getByText(/why these foods/i)).toBeInTheDocument();
     expect(screen.getByText(/reference serving/i)).toBeInTheDocument();
   });
 
-  it("renders nothing extra when portion_basis is absent", () => {
-    // Existing items without portion_basis should render cleanly — no errors.
+  it("renders no 'why these foods' card when portion_basis is absent", () => {
     render(<MealTrace trace={trace} perItem={perItem} />);
-    expect(screen.queryByText(/reference serving/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/why these foods/i)).not.toBeInTheDocument();
   });
 });

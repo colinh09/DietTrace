@@ -55,11 +55,6 @@ def calories_of(totals: list[dict[str, Any]]) -> float:
     return 0.0
 
 
-def _eval_case(meal_text: str, totals: list[dict[str, Any]]) -> dict[str, Any]:
-    """A re-test case: the meal text and its corrected calorie ground truth."""
-    return {"text": meal_text, "calories": calories_of(totals)}
-
-
 def _example_of(meal_text: str, items: list[dict[str, Any]]) -> dict[str, Any]:
     """Render a remembered correction as a few-shot example for the parse prompt."""
     return {
@@ -150,14 +145,11 @@ class SqliteMemory:
             ).fetchone()
         return int(row["n"]) if row else 0
 
-    def eval_cases(self, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    def clear_user(self, user_id: str) -> int:
+        """Forget all of *user_id*'s remembered examples; return rows removed."""
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT meal_text, totals_json FROM memory WHERE user_id = ? "
-                "ORDER BY created_at DESC LIMIT ?",
-                (user_id, limit),
-            ).fetchall()
-        return [_eval_case(r["meal_text"], json.loads(r["totals_json"])) for r in rows]
+            cursor = conn.execute("DELETE FROM memory WHERE user_id = ?", (user_id,))
+            return cursor.rowcount
 
 
 class FirestoreMemory:
@@ -217,17 +209,11 @@ class FirestoreMemory:
         query = self._db.collection(self._col).where(filter=_filter("user_id", user_id))
         return sum(1 for _ in query.stream())
 
-    def eval_cases(self, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
-        from dietrace.web.firestore_store import _filter
+    def clear_user(self, user_id: str) -> int:
+        """Forget all of *user_id*'s remembered examples; return docs removed."""
+        from dietrace.web.firestore_store import _clear_collection
 
-        docs = [
-            d.to_dict()
-            for d in self._db.collection(self._col)
-            .where(filter=_filter("user_id", user_id))
-            .stream()
-        ]
-        docs.sort(key=lambda d: d.get("created_at", 0), reverse=True)
-        return [_eval_case(d["meal_text"], d.get("totals", [])) for d in docs[:limit]]
+        return _clear_collection(self._db, self._col, user_id)
 
 
 def build_memory() -> Any:

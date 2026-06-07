@@ -203,6 +203,40 @@ def test_apply_portion_adjust_scales_grams() -> None:
     assert result[1]["grams"] == pytest.approx(200.0)  # burger unchanged
 
 
+def test_apply_portion_adjust_absolute_grams_sets_portion_directly() -> None:
+    """An absolute target_grams sets the food's grams directly, not as a multiplier.
+
+    Regression: "about 30 grams" must land at 30 g regardless of the logged
+    portion — not be misread as a 0.30 multiplier off the current grams.
+    """
+    fb = StructuredFeedback(
+        kind="portion_adjust",
+        target_food="fries",
+        target_grams=30.0,
+        adjustment=None,
+        scope="this_food",
+        rationale="usually only eat about 30 g",
+    )
+    result = apply_feedback(_ITEMS, fb)
+
+    assert result[0]["grams"] == pytest.approx(30.0)  # set to 30 g, not 300×0.3
+    assert result[1]["grams"] == pytest.approx(200.0)  # burger unchanged
+
+
+def test_apply_portion_adjust_absolute_grams_wins_over_multiplier() -> None:
+    """When both are present, the absolute target_grams takes precedence."""
+    fb = StructuredFeedback(
+        kind="portion_adjust",
+        target_food="fries",
+        target_grams=50.0,
+        adjustment=0.5,
+        scope="this_food",
+        rationale="",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert result[0]["grams"] == pytest.approx(50.0)
+
+
 def test_apply_portion_adjust_case_insensitive() -> None:
     """Food matching for portion_adjust is case-insensitive."""
     fb = StructuredFeedback(

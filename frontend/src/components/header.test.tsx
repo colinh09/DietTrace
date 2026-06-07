@@ -5,33 +5,26 @@ import { Header } from "@/components/header";
 const may30 = new Date(2026, 4, 30);
 
 describe("Header", () => {
-  it("renders the DietTrace brand and the formatted date", () => {
-    render(<Header date={may30} onShift={() => {}} onPickDate={() => {}} />);
+  it("renders the brand and the evenly-spaced nav tabs (no date picker)", () => {
+    render(<Header date={may30} />);
     expect(screen.getByText("DietTrace")).toBeInTheDocument();
-    expect(screen.getByText("Sat, May 30")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Macros" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /persona details/i })).toBeInTheDocument();
+    // The date navigation lives in the day card now, not the navbar.
+    expect(screen.queryByRole("button", { name: /open calendar/i })).not.toBeInTheDocument();
   });
 
-  it("shifts the day back and forward via the date arrows", () => {
-    const onShift = vi.fn();
-    render(<Header date={may30} onShift={onShift} onPickDate={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: /previous day/i }));
-    fireEvent.click(screen.getByRole("button", { name: /next day/i }));
-    expect(onShift).toHaveBeenNthCalledWith(1, -1);
-    expect(onShift).toHaveBeenNthCalledWith(2, 1);
-  });
-
-  it("opens the calendar affordance and picks a day", () => {
-    const onPickDate = vi.fn();
-    render(<Header date={may30} onShift={() => {}} onPickDate={onPickDate} />);
-    // The calendar is closed until the affordance is clicked.
-    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /open calendar/i }));
-    expect(screen.getByRole("grid")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "15" }));
-    expect(onPickDate).toHaveBeenCalledTimes(1);
-    const picked = onPickDate.mock.calls[0][0] as Date;
-    expect(picked.getFullYear()).toBe(2026);
-    expect(picked.getMonth()).toBe(4);
-    expect(picked.getDate()).toBe(15);
+  it("opens the Overview and the Macros editor from the navbar", () => {
+    const onOpenOverview = vi.fn();
+    const onOpenMacros = vi.fn();
+    render(
+      <Header date={may30} onOpenOverview={onOpenOverview} onOpenMacros={onOpenMacros} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Overview" }));
+    fireEvent.click(screen.getByRole("button", { name: "Macros" }));
+    expect(onOpenOverview).toHaveBeenCalledTimes(1);
+    expect(onOpenMacros).toHaveBeenCalledTimes(1);
   });
 });

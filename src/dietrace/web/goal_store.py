@@ -76,3 +76,9 @@ class GoalStore:
                 "  updated_at   = excluded.updated_at",
                 (user, json.dumps(targets), rationale, source, when),
             )
+
+    def clear_user(self, user: str = DEMO_USER) -> int:
+        """Delete *user*'s saved goals; return how many rows were removed."""
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM goals WHERE user_id = ?", (user,))
+            return cursor.rowcount

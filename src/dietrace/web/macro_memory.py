@@ -149,6 +149,14 @@ class SqliteMacroMemory:
             ).fetchone()
         return int(row["n"]) if row else 0
 
+    def clear_user(self, user_id: str) -> int:
+        """Forget *user_id*'s learned macro split; return rows removed."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM macro_memory WHERE user_id = ?", (user_id,)
+            )
+            return cursor.rowcount
+
 
 class FirestoreMacroMemory:
     """Per-user macro preference memory on Firestore (production)."""
@@ -183,6 +191,14 @@ class FirestoreMacroMemory:
     def count(self, user_id: str) -> int:
         snap = self._db.collection(self._col).document(user_id).get()
         return 1 if snap.exists else 0
+
+    def clear_user(self, user_id: str) -> int:
+        """Forget *user_id*'s learned macro split; return 1 if one existed, else 0."""
+        ref = self._db.collection(self._col).document(user_id)
+        if ref.get().exists:
+            ref.delete()
+            return 1
+        return 0
 
 
 def build_macro_memory() -> Any:

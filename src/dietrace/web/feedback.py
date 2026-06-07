@@ -199,6 +199,14 @@ class FeedbackStore:
             ).fetchone()
             return int(row["n"]) if row else 0
 
+    def clear_user(self, user_id: str = DEMO_USER) -> int:
+        """Delete all of *user_id*'s corrections; return rows removed."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM corrections WHERE user_id = ?", (user_id,)
+            )
+            return cursor.rowcount
+
     def recent(
         self, user_id: str = DEMO_USER, limit: int = 10
     ) -> list[dict[str, Any]]:

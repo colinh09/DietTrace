@@ -7,6 +7,7 @@
 // ordered steps plus the per-item editable table — from that meal's `/log`
 // detail when we have it.
 import { useState } from "react";
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import type { ConfidenceAxis, LoggedItem, Meal, TraceStep } from "@/lib/api";
 import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
@@ -45,10 +46,15 @@ function MealRow({
   onEdit?: (meal: Meal) => void;
   onCorrected?: () => void;
 }) {
-  // Set when the user taps "review?": it opens the editor straight into edit
-  // mode (vs. the always-shown read-only breakdown).
-  const [reviewMode, setReviewMode] = useState(false);
+  // A meal is collapsed to a one-line summary by default; clicking the row
+  // expands its full breakdown (every accountability card, incl. confidence).
+  const [expanded, setExpanded] = useState(false);
   const macros = macrosOf(meal.totals);
+  // A held-out confirmed meal mirrored as a visible row: it's the user's asserted
+  // ground truth (the gate's test set), not an agent estimate — so it shows a
+  // "dataset point" badge instead of a confidence chip, and expands to explain
+  // its role rather than a per-item trace (the observability-everywhere rule).
+  const isDataset = meal.dataset_point === true;
   // Prefer the backend's real online-eval confidence when we have it (a freshly
   // logged meal carries it in its detail); fall back to the macro-reconciliation
   // heuristic for a meal read back from history without a backend score (12.2).
@@ -66,72 +72,124 @@ function MealRow({
   const confTitle =
     `${conf.level} confidence (${conf.pct}%) — DietTrace's automatic quality check: ` +
     "how cleanly it resolved each food, the source, and calorie sanity. It does " +
-    "not verify the portion, so if a gram weight looks off, tap “something's off?” " +
-    "to correct it.";
+    "not verify the portion, so if a gram weight looks off, just tell DietTrace " +
+    "below in plain words and it'll fix it.";
+
+  // Expand the breakdown — used by the review flag so a flagged meal goes one
+  // click from "!" to its cards (incl. the "why this confidence" card).
+  const openForReview = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded(true);
+  };
 
   return (
-    <li className="meal">
-      <div className="meal-head">
+    <li className={"meal" + (expanded ? " open" : "")}>
+      <div
+        className="meal-head"
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        onClick={() => setExpanded((s) => !s)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded((s) => !s);
+          }
+        }}
+      >
+        <span className="meal-caret" aria-hidden="true">
+          {expanded ? <ChevronDown size={19} /> : <ChevronRight size={19} />}
+        </span>
         <span className="meal-main">
-          <span className="meal-text">{meal.text}</span>
-          <span className="meal-time mono">{formatTime(meal.created_at)}</span>
+          <span className="meal-title-row">
+            <span className="meal-text">{meal.text}</span>
+            {needsReview && !isDataset && (
+              <button
+                type="button"
+                className="meal-review-flag"
+                data-tip="Show me why this was flagged"
+                aria-label="Show me why this was flagged"
+                onClick={openForReview}
+              >
+                !
+              </button>
+            )}
+          </span>
+          <span className="meal-time mono">
+            {isDataset ? "your confirmed intake" : formatTime(meal.created_at)}
+          </span>
         </span>
         <span className="meal-side">
           <span className="meal-macros mono tnum">
             <b>{fmt.format(Math.round(macros.kcal))}</b> kcal
-            <span className="mm-sep">·</span>
-            <span className="mm-part">P {Math.round(macros.protein)}</span>
-            <span className="mm-sep">·</span>
-            <span className="mm-part">C {Math.round(macros.carb)}</span>
-            <span className="mm-sep">·</span>
-            <span className="mm-part">F {Math.round(macros.fat)}</span>
+            {!isDataset && (
+              <>
+                <span className="mm-sep">·</span>
+                <span className="mm-part">P {Math.round(macros.protein)}</span>
+                <span className="mm-sep">·</span>
+                <span className="mm-part">C {Math.round(macros.carb)}</span>
+                <span className="mm-sep">·</span>
+                <span className="mm-part">F {Math.round(macros.fat)}</span>
+              </>
+            )}
           </span>
-          <span className={"conf-chip " + chip} title={confTitle}>
-            <span className="conf-dot" aria-hidden="true" />
-            <span className="conf-label">{conf.level}</span>
-            <span className="conf-pct tnum"> · {conf.pct}%</span>
-          </span>
-          {needsReview && (
-            <button
-              type="button"
-              className="meal-review"
-              title={detail?.reviewReason ?? undefined}
-              onClick={() => setReviewMode(true)}
+          {isDataset ? (
+            <span
+              className="dataset-badge"
+              title="A meal you confirmed — held out as ground truth to test the agent. It never sees this while learning; it's only scored against it."
             >
-              review?
-            </button>
+              <span className="dataset-badge-dot" aria-hidden="true" />
+              dataset point
+            </span>
+          ) : (
+            <span className={"conf-chip " + chip} title={confTitle}>
+              <span className="conf-dot" aria-hidden="true" />
+              <span className="conf-label">{conf.level}</span>
+              <span className="conf-pct tnum"> · {conf.pct}%</span>
+            </span>
           )}
           <button
             type="button"
             className="meal-edit"
             aria-label="remove meal"
-            onClick={() => onEdit?.(meal)}
+            title="Remove this meal"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit?.(meal);
+            }}
           >
-            remove
+            <Trash2 size={14} aria-hidden="true" />
           </button>
         </span>
       </div>
-      <div className="meal-detail">
-        {detail ? (
-          <MealTrace
-            // Remount into edit mode when the user taps "review?" — the breakdown
-            // is always mounted, so flipping the key is what re-reads startEditing.
-            key={reviewMode ? "edit" : "view"}
-            trace={detail.trace}
-            perItem={detail.perItem}
-            reasons={detail.reasons}
-            axes={detail.axes}
-            mealText={meal.text}
-            mealId={meal.id}
-            startEditing={reviewMode}
-            onCorrected={onCorrected}
-          />
-        ) : (
-          <div className="meal-detail-empty">
-            No breakdown for this meal — log it again to see the per-item table.
-          </div>
-        )}
-      </div>
+      {expanded && (
+        <div className="meal-detail">
+          {isDataset ? (
+            <div className="dataset-explain">
+              <b>Held-out ground truth.</b> This is a meal you confirmed, at your
+              true intake. Every re-tune re-scores the agent against it to prove a
+              learned change actually fits you — but it’s never used to teach the
+              agent, so the test stays honest.
+            </div>
+          ) : detail ? (
+            <MealTrace
+              trace={detail.trace}
+              perItem={detail.perItem}
+              reasons={detail.reasons}
+              axes={detail.axes}
+              confidence={detail.confidence}
+              mealText={meal.text}
+              mealId={meal.id}
+              totals={meal.totals}
+              onCorrected={onCorrected}
+            />
+          ) : (
+            <div className="meal-detail-empty">
+              No breakdown for this meal — log it again to see the per-item table.
+            </div>
+          )}
+        </div>
+      )}
     </li>
   );
 }

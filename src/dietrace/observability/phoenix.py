@@ -36,6 +36,8 @@ def init_tracer(service_name: str) -> TracerProvider | None:
     from openinference.instrumentation.mcp import MCPInstrumentor
     from phoenix.otel import register
 
+    from dietrace.observability.trace_buffer import get_buffer
+
     # register() reads PHOENIX_API_KEY / PHOENIX_COLLECTOR_ENDPOINT from the env and
     # builds the auth headers itself; passing them explicitly mishandles the key.
     tracer_provider = register(
@@ -47,5 +49,10 @@ def init_tracer(service_name: str) -> TracerProvider | None:
     GoogleADKInstrumentor().instrument(tracer_provider=tracer_provider)
     GoogleGenAIInstrumentor().instrument(tracer_provider=tracer_provider)
     MCPInstrumentor().instrument(tracer_provider=tracer_provider)
+
+    # Mirror finished spans into the in-process buffer so the web "reasoning" panel
+    # works in production, not only in tests. Spans still export to Phoenix; this is
+    # a parallel, capped, in-memory observer (see trace_buffer.py).
+    tracer_provider.add_span_processor(get_buffer())
 
     return tracer_provider

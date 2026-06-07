@@ -5,11 +5,14 @@
 import type { GoalProgress } from "@/lib/api";
 
 // USDA number codes for the four tracked macros.
+// Each ring carries its own colour so the four are distinguishable at a glance —
+// a muted, palette-friendly take on the common convention (protein green, carbs
+// blue, fat gold, calories a warm clay). There's no universal standard.
 const CALORIES = "208";
-const MACRO_ORDER: { code: string; key: string; label: string }[] = [
-  { code: "203", key: "P", label: "protein" },
-  { code: "205", key: "C", label: "carbohydrate" },
-  { code: "204", key: "F", label: "fat" },
+const MACRO_ORDER: { code: string; key: string; label: string; tone: string }[] = [
+  { code: "203", key: "P", label: "protein", tone: "var(--macro-protein)" },
+  { code: "205", key: "C", label: "carbohydrate", tone: "var(--macro-carb)" },
+  { code: "204", key: "F", label: "fat", tone: "var(--macro-fat)" },
 ];
 
 const fmt = new Intl.NumberFormat("en-US");
@@ -29,6 +32,7 @@ function Ring({
   size,
   stroke,
   label,
+  tone,
   children,
 }: {
   consumed: number;
@@ -36,6 +40,8 @@ function Ring({
   size: number;
   stroke: number;
   label: string;
+  // The arc colour for this ring (defaults to the sage accent for calories).
+  tone?: string;
   children: React.ReactNode;
 }) {
   const r = (size - stroke) / 2;
@@ -71,6 +77,7 @@ function Ring({
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - filled)}
           transform={`rotate(-90 ${mid} ${mid})`}
+          style={tone ? { stroke: tone } : undefined}
         />
       </svg>
       <div className="ring-center">{children}</div>
@@ -87,21 +94,21 @@ export function DayMacros({ goals }: { goals: GoalProgress[] }) {
   return (
     <section className="daymacros">
       <div className="dm-cal">
-        <Ring consumed={calConsumed} target={calTarget} size={132} stroke={11} label="calories">
+        <Ring consumed={calConsumed} target={calTarget} size={132} stroke={11} label="calories" tone="var(--macro-cal)">
           <span className="dm-cal-val tnum">{fmt.format(Math.round(calConsumed))}</span>
           <span className="dm-cal-goal tnum">/ {fmt.format(Math.round(calTarget))}</span>
           <span className="dm-cal-label">calories</span>
         </Ring>
       </div>
       <div className="dm-macros">
-        {MACRO_ORDER.map(({ code, key, label }) => {
+        {MACRO_ORDER.map(({ code, key, label, tone }) => {
           const goal = byCode.get(code);
           const consumed = goal?.consumed ?? 0;
           const target = goal?.target ?? 0;
           return (
             <div className="dm-macro" key={key}>
-              <Ring consumed={consumed} target={target} size={84} stroke={8} label={label}>
-                <span className="dm-macro-key">{key}</span>
+              <Ring consumed={consumed} target={target} size={84} stroke={8} label={label} tone={tone}>
+                <span className="dm-macro-key" style={{ color: tone }}>{key}</span>
                 <span className="dm-macro-val tnum">{Math.round(consumed)}</span>
               </Ring>
               <div className="dm-macro-goal tnum">

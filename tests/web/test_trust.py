@@ -7,7 +7,33 @@ numbers. Offline SQLite backend; the Firestore one mirrors the interface.
 
 from __future__ import annotations
 
+import sqlite3
+
 from dietrace.web.trust import TrustStore
+
+
+def test_migrates_db_missing_text_and_review_reason_columns(tmp_path) -> None:
+    """A trust_logs DB created by an older schema (no text/review_reason) must be
+    migrated forward on init, not 500 on stats() — the bug that hung the Trust modal.
+    """
+    db = tmp_path / "trust.sqlite"
+    # Simulate the pre-12.5 schema: no text / review_reason columns.
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "CREATE TABLE trust_logs ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL DEFAULT 'demo', "
+            "created_at TEXT NOT NULL, confidence REAL NOT NULL, "
+            "needs_review INTEGER NOT NULL, sources_json TEXT NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO trust_logs (user_id, created_at, confidence, needs_review, "
+            "sources_json) VALUES ('demo', '2026-01-01', 0.4, 1, '[\"web\"]')"
+        )
+
+    store = TrustStore(db)  # __init__ should add the missing columns
+    stats = store.stats()  # would raise 'no such column: text' before the fix
+    assert stats["count"] == 1
+    assert stats["needs_review_pct"] == 1.0
 
 
 def test_record_returns_id_and_stats_roll_up(tmp_path) -> None:

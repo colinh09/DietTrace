@@ -121,6 +121,9 @@ export interface Meal {
   axes?: ConfidenceAxis[];
   needs_review?: boolean;
   review_reason?: string | null;
+  // True for a held-out confirmed meal mirrored as a visible row (a "dataset
+  // point") — ground truth the gate scores against, not an agent estimate.
+  dataset_point?: boolean;
 }
 
 // `GET /history?date=` — one calendar day's meals (default: today).
@@ -157,13 +160,25 @@ export function userId(): string {
   return id;
 }
 
-// Headers every request carries: JSON + the caller's anonymous user id.
+// The current Firebase ID token for a signed-in user, kept in sync by the auth
+// layer (onIdTokenChanged → setAuthToken). Null when signed out / not configured,
+// in which case requests fall back to the anonymous X-DietTrace-User id.
+let _idToken: string | null = null;
+
+export function setAuthToken(token: string | null): void {
+  _idToken = token;
+}
+
+// Headers every request carries: JSON, the anonymous user id (fallback), and —
+// when signed in — the Firebase ID token the backend verifies into a stable uid.
 function authHeaders(extra?: HeadersInit): HeadersInit {
-  return {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-DietTrace-User": userId(),
     ...(extra as Record<string, string>),
   };
+  if (_idToken) headers["Authorization"] = `Bearer ${_idToken}`;
+  return headers;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -229,70 +244,6 @@ export async function correctMeal(
 // How many corrections this user has taught the agent.
 export async function getMemory(): Promise<{ corrections: number }> {
   return request<{ corrections: number }>("/memory");
-}
-
-// The before/after of re-testing the agent on the user's own corrected meals.
-export interface RetuneResult {
-  cases: number;
-  before: number | null;
-  after: number | null;
-  improved: boolean;
-}
-
-// Re-tune & re-test: run the agent on your corrected meals, base vs with-memory.
-export async function retune(): Promise<RetuneResult> {
-  return request<RetuneResult>("/retune", { method: "POST" });
-}
-
-// One corrected meal as it's scored during a streamed re-test.
-export interface RetuneCase {
-  type: "case";
-  text: string;
-  expected_calories: number;
-  before: number;
-  after: number;
-}
-
-// The final roll-up of a streamed re-test.
-export interface RetuneSummary {
-  type: "summary";
-  cases: number;
-  before: number | null;
-  after: number | null;
-  improved: boolean;
-}
-
-export type RetuneEvent = RetuneCase | RetuneSummary;
-
-// Stream the re-test: `onEvent` fires per corrected meal as it's scored, then
-// once with the summary — so the eval is visible happening in the UI.
-export async function retuneStream(
-  onEvent: (event: RetuneEvent) => void,
-): Promise<void> {
-  const response = await fetch(`${API_BASE}/retune/stream`, {
-    method: "POST",
-    headers: authHeaders(),
-  });
-  if (!response.ok || !response.body) {
-    throw new Error(`DietTrace /retune/stream failed: ${response.status}`);
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let sep = buffer.indexOf("\n\n");
-    while (sep >= 0) {
-      const frame = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      if (frame.startsWith("data: ")) {
-        onEvent(JSON.parse(frame.slice(6)) as RetuneEvent);
-      }
-      sep = buffer.indexOf("\n\n");
-    }
-  }
 }
 
 // Read one day's logged meals. Omit `date` for today (the backend default).
@@ -415,12 +366,22 @@ export interface FreeformFeedbackResult {
   kind: string | null;
   target_food: string;
   adjustment: number | null;
+  // Absolute gram target for an absolute portion fix ("about 30 grams"); null
+  // when the user gave a relative amount ("half") expressed via `adjustment`.
+  target_grams?: number | null;
   rationale: string;
   scope: string;
   stored_as_preference: boolean;
   per_item: LoggedItem[];
   totals: Nutrient[];
+  // The recomputed online eval after the fix (null for standing-rule feedback).
+  confidence?: number | null;
+  axes?: ConfidenceAxis[] | null;
+  reasons?: string[] | null;
+  needs_review?: boolean | null;
+  review_reason?: string | null;
   added_to_arize: boolean;
+  corrections?: number;
   phoenix_url: string;
   error?: string;
 }
@@ -610,15 +571,263 @@ export async function postMacrosRetune(body: MacroPlanRequest): Promise<MacroRet
   });
 }
 
-// `POST /demo/seed` — populate the calling user's history with canned meals
-// + demo macro targets so a judge can see the full app state immediately
-//.
+// The persona a demo seed loaded — what was logged, the seeded learning state,
+// and the on-screen under-count, so the explainer modal can describe it exactly.
+export interface SeededPersona {
+  key: string;
+  label: string;
+  blurb: string;
+  goal_rationale: string;
+  hook_meal: string;
+  hook_note: string;
+  learns: string;
+  meal_texts: string[];
+  confirmation_texts: string[];
+  correction_texts: string[];
+}
+
+// `POST /demo/seed` — populate the calling user's account with a persona's
+// visible day (filed on the PREVIOUS day so today stays clean) + the learning
+// seed, so a judge can see the full app state immediately.
 export interface SeedDemoResult {
   seeded: boolean;
   meals: number;
+  // The day the visible playground meals landed on (today, ISO).
+  meal_date: string;
+  // The day the confirmed dataset-point rows landed on (yesterday, ISO).
+  dataset_date: string;
   goals_set: boolean;
+  confirmations: number;
+  corrections: number;
+  persona: SeededPersona;
 }
 
-export async function seedDemo(): Promise<SeedDemoResult> {
-  return request<SeedDemoResult>("/demo/seed", { method: "POST" });
+// The selectable demo personas (the persona loader). Keys match the backend.
+export const DEMO_PERSONAS = [
+  {
+    key: "runner",
+    label: "Endurance runner",
+    blurb: "Under-logs her training carbs.",
+  },
+  {
+    key: "bodybuilder",
+    label: "Bodybuilder",
+    blurb: "Under-logs his post-lift protein.",
+  },
+] as const;
+
+export async function seedDemo(
+  date?: string,
+  persona?: string,
+): Promise<SeedDemoResult> {
+  return request<SeedDemoResult>("/demo/seed", {
+    method: "POST",
+    body: JSON.stringify({ date, persona }),
+  });
+}
+
+// `POST /session/reset` — wipe the calling user's meals, goals, and everything
+// DietTrace has learned about them back to a clean slate.
+export interface SessionResetResult {
+  reset: boolean;
+  cleared: Record<string, number>;
+}
+
+export async function resetSession(): Promise<SessionResetResult> {
+  return request<SessionResetResult>("/session/reset", { method: "POST" });
+}
+
+// ── Learning loop ──────────────────────────────────
+
+// One generalized rule the corrector wrote, with provenance back to the
+// corrections that produced it.
+export interface PreferenceRule {
+  rule: string;
+  rationale: string;
+  from_feedback: number[];
+}
+
+// The per-user preference block — what DietTrace has learned about you.
+export interface PreferenceBlock {
+  block_text: string;
+  version: number;
+  updated_at: string;
+  provenance: PreferenceRule[];
+}
+
+// One confirmed meal in the held-out gate set, with the calories it asserts.
+export interface ConfirmedMeal {
+  id: number;
+  meal_text: string;
+  calories: number;
+}
+
+export interface PreferencesResponse {
+  block: PreferenceBlock | null;
+  corrections: number;
+  // New (unprocessed) corrections — the only ones the next retune folds in.
+  new_corrections: number;
+  confirmations: number;
+  // The confirmed meals (Input A) the gate tests a proposed block against.
+  confirmed: ConfirmedMeal[];
+  min_corrections: number;
+}
+
+// One banked correction (Input B) — natural-language feedback + emphasis weight.
+export interface FeedbackItem {
+  id: number;
+  created_at: string;
+  feedback_text: string;
+  meal_text: string | null;
+  weight: number;
+  // True once it's been folded into a shipped block (a retune won't re-learn it).
+  processed: boolean;
+}
+
+export interface RetuneScores {
+  usda: number;
+  fit: number;
+}
+
+export interface RetuneVerdict {
+  ship: boolean;
+  usda_ok: boolean;
+  fit_gain: boolean;
+  reason: string;
+  eps: number;
+}
+
+// The result of a gated retune: the proposal, both score sets, and the verdict.
+export interface LearningRetuneResult {
+  ok: boolean;
+  shipped?: boolean;
+  verdict?: RetuneVerdict;
+  current?: RetuneScores;
+  proposed?: RetuneScores;
+  proposed_block?: string;
+  rules?: PreferenceRule[];
+  version?: number | null;
+  fit_cases?: number;
+  usda_cases?: number;
+  // when ok=false: "not_enough_corrections" | "no_new_corrections" | "corrector_failed"
+  reason?: string;
+  have?: number;
+  need?: number;
+}
+
+// `GET /preferences` — the learned block + the counts that gate a retune.
+export async function getPreferences(): Promise<PreferencesResponse> {
+  return request<PreferencesResponse>("/preferences");
+}
+
+// The user's freeform "goals + eating style" profile — standing context the
+// corrector reads on every retune so personalization reflects who they are.
+export async function getProfile(): Promise<{ profile_text: string }> {
+  return request<{ profile_text: string }>("/profile");
+}
+
+export async function setProfile(
+  profile_text: string,
+): Promise<{ ok: boolean; profile_text: string }> {
+  return request("/profile", {
+    method: "POST",
+    body: JSON.stringify({ profile_text }),
+  });
+}
+
+// `POST /confirm` — "does this look right?": a confirmed meal becomes a held-out
+// ground-truth datapoint (Input A) the gate scores against.
+export async function confirmMeal(
+  meal_text: string,
+  items: LoggedItem[],
+  totals: Nutrient[],
+): Promise<{ ok: boolean; id: number; confirmations: number }> {
+  return request("/confirm", {
+    method: "POST",
+    body: JSON.stringify({ meal_text, items, totals }),
+  });
+}
+
+export async function listLearningFeedback(): Promise<{
+  feedback: FeedbackItem[];
+  count: number;
+}> {
+  return request("/learning/feedback");
+}
+
+export async function editLearningFeedback(
+  id: number,
+  body: { feedback_text?: string; weight?: number },
+): Promise<{ ok: boolean }> {
+  return request(`/learning/feedback/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteLearningFeedback(
+  id: number,
+): Promise<{ deleted: boolean }> {
+  return request(`/learning/feedback/${id}`, { method: "DELETE" });
+}
+
+// `POST /learning/retune` — the gated retune: corrector proposes, the gate scores
+// it on USDA + held-out fit, ships only if the rule passes. Runs live evals, so
+// it can take a while.
+export async function learningRetune(): Promise<LearningRetuneResult> {
+  return request<LearningRetuneResult>("/learning/retune", { method: "POST" });
+}
+
+// One live event from `POST /learning/retune/stream` — the retune made visible:
+// a `phase` boundary, the proposed `rule`, one `score` per meal as it's re-tested
+// (before/after a 0–1 calorie-accuracy), and a final `done` carrying the verdict.
+export type LearningRetuneEvent =
+  | { type: "phase"; phase: "propose" | "fit" | "usda"; label: string; n?: number }
+  | { type: "rule"; rules: PreferenceRule[] }
+  // The full eval set up front, so the UI lists every meal before scoring starts.
+  | { type: "manifest"; rows: { set: "fit" | "usda"; text: string }[] }
+  | {
+      type: "score";
+      set: "fit" | "usda";
+      i: number;
+      n: number;
+      text: string;
+      expected: number;
+      before: number;
+      after: number;
+    }
+  | ({ type: "done" } & LearningRetuneResult);
+
+// Stream the gated retune: `onEvent` fires per phase/rule/scored-meal as the eval
+// runs, then once with the `done` verdict — so the retest is visible happening.
+// `full` checks the entire USDA standard set (slower); the default quick tune
+// checks a representative sample so it finishes fast.
+export async function learningRetuneStream(
+  onEvent: (event: LearningRetuneEvent) => void,
+  full = false,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/learning/retune/stream${full ? "?full=1" : ""}`,
+    { method: "POST", headers: authHeaders() },
+  );
+  if (!response.ok || !response.body) {
+    throw new Error(`DietTrace /learning/retune/stream failed: ${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep = buffer.indexOf("\n\n");
+    while (sep >= 0) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      if (frame.startsWith("data: ")) {
+        onEvent(JSON.parse(frame.slice(6)) as LearningRetuneEvent);
+      }
+      sep = buffer.indexOf("\n\n");
+    }
+  }
 }

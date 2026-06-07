@@ -33,7 +33,8 @@ CREATE TABLE IF NOT EXISTS meals (
 # rebuild the per-item table + trace + quality eval for a meal logged earlier
 # (so navigating away and back keeps the breakdown, not just the totals).
 _DETAIL_KEYS = (
-    "per_item", "trace", "confidence", "reasons", "axes", "needs_review", "review_reason"
+    "per_item", "trace", "confidence", "reasons", "axes", "needs_review",
+    "review_reason", "dataset_point",
 )
 
 
@@ -88,11 +89,15 @@ class MealLogStore:
         per_item: list[dict[str, Any]],
         totals: list[dict[str, Any]],
         user_id: str = DEMO_USER,
+        detail_patch: dict[str, Any] | None = None,
     ) -> bool:
         """Rewrite a stored meal's totals and per_item after a correction.
 
         Patches totals_json and detail_json.per_item while keeping the rest of
-        the detail (trace, confidence, reasons, needs_review) intact. Scoped to
+        the detail (trace, confidence, reasons, needs_review) intact. When
+        ``detail_patch`` is given (e.g. a recomputed online eval after a portion
+        fix), its keys are merged into the stored detail too, so the persisted
+        confidence/axes/needs_review reflect the corrected meal. Scoped to
         user_id so one user cannot overwrite another's meal.
         """
         with self._connect() as conn:
@@ -104,6 +109,8 @@ class MealLogStore:
                 return False
             detail = json.loads(row["detail_json"]) if row["detail_json"] else {}
             detail["per_item"] = per_item
+            if detail_patch:
+                detail.update(detail_patch)
             cursor = conn.execute(
                 "UPDATE meals SET totals_json = ?, detail_json = ? "
                 "WHERE id = ? AND user_id = ?",
@@ -121,6 +128,16 @@ class MealLogStore:
                 "DELETE FROM meals WHERE id = ? AND user_id = ?", (meal_id, user_id)
             )
             return cursor.rowcount > 0
+
+    def clear_user(self, user_id: str = DEMO_USER) -> int:
+        """Delete all of *user_id*'s meals; return how many rows were removed.
+
+        Backs the session reset / idempotent demo re-seed (a fresh "see it in
+        action" replaces the day rather than appending duplicates).
+        """
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM meals WHERE user_id = ?", (user_id,))
+            return cursor.rowcount
 
     def list(
         self, limit: int = 50, date: str | None = None, user_id: str = DEMO_USER

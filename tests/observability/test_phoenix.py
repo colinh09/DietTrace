@@ -48,7 +48,7 @@ def test_instrumentors_invoked_when_key_set(monkeypatch: pytest.MonkeyPatch) -> 
         },
     )
 
-    provider = object()
+    provider = MagicMock()
     register = MagicMock(return_value=provider)
     adk = MagicMock()
     genai = MagicMock()
@@ -71,3 +71,35 @@ def test_instrumentors_invoked_when_key_set(monkeypatch: pytest.MonkeyPatch) -> 
         instrumentor.return_value.instrument.assert_called_once_with(
             tracer_provider=provider
         )
+
+
+def test_in_process_buffer_attached_when_key_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """init_tracer wires the in-process span buffer onto the registered provider,
+    so the web /reasoning panel sees spans in production — not only in tests
+    (the spans still export to Phoenix; this is a parallel in-memory observer)."""
+    from dietrace.observability.trace_buffer import get_buffer
+
+    mod = _reload_phoenix(
+        monkeypatch,
+        {
+            "PHOENIX_API_KEY": "fake-key",
+            "PHOENIX_COLLECTOR_ENDPOINT": "http://localhost:6006/v1/traces",
+        },
+    )
+
+    provider = MagicMock()
+    monkeypatch.setattr("phoenix.otel.register", MagicMock(return_value=provider))
+    monkeypatch.setattr(
+        "openinference.instrumentation.google_adk.GoogleADKInstrumentor", MagicMock()
+    )
+    monkeypatch.setattr(
+        "openinference.instrumentation.google_genai.GoogleGenAIInstrumentor",
+        MagicMock(),
+    )
+    monkeypatch.setattr("openinference.instrumentation.mcp.MCPInstrumentor", MagicMock())
+
+    mod.init_tracer("dietrace-svc")
+
+    provider.add_span_processor.assert_called_once_with(get_buffer())

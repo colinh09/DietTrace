@@ -3,7 +3,7 @@
 // A /history meal carries only its free text and a nutrient panel keyed by USDA
 // number codes; these pull the four tracked macros out of that panel and derive
 // the row's confidence chip from how well they reconcile to the calorie total.
-import type { Nutrient } from "@/lib/api";
+import type { LoggedItem, Nutrient } from "@/lib/api";
 
 // USDA number codes for the macros a meal row surfaces (matches goals.py).
 const ENERGY = "208";
@@ -17,6 +17,36 @@ export interface MacroSummary {
   protein: number;
   carb: number;
   fat: number;
+}
+
+// Rescale an item's whole nutrient panel proportionally to a new gram weight —
+// used when the user tweaks a portion before confirming a meal as ground truth.
+export function rescaleItem(item: LoggedItem, newGrams: number): LoggedItem {
+  const factor = item.grams ? newGrams / item.grams : 0;
+  return {
+    ...item,
+    grams: newGrams,
+    nutrients: item.nutrients.map((n) => ({
+      ...n,
+      amount: Math.round(n.amount * factor * 100) / 100,
+    })),
+  };
+}
+
+// Sum a set of items' nutrient panels into meal totals (aggregated by USDA code).
+export function sumItemsToTotals(items: LoggedItem[]): Nutrient[] {
+  const byCode = new Map<string, Nutrient>();
+  for (const item of items) {
+    for (const n of item.nutrients) {
+      const existing = byCode.get(n.code);
+      if (existing) existing.amount += n.amount;
+      else byCode.set(n.code, { ...n });
+    }
+  }
+  return [...byCode.values()].map((n) => ({
+    ...n,
+    amount: Math.round(n.amount * 100) / 100,
+  }));
 }
 
 // Pull the tracked macros out of a nutrient panel; any macro the panel omits

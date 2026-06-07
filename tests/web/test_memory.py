@@ -103,32 +103,6 @@ def test_calories_of_returns_zero_for_empty_list() -> None:
 
 
 # ---------------------------------------------------------------------------
-# eval_cases — the SqliteMemory method called by /retune and /retune/stream
-# (app.py:714, 731). Returns {"text": ..., "calories": ...} pairs derived from
-# stored totals via _eval_case → calories_of. Untested in this file.
-# ---------------------------------------------------------------------------
-
-
-def test_eval_cases_returns_text_and_calories(tmp_path) -> None:
-    mem = SqliteMemory(tmp_path / "mem.sqlite")
-    totals = sum_totals(_items())
-    mem.remember("alice", "chipotle bowl", _items(), totals)
-
-    cases = mem.eval_cases("alice")
-    assert len(cases) == 1
-    assert cases[0]["text"] == "chipotle bowl"
-    assert cases[0]["calories"] == 390.0  # 180 + 210 from _items()
-
-
-def test_eval_cases_is_scoped_per_user(tmp_path) -> None:
-    mem = SqliteMemory(tmp_path / "mem.sqlite")
-    totals = sum_totals(_items())
-    mem.remember("alice", "chipotle bowl", _items(), totals)
-
-    assert mem.eval_cases("bob") == []
-
-
-# ---------------------------------------------------------------------------
 # count — the SqliteMemory method checked indirectly in the overwrite test but
 # never at zero. A fresh store must return 0, not raise.
 # ---------------------------------------------------------------------------

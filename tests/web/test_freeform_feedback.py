@@ -83,6 +83,12 @@ def _make_app(
     freeform_client: Mock | None = None,
     pusher=lambda *a: False,
 ):
+    from dietrace.web.preference_stores import (
+        ConfirmationStore,
+        FeedbackLog,
+        PreferenceStore,
+    )
+
     store = MealLogStore(tmp_path / "log.sqlite")
     rules = SqliteStandingRuleStore(tmp_path / "rules.sqlite")
     app = create_app(
@@ -95,6 +101,9 @@ def _make_app(
         trust_store=TrustStore(tmp_path / "trust.sqlite"),
         memory=SqliteMemory(tmp_path / "memory.sqlite"),
         standing_rule_store=rules,
+        confirmation_store=ConfirmationStore(tmp_path / "confirm.sqlite"),
+        feedback_log=FeedbackLog(tmp_path / "fblog.sqlite"),
+        preference_store=PreferenceStore(tmp_path / "pref.sqlite"),
         freeform_client=freeform_client,
         feedback_pusher=pusher,
         tracer_init=lambda name: None,
@@ -136,6 +145,65 @@ def test_portion_adjust_updates_stored_meal_totals(tmp_path) -> None:
     meals = store.list()
     kcal = next(t["amount"] for t in meals[0]["totals"] if t["code"] == "208")
     assert kcal == pytest.approx(200.0, abs=0.5)
+
+
+def test_portion_adjust_is_banked_as_ground_truth(tmp_path) -> None:
+    """A free-form portion fix banks a correction (like /correct) so it shows in
+    the observability rail AND can be re-tuned on — not just applied silently.
+    """
+    client, store, _ = _make_app(
+        tmp_path,
+        freeform_client=_mock_gemini(
+            "portion_adjust", "french fries", 0.5, "this_food", "half portion"
+        ),
+    )
+    meal_id = store.add("fries", _TOTALS, detail=_DETAIL)
+    assert client.get("/memory").json()["corrections"] == 0  # nothing banked yet
+
+    body = client.post(
+        "/feedback/freeform",
+        json={
+            "meal_id": meal_id,
+            "meal_text": "fries",
+            "feedback_text": "fries were half that size",
+            "current_items": [_FRIES_ITEM],
+        },
+    ).json()
+
+    # The response and the memory store both reflect the banked correction.
+    assert body["corrections"] == 1
+    assert client.get("/memory").json()["corrections"] == 1
+
+
+def test_correction_recomputes_and_persists_the_eval(tmp_path) -> None:
+    """After a portion fix the online eval is re-run and persisted, so the meal's
+    confidence/axes reflect the correction (not the stale pre-correction eval).
+    """
+    client, store, _ = _make_app(
+        tmp_path,
+        freeform_client=_mock_gemini(
+            "portion_adjust", "french fries", 0.5, "this_food", "half portion"
+        ),
+    )
+    meal_id = store.add("fries", _TOTALS, detail=_DETAIL)
+
+    body = client.post(
+        "/feedback/freeform",
+        json={
+            "meal_id": meal_id,
+            "meal_text": "fries",
+            "feedback_text": "fries were half that size",
+            "current_items": [_FRIES_ITEM],
+        },
+    ).json()
+
+    # The response carries a freshly computed eval (4 axes + a confidence).
+    assert isinstance(body["confidence"], (int, float))
+    assert body["axes"] is not None and len(body["axes"]) == 4
+    # And it is persisted: the stored meal's detail now matches the recompute.
+    detail = store.list()[0]
+    assert detail["confidence"] == pytest.approx(body["confidence"])
+    assert detail["axes"] == body["axes"]
 
 
 def test_remove_item_updates_stored_meal(tmp_path) -> None:

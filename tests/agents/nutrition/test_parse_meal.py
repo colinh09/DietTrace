@@ -113,6 +113,21 @@ def test_few_shot_examples_are_prepended_to_the_prompt() -> None:
     assert "chipotle bowl" in sent and "chicken" in sent
 
 
+def test_preference_block_is_injected_as_the_primary_profile() -> None:
+    """The learned preference block rides in the prompt as the primary signal."""
+    client = _client(_items_json([{"food": "oats"}]))
+
+    parse_meal(
+        "preworkout oats",
+        client=client,
+        examples=[{"preference_block": "Preworkout meals: carbs run high; scale up."}],
+    )
+
+    sent = client.models.generate_content.call_args.kwargs["contents"]
+    assert "learned logging profile" in sent
+    assert "Preworkout meals: carbs run high" in sent
+
+
 def test_malformed_output_fails_soft() -> None:
     """Non-JSON model output yields an empty parse, never an exception."""
     result = parse_meal("???", client=_client("Sorry, I can't do that."))

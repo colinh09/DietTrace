@@ -47,6 +47,19 @@ def _filter(field: str, value: Any) -> Any:
     return FieldFilter(field, "==", value)
 
 
+def _clear_collection(db: Any, collection: str, user_id: str) -> int:
+    """Delete every doc in *collection* whose ``user_id`` matches; return the count.
+
+    Shared by the per-user session reset / idempotent demo re-seed.
+    """
+    query = db.collection(collection).where(filter=_filter("user_id", user_id))
+    removed = 0
+    for doc in query.stream():
+        doc.reference.delete()
+        removed += 1
+    return removed
+
+
 class FirestoreMealStore:
     """Per-user logged-meal store on Firestore (interface mirrors MealLogStore)."""
 
@@ -84,8 +97,13 @@ class FirestoreMealStore:
         per_item: list[dict[str, Any]],
         totals: list[dict[str, Any]],
         user_id: str = DEMO_USER,
+        detail_patch: dict[str, Any] | None = None,
     ) -> bool:
-        """Rewrite a meal's totals and per_item after a correction."""
+        """Rewrite a meal's totals and per_item after a correction.
+
+        ``detail_patch`` keys (e.g. a recomputed online eval) are merged into the
+        stored detail so the persisted confidence/axes reflect the correction.
+        """
         ref = self._db.collection(_MEALS).document(str(meal_id))
         snap = ref.get()
         if not snap.exists or snap.to_dict().get("user_id") != user_id:
@@ -93,6 +111,8 @@ class FirestoreMealStore:
         data = snap.to_dict()
         detail = data.get("detail") or {}
         detail["per_item"] = per_item
+        if detail_patch:
+            detail.update(detail_patch)
         ref.update({"totals": totals, "detail": detail})
         return True
 
@@ -103,6 +123,10 @@ class FirestoreMealStore:
             return False
         ref.delete()
         return True
+
+    def clear_user(self, user_id: str = DEMO_USER) -> int:
+        """Delete all of *user_id*'s meals; return how many docs were removed."""
+        return _clear_collection(self._db, _MEALS, user_id)
 
     def list(
         self, limit: int = 50, date: str | None = None, user_id: str = DEMO_USER
@@ -157,6 +181,10 @@ class FirestoreFeedbackStore:
         query = self._db.collection(_CORRECTIONS).where(filter=_filter("user_id", user_id))
         return sum(1 for _ in query.stream())
 
+    def clear_user(self, user_id: str = DEMO_USER) -> int:
+        """Delete all of *user_id*'s corrections; return docs removed."""
+        return _clear_collection(self._db, _CORRECTIONS, user_id)
+
     def recent(
         self, user_id: str = DEMO_USER, limit: int = 10
     ) -> list[dict[str, Any]]:
@@ -208,6 +236,10 @@ class FirestoreTrustStore:
             }
         )
         return row_id
+
+    def clear_user(self, user_id: str = DEMO_USER) -> int:
+        """Delete all of *user_id*'s trust logs; return docs removed."""
+        return _clear_collection(self._db, _TRUST, user_id)
 
     def stats(self, user_id: str = DEMO_USER) -> dict[str, Any]:
         query = self._db.collection(_TRUST).where(filter=_filter("user_id", user_id))
@@ -284,3 +316,11 @@ class FirestoreGoalStore:
         if source is not None:
             doc["source"] = source
         self._db.collection(_GOALS).document(user).set(doc)
+
+    def clear_user(self, user: str = DEMO_USER) -> int:
+        """Delete *user*'s saved goals doc; return 1 if one existed, else 0."""
+        ref = self._db.collection(_GOALS).document(user)
+        if ref.get().exists:
+            ref.delete()
+            return 1
+        return 0

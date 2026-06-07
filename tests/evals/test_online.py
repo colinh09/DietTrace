@@ -221,6 +221,43 @@ def test_review_reason_is_none_when_no_reasons() -> None:
     assert flag["review_reason"] is None
 
 
+def test_severe_single_axis_flags_review_even_when_confidence_is_fine() -> None:
+    """A badly-off portion (one axis ≤ 0.5) flags review even though the averaged
+    confidence (0.75 here) clears the threshold — the average smooths it over.
+    """
+    result = {
+        "confidence": 0.75,
+        "flags": ["implausible_portion"],
+        "reasons": ["1 implausible portion(s): 2058 kcal for one item"],
+        "axes": [
+            {"name": "resolution_completeness", "score": 1.0, "note": "✓ all resolved"},
+            {"name": "source_quality", "score": 1.0, "note": "✓ trusted sources"},
+            {"name": "portion_sanity", "score": 0.5, "note": "⚠ 2058 kcal for one item"},
+            {"name": "calorie_plausibility", "score": 1.0, "note": "✓ Atwater ok"},
+        ],
+    }
+    flag = review_flag(result)
+    assert flag["needs_review"] is True
+    # The reason points at the failing axis, glyph stripped.
+    assert flag["review_reason"] == "2058 kcal for one item"
+
+
+def test_all_healthy_axes_do_not_flag_review() -> None:
+    """All four axes high → not flagged (the severe-axis check stays quiet)."""
+    result = {
+        "confidence": 1.0,
+        "flags": [],
+        "reasons": [],
+        "axes": [
+            {"name": "resolution_completeness", "score": 1.0, "note": "✓ ok"},
+            {"name": "source_quality", "score": 1.0, "note": "✓ ok"},
+            {"name": "portion_sanity", "score": 1.0, "note": "✓ ok"},
+            {"name": "calorie_plausibility", "score": 1.0, "note": "✓ ok"},
+        ],
+    }
+    assert review_flag(result)["needs_review"] is False
+
+
 def test_review_flag_over_a_real_low_confidence_log() -> None:
     """End-to-end: a mostly-unresolved log evaluates below the threshold."""
     result = evaluate_log("eggs, toast and orange juice", [], [])

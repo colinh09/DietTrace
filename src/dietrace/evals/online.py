@@ -225,8 +225,8 @@ def _calorie_plausibility(totals: Any) -> dict[str, Any] | None:
         "score": 1.0 - min(rel_err, 1.0),
         "flag": "calorie_mismatch",
         "reason": (
-            f"{energy:.0f} kcal logged vs {atwater:.0f} kcal Atwater estimate "
-            f"({rel_err:.0%} off)"
+            f"{energy:.0f} kcal logged, but the protein/carbs/fat add up to "
+            f"~{atwater:.0f} kcal ({rel_err:.0%} off)"
         ),
     }
 
@@ -276,7 +276,7 @@ def evaluate_log(
     ps_pass = f"all {len(per_item)} portion(s) plausible" if per_item else "n/a"
     by_code = _totals_by_code(totals)
     cp_pass = (
-        f"{by_code[_ENERGY]:.0f} kcal ≈ Atwater estimate"
+        f"{by_code[_ENERGY]:.0f} kcal matches its protein, carbs & fat"
         if _ENERGY in by_code
         else "n/a"
     )
@@ -308,18 +308,43 @@ def evaluate_log(
     return result
 
 
+# A single axis at or below this is "more wrong than right" on that dimension —
+# worth a glance even when the averaged confidence is otherwise fine. Without
+# this, an over-portioned but cleanly-resolved meal (one bad axis, three perfect)
+# averages ~0.75 and never trips REVIEW_THRESHOLD, so the agent would silently
+# keep an obviously-off portion. The check catches that the average smooths over.
+_CRITICAL_AXIS_SCORE = 0.5
+
+
+def _strip_axis_glyph(note: str) -> str:
+    """Drop the leading ✓/⚠ status glyph from an axis note for plain display."""
+    return note.lstrip("✓⚠").strip()
+
+
 def review_flag(result: dict[str, Any]) -> dict[str, Any]:
     """Whether an ``evaluate_log`` *result* warrants a user review.
 
-    Confidence below :data:`REVIEW_THRESHOLD` sets ``needs_review`` and surfaces a
-    single ``review_reason`` — the eval's top (first) reason — so the meal row can
-    offer a calm "review?" affordance into the correction editor. A confident log,
-    or one with no reason to show, carries ``review_reason: None``. This is policy
-    over the measurement: ``evaluate_log`` scores, ``review_flag`` decides.
+    A log is flagged when EITHER the averaged confidence falls below
+    :data:`REVIEW_THRESHOLD`, OR any single axis is at/below
+    :data:`_CRITICAL_AXIS_SCORE` (a severe one-dimension problem the average
+    hides — e.g. a wildly over-portioned item in an otherwise clean meal). The
+    surfaced ``review_reason`` prefers the failing axis's own note so it points at
+    the actual problem. A confident log carries ``review_reason: None``. This is
+    policy over the measurement: ``evaluate_log`` scores, ``review_flag`` decides.
     """
-    needs_review = result["confidence"] < REVIEW_THRESHOLD
     reasons = result.get("reasons") or []
-    return {
-        "needs_review": needs_review,
-        "review_reason": reasons[0] if (needs_review and reasons) else None,
-    }
+    axes = result.get("axes") or []
+    critical = next(
+        (a for a in axes if float(a.get("score", 1.0)) <= _CRITICAL_AXIS_SCORE),
+        None,
+    )
+    needs_review = result["confidence"] < REVIEW_THRESHOLD or critical is not None
+    if not needs_review:
+        review_reason = None
+    elif critical is not None:
+        review_reason = _strip_axis_glyph(critical.get("note", "")) or (
+            reasons[0] if reasons else None
+        )
+    else:
+        review_reason = reasons[0] if reasons else None
+    return {"needs_review": needs_review, "review_reason": review_reason}

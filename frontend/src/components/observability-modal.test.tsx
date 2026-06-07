@@ -1,9 +1,19 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ObservabilityModal } from "@/components/observability-modal";
-import { getAccuracy, getTrust, type AccuracyReport, type TrustReport } from "@/lib/api";
+import { OverviewModal } from "@/components/observability-modal";
+import {
+  getAccuracy,
+  getTrust,
+  listLearningFeedback,
+  type AccuracyReport,
+  type TrustReport,
+} from "@/lib/api";
 
-vi.mock("@/lib/api", () => ({ getAccuracy: vi.fn(), getTrust: vi.fn() }));
+vi.mock("@/lib/api", () => ({
+  getAccuracy: vi.fn(),
+  getTrust: vi.fn(),
+  listLearningFeedback: vi.fn(),
+}));
 
 const accuracy: AccuracyReport = {
   headline: { calorie_accuracy: 0.81, macro_accuracy: 0.81, within_tolerance: 0.75 },
@@ -24,35 +34,41 @@ const trust: TrustReport = {
   recent_low_confidence: [],
 };
 
-describe("ObservabilityModal", () => {
-  it("opens on the requested tab, switches tabs, and closes", async () => {
+describe("OverviewModal", () => {
+  it("shows the project intro with Accuracy and Trust stacked on one page", async () => {
     vi.mocked(getAccuracy).mockResolvedValue(accuracy);
     vi.mocked(getTrust).mockResolvedValue(trust);
+    vi.mocked(listLearningFeedback).mockResolvedValue({ feedback: [], count: 0 });
     const onClose = vi.fn();
 
-    render(<ObservabilityModal initialTab="accuracy" onClose={onClose} />);
+    render(<OverviewModal onClose={onClose} />);
 
-    // Accuracy content loads.
+    // The project intro.
+    expect(
+      screen.getByText(/held accountable by evals/i),
+    ).toBeInTheDocument();
+
+    // Both reports render together — no tab switching.
     await waitFor(() =>
-      expect(screen.getByText(/How DietTrace stays accurate/i)).toBeInTheDocument(),
+      expect(
+        screen.getByRole("heading", { name: /How DietTrace stays accurate/i }),
+      ).toBeInTheDocument(),
     );
+    expect(
+      screen.getByRole("heading", { name: /How much to trust your numbers/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
 
-    // Switch to the trust tab.
-    fireEvent.click(screen.getByRole("tab", { name: /trust/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/How much to trust your numbers/i)).toBeInTheDocument(),
-    );
-
-    // Close via the ✕.
     fireEvent.click(screen.getByRole("button", { name: /close/i }));
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("closes on Escape", async () => {
+  it("closes on Escape", () => {
     vi.mocked(getAccuracy).mockResolvedValue(accuracy);
     vi.mocked(getTrust).mockResolvedValue(trust);
+    vi.mocked(listLearningFeedback).mockResolvedValue({ feedback: [], count: 0 });
     const onClose = vi.fn();
-    render(<ObservabilityModal initialTab="trust" onClose={onClose} />);
+    render(<OverviewModal onClose={onClose} />);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });

@@ -6,6 +6,7 @@
 //. Sits alongside the existing gram-edit correction
 // so both paths stay available.
 import { useState } from "react";
+import { Check } from "lucide-react";
 import type { FreeformFeedbackResult, LoggedItem } from "@/lib/api";
 import { submitFreeformFeedback } from "@/lib/api";
 
@@ -19,7 +20,11 @@ interface Props {
 function learnedLabel(result: FreeformFeedbackResult): string {
   switch (result.kind) {
     case "portion_adjust":
-      return `adjusted ${result.target_food} to ${((result.adjustment ?? 1) * 100).toFixed(0)}% of logged portion`;
+      // Absolute fix ("about 30 grams") sets the portion directly; a relative
+      // fix ("half") scales it — label each in its own terms.
+      return result.target_grams != null
+        ? `set ${result.target_food} to ${Math.round(result.target_grams)} g`
+        : `scaled ${result.target_food} to ${Math.round((result.adjustment ?? 1) * 100)}% of the logged portion`;
     case "remove_item":
       return `removed ${result.target_food} from this meal`;
     case "add_item":
@@ -63,44 +68,101 @@ export function FreeformFeedback({
     }
   }
 
+  const reset = () => {
+    setStatus("idle");
+    setResult(null);
+  };
+
   return (
     <div className="freeform-feedback">
       {status !== "done" && (
-        <div className="freeform-input-row">
-          <input
-            className="freeform-input mono"
-            type="text"
-            placeholder="Anything off? (e.g. 'fries were smaller, maybe half')"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void submit();
-            }}
-            disabled={status === "loading"}
-            aria-label="free-form feedback"
-          />
-          <button
-            type="button"
-            className="correct-btn mono"
-            onClick={() => void submit()}
-            disabled={status === "loading" || !text.trim()}
-          >
-            {status === "loading" ? "thinking…" : "tell it"}
-          </button>
-        </div>
+        <>
+          <div className="freeform-hint">
+            Tell DietTrace what to fix in plain words — it corrects this meal and
+            learns your style.
+          </div>
+          <div className="freeform-input-row">
+            <input
+              className="freeform-input"
+              type="text"
+              placeholder=""
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submit();
+              }}
+              disabled={status === "loading"}
+              aria-label="free-form feedback"
+            />
+            <button
+              type="button"
+              className="freeform-btn"
+              onClick={() => void submit()}
+              disabled={status === "loading" || !text.trim()}
+            >
+              {status === "loading" ? "thinking…" : "tell it"}
+            </button>
+          </div>
+        </>
       )}
       {status === "error" && (
-        <span className="correct-err">couldn&apos;t apply — try again</span>
+        <span className="freeform-err">couldn&apos;t apply — try again</span>
       )}
       {status === "done" && result?.ok && (
         <div className="freeform-learned" aria-live="polite">
-          <span className="freeform-learned-label mono">DietTrace learned:</span>
+          <span className="freeform-learned-label mono">✦ DietTrace learned</span>
           <span className="freeform-learned-desc">{learnedLabel(result)}</span>
-          {result.stored_as_preference && (
-            <span className="freeform-pref-note dim">
+
+          {/* Observability: the exact backend + Arize steps this correction took,
+              so it's clear how feedback becomes ground truth the agent re-tests on. */}
+          {result.kind === "standing_rule" ? (
+            <span className="freeform-pref-note">
               saved as a standing preference — applies to future meals
             </span>
+          ) : (
+            <>
+              <ol className="freeform-process">
+                <li className="fp-step">
+                  <Check size={12} className="fp-check" /> Interpreted your words
+                  with Gemini (no fiddly gram editing)
+                </li>
+                <li className="fp-step">
+                  <Check size={12} className="fp-check" /> Recalculated this meal
+                  &amp; the day total
+                </li>
+                <li className="fp-step">
+                  <Check size={12} className="fp-check" /> Banked as ground truth
+                  {result.corrections != null
+                    ? ` — correction #${result.corrections}`
+                    : ""}
+                </li>
+                <li className={"fp-step" + (result.added_to_arize ? "" : " fp-muted")}>
+                  <Check size={12} className="fp-check" />{" "}
+                  {result.added_to_arize
+                    ? "Logged to Arize as an eval example"
+                    : "Arize logging skipped (not configured)"}
+                </li>
+              </ol>
+              <span className="freeform-process-foot">
+                Hit <b>Re-tune</b> in the Observability panel to score the agent
+                on what you just taught it.
+              </span>
+            </>
           )}
+
+          <button type="button" className="freeform-again" onClick={reset}>
+            tell it something else
+          </button>
+        </div>
+      )}
+      {status === "done" && result && !result.ok && (
+        <div className="freeform-learned warn" aria-live="polite">
+          <span className="freeform-learned-desc">
+            Couldn&apos;t read that one — try rephrasing.
+          </span>
+          <button type="button" className="freeform-again" onClick={reset}>
+            try again
+          </button>
         </div>
       )}
     </div>

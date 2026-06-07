@@ -130,6 +130,14 @@ class SqliteStandingRuleStore:
             ).fetchone()
         return int(row["n"]) if row else 0
 
+    def clear_user(self, user_id: str = DEMO_USER) -> int:
+        """Delete all of *user_id*'s standing rules; return rows removed."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM standing_rules WHERE user_id = ?", (user_id,)
+            )
+            return cursor.rowcount
+
 
 class FirestoreStandingRuleStore:
     """Per-user standing rules on Firestore (production)."""
@@ -200,6 +208,12 @@ class FirestoreStandingRuleStore:
             self._db.collection(self._col).where(filter=_filter("user_id", user_id))
         )
         return sum(1 for _ in query.stream())
+
+    def clear_user(self, user_id: str = DEMO_USER) -> int:
+        """Delete all of *user_id*'s standing rules; return docs removed."""
+        from dietrace.web.firestore_store import _clear_collection
+
+        return _clear_collection(self._db, self._col, user_id)
 
 
 def build_standing_rules() -> Any:

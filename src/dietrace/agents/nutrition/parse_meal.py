@@ -44,17 +44,31 @@ def _prompt(text: str, examples: list[dict[str, Any]] | None = None) -> str:
 
 
 def _few_shot_block(examples: list[dict[str, Any]] | None) -> str:
-    """Render the user's corrections + standing rules as a preamble (empty if none).
+    """Render the user's learned profile + corrections + standing rules (empty if none).
 
-    Each entry is either a worked correction (``{text, foods:[{food, grams}]}``)
-    or a standing preference (``{rule: "..."}``) recalled from the user's free-form
-    feedback — so the model parses meals the way this user has taught it.
+    Each entry is one of: the generalized **preference block**
+    (``{preference_block: "..."}``, the primary personalization signal from the
+    learning loop), a worked correction (``{text, foods:[{food, grams}]}``), or a
+    standing preference (``{rule: "..."}``) — so the model parses meals the way
+    this user eats.
     """
     if not examples:
         return ""
-    corrections = [e for e in examples if not e.get("rule")]
+    preference = next(
+        (e["preference_block"] for e in examples if e.get("preference_block")), ""
+    )
+    corrections = [
+        e for e in examples if not e.get("rule") and not e.get("preference_block")
+    ]
     rules = [e["rule"] for e in examples if e.get("rule")]
     blocks: list[str] = []
+    if preference:
+        blocks.append(
+            "This user's learned logging profile. Apply each rule ONLY when the "
+            "current meal matches the rule's stated condition (e.g. a pre-workout "
+            "rule applies only to a pre-workout meal); log every other meal "
+            "normally, exactly as you would without this profile:\n" + preference
+        )
     if corrections:
         lines = [
             "This user has corrected past meals. Match how they break meals into foods "

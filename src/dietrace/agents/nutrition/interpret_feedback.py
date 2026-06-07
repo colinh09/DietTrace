@@ -40,7 +40,10 @@ class StructuredFeedback(BaseModel):
     """The structured interpretation of a user's free-form meal feedback.
 
     ``kind`` is the action type:
-    - ``portion_adjust``: scale a food's portion (``adjustment`` = multiplier).
+    - ``portion_adjust``: change a food's portion. Use ``target_grams`` when the
+      user gives an absolute amount ("about 30 grams", "two tablespoons");
+      use ``adjustment`` (a multiplier) when they give a relative amount
+      ("half", "a third", "double"). Absolute wins if both are present.
     - ``remove_item``: drop a food that was not eaten.
     - ``add_item``: append a food that was eaten but not logged
       (``adjustment`` = grams, or None if unknown).
@@ -50,6 +53,8 @@ class StructuredFeedback(BaseModel):
     ``target_food`` identifies the food the action applies to; empty for
     ``standing_rule``. ``adjustment`` is a multiplier for ``portion_adjust``
     and a gram weight for ``add_item``; ``None`` when not applicable.
+    ``target_grams`` is an absolute gram target for ``portion_adjust``; ``None``
+    when the user gave a relative amount instead.
     ``scope`` is one of ``this_food``, ``this_meal``, or ``meal_type``.
     ``rationale`` is a plain-English explanation of the user's intent.
     """
@@ -57,6 +62,7 @@ class StructuredFeedback(BaseModel):
     kind: str
     target_food: str = ""
     adjustment: float | None = None
+    target_grams: float | None = None
     scope: str = "this_meal"
     rationale: str = ""
 
@@ -192,15 +198,23 @@ def _target_indices(items: list[dict[str, Any]], target: str) -> set[int]:
 def _apply_portion_adjust(
     items: list[dict[str, Any]], feedback: StructuredFeedback
 ) -> list[dict[str, Any]]:
-    if feedback.adjustment is None or not feedback.target_food:
+    if not feedback.target_food:
         return items
-    multiplier = max(0.0, min(_MAX_MULTIPLIER, feedback.adjustment))
+    # An absolute gram target ("about 30 grams") sets the portion directly;
+    # otherwise fall back to the relative multiplier ("half", "a third").
+    absolute = feedback.target_grams is not None
+    if not absolute and feedback.adjustment is None:
+        return items
     idxs = _target_indices(items, feedback.target_food)
     result = []
     for i, item in enumerate(items):
         if i in idxs:
             item = dict(item)
-            item["grams"] = max(0.0, item.get("grams", 0.0) * multiplier)
+            if absolute:
+                item["grams"] = max(0.0, min(_MAX_ADD_GRAMS, feedback.target_grams))
+            else:
+                multiplier = max(0.0, min(_MAX_MULTIPLIER, feedback.adjustment))
+                item["grams"] = max(0.0, item.get("grams", 0.0) * multiplier)
         result.append(item)
     return result
 

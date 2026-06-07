@@ -170,9 +170,3 @@ def test_full_nutritionist_journey(journey) -> None:
     # The recalled calories are the corrected 71.5 kcal, not the stub 143.0 kcal.
     recalled_kcal = next(t["amount"] for t in recall_body["totals"] if t["code"] == "208")
     assert recalled_kcal == pytest.approx(71.5)
-
-    # ── Step 9: retune — the banked correction is an eval case ───────────────
-    retune_resp = client.post("/retune")
-    assert retune_resp.status_code == 200
-    retune_body = retune_resp.json()
-    assert retune_body["cases"] >= 1, "retune must find the banked correction as an eval case"

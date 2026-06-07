@@ -38,6 +38,15 @@ CREATE TABLE IF NOT EXISTS trust_logs (
 _RECENT_LIMIT = 5
 
 
+def _ensure_column(
+    conn: sqlite3.Connection, table: str, name: str, decl: str
+) -> None:
+    """Add a column to *table* if an older DB predates it (forward migration)."""
+    cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if name not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
 class TrustStore:
     """Append-and-aggregate store for per-log eval results at *db_path*, by user."""
 
@@ -48,6 +57,11 @@ class TrustStore:
             parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(_SCHEMA)
+            # Older DBs predate the text/review_reason columns (added for the
+            # "revisit these" list, 12.5); add them so /trust never 500s on a
+            # DB created by an earlier schema.
+            _ensure_column(conn, "trust_logs", "text", "TEXT NOT NULL DEFAULT ''")
+            _ensure_column(conn, "trust_logs", "review_reason", "TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path)
@@ -87,6 +101,14 @@ class TrustStore:
                 ),
             )
             return int(cursor.lastrowid or 0)
+
+    def clear_user(self, user_id: str = DEMO_USER) -> int:
+        """Delete all of *user_id*'s trust logs; return rows removed."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "DELETE FROM trust_logs WHERE user_id = ?", (user_id,)
+            )
+            return cursor.rowcount
 
     def stats(self, user_id: str = DEMO_USER) -> dict[str, Any]:
         """Rolling trust stats for *user_id* (the ``GET /trust`` payload).

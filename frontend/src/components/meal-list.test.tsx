@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { MealList, type MealDetail } from "@/components/meal-list";
 import type { LoggedItem, Meal, TraceStep } from "@/lib/api";
 
+// Meals collapse to a one-line summary by default; click the row to expand.
+const expandMeal = (row: HTMLElement) =>
+  fireEvent.click(row.querySelector(".meal-head") as HTMLElement);
+
 // Two days-worth of /history meals: one whose macros reconcile cleanly (High)
 // and one whose macros diverge from its calorie total (Medium).
 const meals: Meal[] = [
@@ -85,7 +89,7 @@ describe("MealList", () => {
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
   });
 
-  it("always shows the breakdown from the /log detail, with the trace behind a toggle", () => {
+  it("reveals the breakdown when expanded, with the trace behind the agent's-work dropdown", () => {
     const perItem: LoggedItem[] = [
       {
         fdc_id: 171477,
@@ -101,14 +105,13 @@ describe("MealList", () => {
     render(<MealList meals={meals} detailsById={{ 2: { trace, perItem } }} />);
 
     const row = screen.getByText("grilled chicken salad with olive oil").closest("li") as HTMLElement;
-    // The breakdown shows straight away — portion read-only, correction one click away.
+    // Collapsed by default — the breakdown is hidden until the row is expanded.
+    expect(within(row).queryByText("140 g")).not.toBeInTheDocument();
+    expandMeal(row);
     expect(within(row).getByText("140 g")).toBeInTheDocument();
-    expect(
-      within(row).getByRole("button", { name: /something's off/i }),
-    ).toBeInTheDocument();
-    // The trace steps sit behind the "agent's work" toggle.
-    expect(within(row).queryByText(/Parsed 1 food/)).not.toBeInTheDocument();
-    fireEvent.click(within(row).getByRole("button", { name: /the agent's work/i }));
+    // The review step (confirm / tweak / correct) is the single correction surface.
+    expect(within(row).getByText(/does this look about right/i)).toBeInTheDocument();
+    // The trace steps are an always-visible "agent's work" card once expanded.
     expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
   });
 
@@ -129,7 +132,7 @@ describe("MealList", () => {
     expect(within(clean).getByText(/42%/)).toBeInTheDocument();
   });
 
-  it("shows the confidence reasons inside the agent's-work toggle", () => {
+  it("shows the confidence reasons in the 'why this confidence' card when expanded", () => {
     const detail: MealDetail = {
       trace: [
         { step: "parse_meal", summary: "Parsed 1 food(s): chicken", foods: ["chicken"] },
@@ -142,14 +145,14 @@ describe("MealList", () => {
     const row = screen
       .getByText("grilled chicken salad with olive oil")
       .closest("li") as HTMLElement;
-    // Tucked away until the trace is opened.
+    // Hidden until the meal row is expanded; then visible as a card (no toggle).
     expect(screen.queryByText(/lower-trust source/)).not.toBeInTheDocument();
-    fireEvent.click(within(row).getByRole("button", { name: /the agent's work/i }));
+    expandMeal(row);
     expect(within(row).getByText(/lower-trust source/)).toBeInTheDocument();
     expect(within(row).getByText(/macros total zero energy/)).toBeInTheDocument();
   });
 
-  it("offers a calm 'review?' affordance only when the backend flags needs_review (12.3)", () => {
+  it("offers a review flag only when the backend flags needs_review (12.3)", () => {
     const flagged: MealDetail = {
       trace: [],
       perItem: [],
@@ -164,59 +167,47 @@ describe("MealList", () => {
       .getByText("grilled chicken salad with olive oil")
       .closest("li") as HTMLElement;
     expect(
-      within(flaggedRow).getByRole("button", { name: /review/i }),
+      within(flaggedRow).getByRole("button", { name: /why this was flagged/i }),
     ).toBeInTheDocument();
 
     // A meal with no review flag (the other row) shows no review affordance.
     const calmRow = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
     expect(
-      within(calmRow).queryByRole("button", { name: /review/i }),
+      within(calmRow).queryByRole("button", { name: /why this was flagged/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("opens the correction editor when the 'review?' affordance is clicked (12.3)", () => {
-    const perItem: LoggedItem[] = [
-      {
-        fdc_id: 0,
-        description: "mystery dish",
-        grams: 9000,
-        nutrients: [{ code: "208", name: "Energy", amount: 105, unit: "kcal" }],
-      },
-    ];
+  it("review flag opens the agent's work so the user can see why it's flagged", () => {
     const flagged: MealDetail = {
-      trace: [],
-      perItem,
-      confidence: 0.4,
-      reasons: ["implausible portion"],
+      trace: [
+        { step: "parse_meal", summary: "Parsed 1 food(s): chicken", foods: ["chicken"] },
+      ],
+      perItem: [],
+      confidence: 0.42,
+      reasons: ["lower-trust source(s): web"],
       needsReview: true,
-      reviewReason: "implausible portion",
+      reviewReason: "lower-trust source(s): web",
     };
     render(<MealList meals={meals} detailsById={{ 2: flagged }} />);
     const row = screen
       .getByText("grilled chicken salad with olive oil")
       .closest("li") as HTMLElement;
 
-    // The breakdown is shown read-only — no editor until "review?" is tapped.
-    expect(
-      within(row).queryByRole("button", { name: /save correction/i }),
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(within(row).getByRole("button", { name: /review/i }));
-
-    // The breakdown flips into the existing correction editor.
-    expect(
-      within(row).getByRole("button", { name: /save correction/i }),
-    ).toBeInTheDocument();
+    // Trace hidden until the review flag is clicked.
+    expect(within(row).queryByText(/Parsed 1 food/)).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: /why this was flagged/i }));
+    expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
   });
 
   it("shows a calm note when a row has no breakdown detail", () => {
     render(<MealList meals={meals} />);
     const row = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
-    // No /log detail captured for this history row → a calm note, always shown.
+    // No /log detail captured for this history row → a calm note once expanded.
+    expandMeal(row);
     expect(within(row).getByText(/no breakdown/i)).toBeInTheDocument();
   });
 
-  it("renders trace steps for a history-loaded meal when the agent's work is expanded", () => {
+  it("renders trace steps for a history-loaded meal once the row is expanded", () => {
     // Simulate a meal as /history returns it — per_item + trace from the persisted
     // detail (or rebuilt by the history endpoint for older logs).
     const historyTrace: TraceStep[] = [
@@ -260,12 +251,36 @@ describe("MealList", () => {
     // Trace steps are hidden before expansion.
     expect(within(row).queryByText(/Parsed 1 food/)).not.toBeInTheDocument();
 
-    // Expanding reveals all four trace steps.
-    fireEvent.click(within(row).getByRole("button", { name: /the agent's work/i }));
+    // Expanding the row reveals the always-visible agent's-work card.
+    expandMeal(row);
 
     expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
     expect(within(row).getByText(/Searched the web for 'banana'/)).toBeInTheDocument();
     expect(within(row).getByText(/Estimated 118 g/)).toBeInTheDocument();
     expect(within(row).getByText(/Logged 1 item/)).toBeInTheDocument();
+  });
+
+  it("renders a confirmed meal as a badged dataset point, not a confidence chip", () => {
+    const datasetMeal: Meal = {
+      id: 9,
+      created_at: new Date(2026, 4, 29, 9, 0).toISOString(),
+      date: "2026-05-29",
+      text: "oatmeal with a banana before the gym",
+      totals: [{ code: "208", name: "Energy", amount: 450, unit: "kcal" }],
+      dataset_point: true,
+    };
+    render(<MealList meals={[datasetMeal]} />);
+    const row = screen.getByText(/oatmeal with a banana/).closest("li") as HTMLElement;
+
+    // It's badged as a dataset point — no confidence chip.
+    expect(within(row).getByText(/dataset point/i)).toBeInTheDocument();
+    expect(row.querySelector(".conf-chip")).toBeNull();
+    // kcal shows, but the empty P/C/F zeros are suppressed for a ground-truth row.
+    expect(within(row).getByText(/450/)).toBeInTheDocument();
+    expect(within(row).queryByText(/P 0/)).not.toBeInTheDocument();
+
+    // Expanding explains its held-out role rather than a per-item trace.
+    expandMeal(row);
+    expect(within(row).getByText(/Held-out ground truth/i)).toBeInTheDocument();
   });
 });
