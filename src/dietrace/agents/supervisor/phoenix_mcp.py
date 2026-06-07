@@ -175,3 +175,23 @@ class PhoenixMCPClient:
             )
         parsed = _parse_tool_result(result)
         return parsed if isinstance(parsed, dict) else {"added": len(examples)}
+
+
+def add_user_dataset_point(  # pragma: no cover - live MCP
+    user_id: str, example: dict[str, Any]
+) -> None:
+    """Fail-soft sync write of one example to the user's Phoenix dataset over MCP.
+
+    Safe to call from a background task (spawns the npx MCP server, so off the hot
+    path); a no-op when Phoenix isn't configured or the write fails.
+    """
+    if not mcp_available():
+        return
+    import asyncio
+
+    try:
+        asyncio.run(
+            PhoenixMCPClient().add_dataset_examples(user_dataset_name(user_id), [example])
+        )
+    except Exception:
+        return

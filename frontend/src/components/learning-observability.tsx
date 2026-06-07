@@ -627,8 +627,9 @@ export function LearningObservability({
             </span>
           </button>
           <p className="lo-dataset-note">
-            Meals you&apos;ve confirmed as right. Every re-tune is tested on these —
-            but never learns from them — so the test stays honest.
+            Meals you&apos;ve confirmed as right, synced to your Phoenix dataset over
+            MCP. Every re-tune is tested on these — but never learns from them — so
+            the test stays honest.
           </p>
           {showData && (
             <ul className="lo-data-list">

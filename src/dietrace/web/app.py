@@ -29,6 +29,7 @@ from dietrace.agents.nutrition.interpret_feedback import apply_feedback, interpr
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.agents.supervisor.config import load_supervisor_config
 from dietrace.agents.supervisor.decide import decide_op, gather_signals
+from dietrace.agents.supervisor.phoenix_mcp import add_user_dataset_point
 from dietrace.agents.supervisor.run import default_experiment_runner
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
 from dietrace.macros.adherence import macro_adherence
@@ -532,6 +533,7 @@ def create_app(
     profile_store: Any | None = None,
     corrector_client: Any | None = None,
     experiment_runner: Callable[[dict[str, Any]], dict[str, Any]] = default_experiment_runner,
+    dataset_writer: Callable[[str, dict[str, Any]], None] = add_user_dataset_point,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
@@ -1376,12 +1378,23 @@ def create_app(
 
     @app.post("/confirm")
     def confirm_meal(
-        req: ConfirmRequest, user: str = Depends(current_user)
+        req: ConfirmRequest,
+        background: BackgroundTasks,
+        user: str = Depends(current_user),
     ) -> dict[str, Any]:
         """"Does this look right?" — record a confirmed meal as a held-out
         ground-truth datapoint (Input A). Grows the gate dataset; never touches
-        the prompt. Kept strictly disjoint from corrections (the XOR rule)."""
+        the prompt. Kept strictly disjoint from corrections (the XOR rule).
+
+        The confirmed meal is also written to the user's Phoenix dataset over the
+        MCP server, off the hot path (the npx MCP server is slow), fail-soft."""
         cid = confirms.add(user, req.meal_text, req.items, req.totals)
+        example = {
+            "input": {"text": req.meal_text},
+            "output": {"calories": calories_of(req.totals)},
+            "metadata": {"source": "user_confirmed"},
+        }
+        background.add_task(dataset_writer, user, example)
         return {"ok": True, "id": cid, "confirmations": confirms.count(user)}
 
     @app.get("/learning/feedback")

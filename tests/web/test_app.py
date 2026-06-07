@@ -24,7 +24,7 @@ def _stub_logger(text: str, examples=()) -> dict:
 
 def _client(
     tmp_path, logger=_stub_logger, pusher=lambda *a: False, usda_loader=None,
-    experiment_runner=None,
+    experiment_runner=None, dataset_writer=None,
 ):
     store = MealLogStore(tmp_path / "log.sqlite")
     kwargs: dict = {}
@@ -32,6 +32,8 @@ def _client(
         kwargs["usda_case_loader"] = usda_loader
     if experiment_runner is not None:
         kwargs["experiment_runner"] = experiment_runner
+    if dataset_writer is not None:
+        kwargs["dataset_writer"] = dataset_writer
     app = create_app(
         meal_logger=logger,
         store=store,
@@ -670,6 +672,31 @@ def test_retune_rate_limited_when_daily_cap_reached(tmp_path, monkeypatch) -> No
     res = client.post("/learning/retune", headers={"X-DietTrace-User": "alice"}).json()
     assert res["ok"] is False
     assert res["reason"] == "rate_limited"
+
+
+def test_confirm_writes_a_dataset_point_to_phoenix_offthehotpath(tmp_path) -> None:
+    """POST /confirm queues a fail-soft MCP write of the confirmed meal to the
+    user's Phoenix dataset (the held-out ground-truth point)."""
+    writes: list[tuple] = []
+
+    def fake_writer(user_id: str, example: dict) -> None:
+        writes.append((user_id, example))
+
+    client, _ = _client(tmp_path, dataset_writer=fake_writer)
+    totals = [{"code": "208", "name": "Energy", "amount": 540.0, "unit": "kcal"}]
+    res = client.post(
+        "/confirm",
+        json={"meal_text": "my usual breakfast", "items": [], "totals": totals},
+        headers={"X-DietTrace-User": "alice"},
+    ).json()
+    assert res["ok"] is True
+    # Starlette runs the BackgroundTask before TestClient returns.
+    assert len(writes) == 1
+    user_id, example = writes[0]
+    assert user_id == "alice"
+    assert example["input"]["text"] == "my usual breakfast"
+    assert example["output"]["calories"] == 540.0
+    assert example["metadata"]["source"] == "user_confirmed"
 
 
 def test_log_response_carries_supervisor_decision(tmp_path) -> None:
