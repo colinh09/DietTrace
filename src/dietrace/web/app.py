@@ -776,6 +776,14 @@ def create_app(
                     event["safety"] = safety
                     event.update(review)
                     _record_trust(per_item, quality, review, user, req.text)
+                    event["supervisor"] = decide(
+                        gather_signals(
+                            fblog, confirms, user,
+                            runs_today=_runs_today(user),
+                            meal_confidence=quality["confidence"],
+                        ),
+                        supervisor_config,
+                    ).as_dict()
                 elif pace:
                     time.sleep(pace)  # let fast steps arrive one at a time
                 yield f"data: {json.dumps(event)}\n\n"

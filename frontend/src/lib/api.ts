@@ -103,6 +103,15 @@ export interface LogResponse {
   review_reason: string | null;
   // The rule-based safety guardrail result.
   safety: Safety;
+  // The supervisor's per-meal decision: one of bank_feedback | add_dataset_point
+  // | retune, with a one-line reason (agent-observability).
+  supervisor?: SupervisorDecision;
+}
+
+// One per-meal supervisor decision (what the autonomous supervisor chose to do).
+export interface SupervisorDecision {
+  op: "bank_feedback" | "add_dataset_point" | "retune";
+  reason: string;
 }
 
 // A persisted meal as stored by `dietrace.web.store.MealLogStore`. The breakdown
@@ -428,6 +437,8 @@ export interface StreamEvent {
   review_reason?: string | null;
   // The rule-based safety guardrail result.
   safety?: Safety;
+  // On the final `result` event: the supervisor's per-meal decision.
+  supervisor?: SupervisorDecision;
 }
 
 // Stream a meal log: `onEvent` fires for each step as the agent works, then once
@@ -830,4 +841,37 @@ export async function learningRetuneStream(
       sep = buffer.indexOf("\n\n");
     }
   }
+}
+
+// ── Experiments ──────────────────────────────────────────────────────────
+// The supervisor runs an eval experiment off the hot path (no run-experiment MCP
+// tool exists), then reads the results back over Phoenix MCP. Kick + poll here.
+
+export interface ExperimentRun {
+  run_id: string;
+  status: "running" | "done" | "error";
+}
+
+export interface ExperimentStatus {
+  run_id: string;
+  status: "running" | "done" | "error";
+  summary?: Record<string, unknown> | null;
+}
+
+// Start an experiment run; returns a run id to poll with getExperimentStatus.
+export async function runExperiment(
+  dataset?: string,
+  name?: string,
+): Promise<ExperimentRun> {
+  return request<ExperimentRun>("/experiments/run", {
+    method: "POST",
+    body: JSON.stringify({ dataset, name }),
+  });
+}
+
+// Poll an experiment run's status (running | done | error) + its summary.
+export async function getExperimentStatus(
+  runId: string,
+): Promise<ExperimentStatus> {
+  return request<ExperimentStatus>(`/experiments/${encodeURIComponent(runId)}`);
 }
