@@ -206,9 +206,15 @@ def test_retune_scores_fit_via_phoenix_when_scorer_provided(tmp_path) -> None:
     and the response marks scored_via=phoenix with the experiment link."""
     captured: dict = {}
 
-    def fake_scorer(user, current_block, proposed_block, logger_fn):
-        captured["args"] = (user, proposed_block)
-        return {"current": 0.50, "proposed": 0.90, "experiment_url": "https://phoenix/exp/1"}
+    def fake_scorer(user, current_block, proposed_block, logger_fn, fit_cases):
+        captured["args"] = (user, proposed_block, len(fit_cases))
+        return {
+            "current": 0.50,
+            "proposed": 0.90,
+            "experiment_url": "https://phoenix/exp/1",
+            "rows": [{"text": "preworkout oats", "expected": 600,
+                      "before": 0.50, "after": 0.90}],
+        }
 
     client, confirms, fblog, _ = _make_app(
         tmp_path, corrector_client=_corrector_client(), phoenix_fit_scorer=fake_scorer

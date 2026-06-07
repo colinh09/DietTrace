@@ -44,6 +44,19 @@ def mean_accuracy(results: list[dict[str, Any]]) -> float | None:
     return round(sum(accs) / len(accs), 3) if accs else None
 
 
+def row_accuracies(results: list[dict[str, Any]]) -> dict[str, tuple[float, float]]:
+    """Map each example's meal text → (calorie accuracy, expected kcal), for the
+    per-meal table the rail shows. Skips rows missing an estimate or a truth."""
+    out: dict[str, tuple[float, float]] = {}
+    for r in results or []:
+        text = (r.get("input") or {}).get("text", "")
+        est = (r.get("output") or {}).get("calories")
+        ref = (r.get("reference_output") or {}).get("calories")
+        if text and est is not None and ref is not None:
+            out[text] = (accuracy(float(est), float(ref)), float(ref))
+    return out
+
+
 def _phoenix_client() -> Any | None:  # pragma: no cover - live
     """A REST Phoenix client (the one whose auth actually works), or None."""
     base = os.environ.get("PHOENIX_BASE_URL", "")
@@ -97,24 +110,31 @@ def _run_experiment(
     return asyncio.run(_latest())
 
 
-def _score_via_mcp(experiment_id: str) -> float | None:  # pragma: no cover - live
-    """Mean accuracy for an experiment, read back over MCP (the load-bearing read)."""
+def _results_via_mcp(experiment_id: str) -> list[dict[str, Any]]:  # pragma: no cover
+    """Per-example results for an experiment, read back over MCP (the load-bearing read)."""
     from dietrace.agents.supervisor.phoenix_mcp import PhoenixMCPClient
 
     async def _pull() -> list[dict[str, Any]]:
         return await PhoenixMCPClient().get_experiment_results(experiment_id)
 
-    return mean_accuracy(asyncio.run(_pull()))
+    return asyncio.run(_pull()) or []
 
 
 def score_fit_via_phoenix(
-    user: str, current_block: str, proposed_block: str, logger_fn: Callable[..., dict]
+    user: str,
+    current_block: str,
+    proposed_block: str,
+    logger_fn: Callable[..., dict],
+    fit_cases: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:  # pragma: no cover - live
     """Score the user's confirmed-meal set as base/tuned Phoenix experiments.
 
-    Returns ``{"current": <fit>, "proposed": <fit>, "experiment_url": <str>}`` (fit
-    accuracies pulled over MCP), or ``None`` on any failure so the caller falls back
-    to local scoring.
+    *fit_cases* are the local confirmations (``{text, calories}``) — used to
+    get-or-create the user's Phoenix dataset so the experiment has ground truth to
+    score against even on a fresh/seeded user. Returns ``{"current", "proposed",
+    "experiment_url", "rows"}`` — mean fit accuracies (base/tuned) pulled over MCP
+    plus per-meal rows ``{text, expected, before, after}`` for the rail — or ``None``
+    on any failure so the caller falls back to local scoring.
     """
     try:
         from dietrace.agents.supervisor.phoenix_mcp import (
@@ -127,9 +147,26 @@ def score_fit_via_phoenix(
         client = _phoenix_client()
         if client is None:
             return None
-        dataset = client.datasets.get_dataset(dataset=user_dataset_name(user))
-        if not getattr(dataset, "example_count", 0):
-            return None
+        # Get-or-create the user's Phoenix dataset from the local confirmations, so
+        # the experiment has ground truth to score against (the /confirm MCP writes
+        # may not have landed yet, e.g. a freshly-seeded persona).
+        name = user_dataset_name(user)
+        dataset = None
+        try:
+            dataset = client.datasets.get_dataset(dataset=name)
+            if not getattr(dataset, "example_count", 0):
+                dataset = None
+        except Exception:
+            dataset = None
+        if dataset is None:
+            if not fit_cases:
+                return None
+            dataset = client.datasets.create_dataset(
+                name=name,
+                inputs=[{"text": c["text"]} for c in fit_cases],
+                outputs=[{"calories": c["calories"]} for c in fit_cases],
+                dataset_description="DietTrace user confirmed meals — the gate's fit set",
+            )
 
         base_id = _run_experiment(
             client, dataset, current_block, logger_fn, f"dietrace-{user}-fit-base"
@@ -137,10 +174,21 @@ def score_fit_via_phoenix(
         tuned_id = _run_experiment(
             client, dataset, proposed_block, logger_fn, f"dietrace-{user}-fit-tuned"
         )
-        current_fit = _score_via_mcp(base_id) if base_id else None
-        proposed_fit = _score_via_mcp(tuned_id) if tuned_id else None
-        if current_fit is None or proposed_fit is None:
+        base = row_accuracies(_results_via_mcp(base_id)) if base_id else {}
+        tuned = row_accuracies(_results_via_mcp(tuned_id)) if tuned_id else {}
+        if not base or not tuned:
             return None
+        current_fit = round(sum(a for a, _ in base.values()) / len(base), 3)
+        proposed_fit = round(sum(a for a, _ in tuned.values()) / len(tuned), 3)
+        rows = [
+            {
+                "text": text,
+                "expected": round(expected),
+                "before": acc,
+                "after": tuned.get(text, (None, None))[0],
+            }
+            for text, (acc, expected) in base.items()
+        ]
 
         url = ""
         try:
@@ -151,6 +199,7 @@ def score_fit_via_phoenix(
             "current": current_fit,
             "proposed": proposed_fit,
             "experiment_url": url,
+            "rows": rows,
         }
     except Exception:
         return None

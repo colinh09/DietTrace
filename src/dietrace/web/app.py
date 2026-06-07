@@ -1584,7 +1584,9 @@ def create_app(
         # back over MCP; the USDA floor stays local for speed. Fail-soft: a None from
         # the scorer falls back to fully-local scoring so the retune never hangs.
         fit_phoenix = (
-            phoenix_fit_scorer(user, current_block, proposed.block_text, logger_fn)
+            phoenix_fit_scorer(
+                user, current_block, proposed.block_text, logger_fn, fit_cases
+            )
             if phoenix_fit_scorer is not None
             else None
         )
@@ -1690,47 +1692,87 @@ def create_app(
                 ex = [{"preference_block": block}] if block else []
                 return _case_score(case, lambda t: logger_fn(t, examples=ex))
 
-            scored: dict[str, tuple[list[float], list[float]]] = {
-                "fit": ([], []), "usda": ([], []),
-            }
-            for label, cases, intro in (
-                ("fit", fit_cases,
-                 "Re-scoring the meals you confirmed — with your rule vs without"),
-                ("usda", usda_cases,
-                 ("Re-checking the full standard set — accuracy can't regress"
-                  if full else
-                  "Re-checking a sample of standard foods — accuracy can't regress")),
-            ):
-                yield sse({"type": "phase", "phase": label, "label": intro,
-                           "n": len(cases)})
-                befores, afters = scored[label]
-                for i, c in enumerate(cases):
-                    # One named span per meal so the re-score is VISIBLE in Phoenix
-                    # in real time: the agent's Gemini calls (base vs tuned) nest
-                    # under it, and the accuracy lands as span attributes. A judge
-                    # watching the Phoenix Traces tab sees the gate run meal by meal.
-                    with _TRACER.start_as_current_span("retune.rescore") as span:
-                        span.set_attribute("retune.set", label)
-                        span.set_attribute("meal.text", c["text"])
-                        span.set_attribute("expected.kcal", round(c["calories"]))
-                        before = score_one(c, current_block)
-                        after = score_one(c, proposed.block_text)
-                        span.set_attribute("accuracy.base", before)
-                        span.set_attribute("accuracy.tuned", after)
-                        span.set_attribute("accuracy.delta", round(after - before, 3))
-                    befores.append(before)
-                    afters.append(after)
-                    yield sse({
-                        "type": "score", "set": label, "i": i + 1, "n": len(cases),
-                        "text": c["text"], "expected": round(c["calories"]),
-                        "before": before, "after": after,
-                    })
+            def score_case_traced(case: dict[str, Any], label: str) -> tuple[float, float]:
+                # One named span per meal so the re-score is VISIBLE in Phoenix in real
+                # time: the agent's Gemini calls (base vs tuned) nest under it.
+                with _TRACER.start_as_current_span("retune.rescore") as span:
+                    span.set_attribute("retune.set", label)
+                    span.set_attribute("meal.text", case["text"])
+                    span.set_attribute("expected.kcal", round(case["calories"]))
+                    before = score_one(case, current_block)
+                    after = score_one(case, proposed.block_text)
+                    span.set_attribute("accuracy.base", before)
+                    span.set_attribute("accuracy.tuned", after)
+                    span.set_attribute("accuracy.delta", round(after - before, 3))
+                return before, after
 
             def mean(xs: list[float]) -> float:
                 return round(sum(xs) / len(xs), 3) if xs else 0.0
 
-            current_scores = {"fit": mean(scored["fit"][0]), "usda": mean(scored["usda"][0])}
-            proposed_scores = {"fit": mean(scored["fit"][1]), "usda": mean(scored["usda"][1])}
+            fit_before: list[float] = []
+            fit_after: list[float] = []
+            scored_via = "local"
+            experiment_url = ""
+
+            # FIT: score the user's confirmed meals as Phoenix experiments and read the
+            # per-meal results back over MCP (the agent reading its own eval). Fall back
+            # to local per-meal scoring when Phoenix/MCP is unavailable.
+            fit_phoenix = None
+            if phoenix_fit_scorer is not None and fit_cases:
+                yield sse({"type": "phase", "phase": "fit", "n": len(fit_cases),
+                           "label": "Running your meals as a Phoenix experiment — "
+                                    "scored in Arize, read back over MCP"})
+                fit_phoenix = phoenix_fit_scorer(
+                    user, current_block, proposed.block_text, logger_fn, fit_cases
+                )
+            if fit_phoenix is not None:
+                scored_via = "phoenix"
+                experiment_url = fit_phoenix.get("experiment_url", "")
+                rows = fit_phoenix.get("rows", [])
+                for i, r in enumerate(rows):
+                    b, a = r.get("before"), r.get("after")
+                    if b is not None:
+                        fit_before.append(b)
+                    if a is not None:
+                        fit_after.append(a)
+                    yield sse({"type": "score", "set": "fit", "i": i + 1,
+                               "n": len(rows), "text": r.get("text", ""),
+                               "expected": r.get("expected", 0), "before": b, "after": a})
+                yield sse({"type": "phoenix", "experiment_url": experiment_url})
+            else:
+                yield sse({"type": "phase", "phase": "fit", "n": len(fit_cases),
+                           "label": "Re-scoring the meals you confirmed — "
+                                    "with your rule vs without"})
+                for i, c in enumerate(fit_cases):
+                    before, after = score_case_traced(c, "fit")
+                    fit_before.append(before)
+                    fit_after.append(after)
+                    yield sse({"type": "score", "set": "fit", "i": i + 1,
+                               "n": len(fit_cases), "text": c["text"],
+                               "expected": round(c["calories"]),
+                               "before": before, "after": after})
+
+            # USDA floor: always local + fast (a "can't regress" guardrail).
+            usda_before: list[float] = []
+            usda_after: list[float] = []
+            usda_label = (
+                "Re-checking the full standard set — accuracy can't regress"
+                if full
+                else "Re-checking a sample of standard foods — accuracy can't regress"
+            )
+            yield sse({"type": "phase", "phase": "usda",
+                       "n": len(usda_cases), "label": usda_label})
+            for i, c in enumerate(usda_cases):
+                before, after = score_case_traced(c, "usda")
+                usda_before.append(before)
+                usda_after.append(after)
+                yield sse({"type": "score", "set": "usda", "i": i + 1,
+                           "n": len(usda_cases), "text": c["text"],
+                           "expected": round(c["calories"]),
+                           "before": before, "after": after})
+
+            current_scores = {"fit": mean(fit_before), "usda": mean(usda_before)}
+            proposed_scores = {"fit": mean(fit_after), "usda": mean(usda_after)}
             decision = ship_decision(current_scores, proposed_scores)
 
             shipped = False
@@ -1745,7 +1787,8 @@ def create_app(
                 "current": current_scores, "proposed": proposed_scores,
                 "proposed_block": proposed.block_text, "rules": rules,
                 "version": version, "fit_cases": len(fit_cases),
-                "usda_cases": len(usda_cases), "phoenix_url": phoenix_dashboard_url(),
+                "usda_cases": len(usda_cases), "scored_via": scored_via,
+                "experiment_url": experiment_url, "phoenix_url": phoenix_dashboard_url(),
             })
 
         return StreamingResponse(events(), media_type="text/event-stream")
