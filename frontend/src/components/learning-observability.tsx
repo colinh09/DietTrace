@@ -108,6 +108,10 @@ function RetuneLive({
 }) {
   const fit = rows.filter((r) => r.set === "fit");
   const usda = rows.filter((r) => r.set === "usda");
+  // Don't show the panels until the experiment is actually producing scores — an
+  // empty Meal/Base/Tuned grid while the rule is still being written / the run is
+  // being set up is a half-baked preview. Until then, the headline is the status.
+  const hasScores = rows.some((r) => r.before != null);
   const allDone = rows.length > 0 && rows.every((r) => r.before != null);
   return (
     <div className="rt-live">
@@ -129,20 +133,22 @@ function RetuneLive({
           </span>
         </div>
       )}
-      <div className="rt-panels">
-        <ScorePanel
-          title="Your Dataset"
-          tone="var(--accent)"
-          goal="meals you confirmed · should improve"
-          rows={fit}
-        />
-        <ScorePanel
-          title="USDA / everyday"
-          tone="var(--macro-carb)"
-          goal="reference foods · must stay accurate"
-          rows={usda}
-        />
-      </div>
+      {hasScores && (
+        <div className="rt-panels">
+          <ScorePanel
+            title="Your Dataset"
+            tone="var(--accent)"
+            goal="meals you confirmed · should improve"
+            rows={fit}
+          />
+          <ScorePanel
+            title="USDA / everyday"
+            tone="var(--macro-carb)"
+            goal="reference foods · must stay accurate"
+            rows={usda}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -425,7 +431,7 @@ export function LearningObservability({
     if (retuning) return;
     setRetuning(true);
     setResult(null);
-    setLivePhase("Starting the eval…");
+    setLivePhase("Suggesting a change…");
     setLiveRules([]);
     setLiveRows([]);
     liveRowsRef.current = [];

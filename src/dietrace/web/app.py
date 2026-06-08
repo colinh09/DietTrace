@@ -1676,7 +1676,8 @@ def create_app(
                 return
 
             yield sse({"type": "phase", "phase": "propose",
-                       "label": "Generalizing your new corrections into a rule…"})
+                       "label": "Suggesting a change — generalizing your corrections "
+                                "into a rule…"})
             current_block = prefs.block_text(user)
             proposed = propose_preference_block(
                 new_corrections, current_block, client=corrector_client,
@@ -1766,8 +1767,8 @@ def create_app(
                     fit_phoenix = None
                     if phoenix_fit_scorer is not None and fit_cases:
                         q.put({"type": "phase", "phase": "fit", "n": len(fit_cases),
-                               "label": "Running your meals as a Phoenix experiment — "
-                                        "scored in Arize, read back over MCP"})
+                               "label": "Setting up an experiment in Arize — scoring "
+                                        "your meals, read back over MCP…"})
                         fit_phoenix = phoenix_fit_scorer(
                             user, current_block, proposed.block_text, logger_fn, fit_cases
                         )
@@ -1819,9 +1820,8 @@ def create_app(
                     usda_phoenix = None
                     if phoenix_usda_scorer is not None and usda_cases:
                         q.put({"type": "phase", "phase": "usda", "n": len(usda_cases),
-                               "label": "Running everyday foods as a Phoenix "
-                                        "experiment — scored in Arize, read back over "
-                                        "MCP"})
+                               "label": "Setting up an experiment in Arize — scoring "
+                                        "everyday foods, read back over MCP…"})
                         usda_phoenix = phoenix_usda_scorer(
                             user, current_block, proposed.block_text, logger_fn,
                             usda_cases,
