@@ -483,10 +483,12 @@ export function LearningObservability({
               reason: e.shipped
                 ? (rule ?? "a new rule is now in effect")
                 : "no change — it wasn't more accurate",
-              // The recap replaces the old raw "your-meal accuracy 61% → 86%" line.
-              // No Phoenix code line here — the "See your experiment results" panel
-              // right below already shows the read (and "read experiment" was cryptic).
-              phoenix: undefined,
+              // The recap replaces the raw "your-meal accuracy 61% → 86%" line, but
+              // keep the blue Phoenix-MCP node like the other feed events.
+              phoenix:
+                e.scored_via === "phoenix"
+                  ? "pulled experiment results from Phoenix"
+                  : undefined,
               when: "now",
               recap,
               // Persist the per-meal results ON the event so they survive a reload.

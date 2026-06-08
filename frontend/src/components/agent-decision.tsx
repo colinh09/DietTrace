@@ -236,7 +236,7 @@ export function AgentFeed({
                     {e.reason && <div className="revent-reason">{e.reason}</div>}
                     {e.op === "retune" && e.recap && <RetuneRecap recap={e.recap} />}
                     {e.detail && <div className="revent-reason mono">{e.detail}</div>}
-                    {e.phoenix && e.op !== "retune" && (
+                    {e.phoenix && (
                       <div className="phoenix-line">
                         <span className="phoenix-tag">
                           <span className="pdot" /> Arize Phoenix
