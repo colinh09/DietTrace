@@ -11,6 +11,7 @@ import json
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from dietrace.web.app import create_app
@@ -62,7 +63,7 @@ def _corrector_client(block: str = "Preworkout meals: carbs run high; scale up."
 
 
 def _make_app(tmp_path, *, corrector_client=None, freeform_client=None,
-              phoenix_fit_scorer=None):
+              phoenix_fit_scorer=None, meal_logger=_stub_logger):
     from dietrace.web.preference_stores import UserProfileStore
 
     confirms = ConfirmationStore(tmp_path / "confirm.sqlite")
@@ -70,7 +71,7 @@ def _make_app(tmp_path, *, corrector_client=None, freeform_client=None,
     prefs = PreferenceStore(tmp_path / "pref.sqlite")
     profiles = UserProfileStore(tmp_path / "profile.sqlite")
     app = create_app(
-        meal_logger=_stub_logger,
+        meal_logger=meal_logger,
         store=MealLogStore(tmp_path / "log.sqlite"),
         feedback_store=FeedbackStore(tmp_path / "fb.sqlite"),
         trust_store=TrustStore(tmp_path / "trust.sqlite"),
@@ -383,6 +384,72 @@ def test_retune_stream_emits_per_meal_scores_then_the_verdict(tmp_path) -> None:
     assert done["ok"] is True and done["shipped"] is True
     assert done["proposed"]["fit"] > done["current"]["fit"]
     assert prefs.get("loop-user")["version"] == 1  # the block shipped + persisted
+
+
+def test_retune_stream_fills_both_panels_concurrently(tmp_path) -> None:
+    """The redesign's two panels — "Fit to you" + "USDA/everyday" — fill
+    concurrently: the manifest splits the two row sets, each panel streams its own
+    scores and a per-set delta as it finishes, and the ship verdict is unchanged
+    vs the non-streamed retune (running the two sets in parallel can't change what
+    the gate decides)."""
+    client, confirms, fblog, prefs = _make_app(
+        tmp_path, corrector_client=_corrector_client())
+    confirms.add("loop-user", "preworkout oats", [], _energy(600))  # held-out truth
+    fblog.add("loop-user", "I run more carbs preworkout")
+
+    events = _sse_events(client.post("/learning/retune/stream", headers=_H).text)
+
+    # Parallel-friendly manifest: both row sets, split per panel so each can be
+    # rendered and filled independently. The flat `rows` shape stays too.
+    manifest = next(e for e in events if e["type"] == "manifest")
+    assert set(manifest["sets"]) == {"fit", "usda"}
+    assert manifest["sets"]["fit"] and manifest["sets"]["usda"]
+    assert {r["set"] for r in manifest["rows"]} <= {"fit", "usda"}
+
+    # Both panels stream their own scores...
+    scores = [e for e in events if e["type"] == "score"]
+    assert any(s["set"] == "fit" for s in scores)
+    assert any(s["set"] == "usda" for s in scores)
+
+    # ...and each panel reports a per-set delta as soon as it finishes.
+    set_dones = {e["set"]: e for e in events if e["type"] == "set_done"}
+    assert set(set_dones) == {"fit", "usda"}
+    assert "delta" in set_dones["fit"] and "delta" in set_dones["usda"]
+
+    done = events[-1]
+    assert done["type"] == "done" and done["ok"] is True and done["shipped"] is True
+    assert done["fit_delta"] > 0  # fit improved → the rule shipped
+
+    # The ship verdict is unchanged vs the non-streamed endpoint. Use a fresh app
+    # with the identical setup so the two runs don't share state.
+    (tmp_path / "b").mkdir()
+    other, oc, ofb, _ = _make_app(
+        tmp_path / "b", corrector_client=_corrector_client())
+    oc.add("loop-user", "preworkout oats", [], _energy(600))
+    ofb.add("loop-user", "I run more carbs preworkout")
+    post = other.post("/learning/retune", headers=_H).json()
+    assert done["verdict"] == post["verdict"]
+    assert done["current"] == post["current"]
+    assert done["proposed"] == post["proposed"]
+
+
+def test_retune_stream_surfaces_a_scoring_failure(tmp_path) -> None:
+    """A scoring failure in a panel's thread is surfaced, not swallowed: the stream
+    fails loud rather than reporting a misleading zeroed (and unshipped) verdict."""
+    def boom_logger(text, examples=None):
+        if "usda" in text:
+            raise RuntimeError("scoring blew up")
+        return _stub_logger(text, examples)
+
+    client, confirms, fblog, prefs = _make_app(
+        tmp_path, corrector_client=_corrector_client(), meal_logger=boom_logger)
+    confirms.add("loop-user", "preworkout oats", [], _energy(600))
+    fblog.add("loop-user", "I run more carbs preworkout")
+
+    with pytest.raises(RuntimeError, match="scoring blew up"):
+        client.post("/learning/retune/stream", headers=_H)
+    # Nothing shipped on a failed scoring run.
+    assert prefs.get("loop-user") is None
 
 
 # ── Injection: a shipped block reaches the agent ─────────────────────────────────

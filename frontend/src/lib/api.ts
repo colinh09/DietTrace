@@ -737,6 +737,9 @@ export interface LearningRetuneResult {
   verdict?: RetuneVerdict;
   current?: RetuneScores;
   proposed?: RetuneScores;
+  // proposed − current per set (streamed retune); convenience for the two panels.
+  fit_delta?: number;
+  usda_delta?: number;
   proposed_block?: string;
   rules?: PreferenceRule[];
   version?: number | null;
@@ -827,7 +830,16 @@ export type LearningRetuneEvent =
   | { type: "phase"; phase: "propose" | "fit" | "usda"; label: string; n?: number }
   | { type: "rule"; rules: PreferenceRule[] }
   // The full eval set up front, so the UI lists every meal before scoring starts.
-  | { type: "manifest"; rows: { set: "fit" | "usda"; text: string }[] }
+  // `sets` splits the rows per panel ("Fit to you" + "USDA/everyday") so the two
+  // can render and fill concurrently as scores stream in.
+  | {
+      type: "manifest";
+      rows: { set: "fit" | "usda"; text: string }[];
+      sets?: { fit: { text: string; expected: number }[]; usda: { text: string; expected: number }[] };
+    }
+  // Emitted once per panel when its set finishes — carries that set's mean
+  // before/after and the delta, so each panel can show its own result independently.
+  | { type: "set_done"; set: "fit" | "usda"; before: number; after: number; delta: number; n: number }
   // Emitted when the fit set was scored as a Phoenix experiment — carries the link
   // to the run in Arize so it can be opened live.
   | { type: "phoenix"; experiment_url: string }

@@ -18,6 +18,8 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import asynccontextmanager
+from queue import Queue
+from threading import Thread
 from typing import Any
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
@@ -1685,11 +1687,21 @@ def create_app(
                 usda_cases = usda_cases[:_RETUNE_USDA_SAMPLE]
 
             # Emit the FULL eval set up front so the UI can list every meal
-            # immediately (dashes), then fill each in as its score lands.
+            # immediately (dashes), then fill each in as its score lands. `rows` is
+            # the original flat shape (live UI). `sets` is the parallel-friendly
+            # split — one row list per panel ("Fit to you" + "USDA/everyday") — so
+            # each panel can render and fill independently as scores arrive.
+            fit_rows = [
+                {"text": c["text"], "expected": round(c["calories"])} for c in fit_cases
+            ]
+            usda_rows = [
+                {"text": c["text"], "expected": round(c["calories"])} for c in usda_cases
+            ]
             yield sse({
                 "type": "manifest",
                 "rows": [{"set": "fit", "text": c["text"]} for c in fit_cases]
                 + [{"set": "usda", "text": c["text"]} for c in usda_cases],
+                "sets": {"fit": fit_rows, "usda": usda_rows},
             })
 
             def score_one(case: dict[str, Any], block: str) -> float:
@@ -1715,76 +1727,128 @@ def create_app(
 
             fit_before: list[float] = []
             fit_after: list[float] = []
-            scored_via = "local"
-            experiment_url = ""
-
-            # FIT: score the user's confirmed meals as Phoenix experiments and read the
-            # per-meal results back over MCP (the agent reading its own eval). Fall back
-            # to local per-meal scoring when Phoenix/MCP is unavailable.
-            fit_phoenix = None
-            if phoenix_fit_scorer is not None and fit_cases:
-                yield sse({"type": "phase", "phase": "fit", "n": len(fit_cases),
-                           "label": "Running your meals as a Phoenix experiment — "
-                                    "scored in Arize, read back over MCP"})
-                fit_phoenix = phoenix_fit_scorer(
-                    user, current_block, proposed.block_text, logger_fn, fit_cases
-                )
-            if fit_phoenix is not None:
-                scored_via = "phoenix"
-                experiment_url = fit_phoenix.get("experiment_url", "")
-                rows = fit_phoenix.get("rows", [])
-                for i, r in enumerate(rows):
-                    b, a = r.get("before"), r.get("after")
-                    if b is not None:
-                        fit_before.append(b)
-                    if a is not None:
-                        fit_after.append(a)
-                    yield sse({"type": "score", "set": "fit", "i": i + 1,
-                               "n": len(rows), "text": r.get("text", ""),
-                               "expected": r.get("expected", 0), "before": b, "after": a,
-                               "base_kcal": r.get("base_kcal"),
-                               "tuned_kcal": r.get("tuned_kcal")})
-                yield sse({"type": "phoenix", "experiment_url": experiment_url})
-            else:
-                yield sse({"type": "phase", "phase": "fit", "n": len(fit_cases),
-                           "label": "Re-scoring the meals you confirmed — "
-                                    "with your rule vs without"})
-                for i, c in enumerate(fit_cases):
-                    before, after = score_case_traced(c, "fit")
-                    fit_before.append(before)
-                    fit_after.append(after)
-                    yield sse({"type": "score", "set": "fit", "i": i + 1,
-                               "n": len(fit_cases), "text": c["text"],
-                               "expected": round(c["calories"]),
-                               "before": before, "after": after})
-
-            # USDA floor: always local, and scored in PARALLEL (the food repo opens a
-            # connection per query, so the agent is thread-safe). Rows fill in as each
-            # completes — out of order, by index — which is the bulk of the speed-up.
+            usda_before = [0.0] * len(usda_cases)
+            usda_after = [0.0] * len(usda_cases)
+            shared: dict[str, Any] = {"scored_via": "local", "experiment_url": ""}
             usda_label = (
                 "Re-checking the full standard set — accuracy can't regress"
                 if full
                 else "Re-checking a sample of standard foods — accuracy can't regress"
             )
-            yield sse({"type": "phase", "phase": "usda",
-                       "n": len(usda_cases), "label": usda_label})
-            usda_before = [0.0] * len(usda_cases)
-            usda_after = [0.0] * len(usda_cases)
-            with ThreadPoolExecutor(max_workers=6) as pool:
-                futs = {
-                    pool.submit(score_case_traced, c, "usda"): i
-                    for i, c in enumerate(usda_cases)
-                }
-                for fut in as_completed(futs):
-                    i = futs[fut]
-                    before, after = fut.result()
-                    usda_before[i], usda_after[i] = before, after
-                    c = usda_cases[i]
-                    yield sse({"type": "score", "set": "usda", "i": i + 1,
-                               "n": len(usda_cases), "text": c["text"],
-                               "expected": round(c["calories"]),
-                               "before": before, "after": after})
 
+            # Both panels fill CONCURRENTLY: each set scores in its own thread and
+            # funnels its phase/score/phoenix events through a queue the generator
+            # drains in arrival order, so "Fit to you" and "USDA/everyday" stream
+            # side by side. The food repo opens a SQLite connection per query, so the
+            # agent is thread-safe across the two sets.
+            q: Queue = Queue()
+            _SET_DONE = object()
+            # A scoring failure in either set is surfaced, not swallowed: the producer
+            # records it and the consumer re-raises after draining, so the stream fails
+            # loud (as the inline/`fut.result()` scoring did before) rather than
+            # shipping a misleading zeroed verdict.
+            errors: list[Exception] = []
+
+            def run_fit() -> None:
+                # FIT: score the user's confirmed meals as Phoenix experiments and read
+                # the per-meal results back over MCP (the agent reading its own eval).
+                # Fall back to local per-meal scoring when Phoenix/MCP is unavailable.
+                try:
+                    fit_phoenix = None
+                    if phoenix_fit_scorer is not None and fit_cases:
+                        q.put({"type": "phase", "phase": "fit", "n": len(fit_cases),
+                               "label": "Running your meals as a Phoenix experiment — "
+                                        "scored in Arize, read back over MCP"})
+                        fit_phoenix = phoenix_fit_scorer(
+                            user, current_block, proposed.block_text, logger_fn, fit_cases
+                        )
+                    if fit_phoenix is not None:
+                        shared["scored_via"] = "phoenix"
+                        shared["experiment_url"] = fit_phoenix.get("experiment_url", "")
+                        rows = fit_phoenix.get("rows", [])
+                        for i, r in enumerate(rows):
+                            b, a = r.get("before"), r.get("after")
+                            if b is not None:
+                                fit_before.append(b)
+                            if a is not None:
+                                fit_after.append(a)
+                            q.put({"type": "score", "set": "fit", "i": i + 1,
+                                   "n": len(rows), "text": r.get("text", ""),
+                                   "expected": r.get("expected", 0), "before": b,
+                                   "after": a, "base_kcal": r.get("base_kcal"),
+                                   "tuned_kcal": r.get("tuned_kcal")})
+                        q.put({"type": "phoenix",
+                               "experiment_url": shared["experiment_url"]})
+                    else:
+                        q.put({"type": "phase", "phase": "fit", "n": len(fit_cases),
+                               "label": "Re-scoring the meals you confirmed — "
+                                        "with your rule vs without"})
+                        for i, c in enumerate(fit_cases):
+                            before, after = score_case_traced(c, "fit")
+                            fit_before.append(before)
+                            fit_after.append(after)
+                            q.put({"type": "score", "set": "fit", "i": i + 1,
+                                   "n": len(fit_cases), "text": c["text"],
+                                   "expected": round(c["calories"]),
+                                   "before": before, "after": after})
+                    q.put({"type": "set_done", "set": "fit",
+                           "before": mean(fit_before), "after": mean(fit_after),
+                           "delta": round(mean(fit_after) - mean(fit_before), 3),
+                           "n": len(fit_cases)})
+                except Exception as exc:  # noqa: BLE001 — surfaced below, not swallowed
+                    errors.append(exc)
+                finally:
+                    q.put(_SET_DONE)
+
+            def run_usda() -> None:
+                # USDA floor: always local, and scored in PARALLEL (the food repo opens
+                # a connection per query, so the agent is thread-safe). Rows fill in as
+                # each completes — out of order, by index — the bulk of the speed-up.
+                try:
+                    q.put({"type": "phase", "phase": "usda",
+                           "n": len(usda_cases), "label": usda_label})
+                    with ThreadPoolExecutor(max_workers=6) as pool:
+                        futs = {
+                            pool.submit(score_case_traced, c, "usda"): i
+                            for i, c in enumerate(usda_cases)
+                        }
+                        for fut in as_completed(futs):
+                            i = futs[fut]
+                            before, after = fut.result()
+                            usda_before[i], usda_after[i] = before, after
+                            c = usda_cases[i]
+                            q.put({"type": "score", "set": "usda", "i": i + 1,
+                                   "n": len(usda_cases), "text": c["text"],
+                                   "expected": round(c["calories"]),
+                                   "before": before, "after": after})
+                    q.put({"type": "set_done", "set": "usda",
+                           "before": mean(usda_before), "after": mean(usda_after),
+                           "delta": round(mean(usda_after) - mean(usda_before), 3),
+                           "n": len(usda_cases)})
+                except Exception as exc:  # noqa: BLE001 — surfaced below, not swallowed
+                    errors.append(exc)
+                finally:
+                    q.put(_SET_DONE)
+
+            workers = [Thread(target=run_fit), Thread(target=run_usda)]
+            for w in workers:
+                w.start()
+            finished = 0
+            while finished < len(workers):
+                item = q.get()
+                if item is _SET_DONE:
+                    finished += 1
+                    continue
+                yield sse(item)
+            for w in workers:
+                w.join()
+            if errors:
+                # join() above is the happens-before edge for the threads' writes to
+                # `errors`/`shared`/the score lists, so reading them here is safe.
+                raise errors[0]
+
+            scored_via = shared["scored_via"]
+            experiment_url = shared["experiment_url"]
             current_scores = {"fit": mean(fit_before), "usda": mean(usda_before)}
             proposed_scores = {"fit": mean(fit_after), "usda": mean(usda_after)}
             decision = ship_decision(current_scores, proposed_scores)
@@ -1799,6 +1863,8 @@ def create_app(
             yield sse({
                 "type": "done", "ok": True, "shipped": shipped, "verdict": decision,
                 "current": current_scores, "proposed": proposed_scores,
+                "fit_delta": round(proposed_scores["fit"] - current_scores["fit"], 3),
+                "usda_delta": round(proposed_scores["usda"] - current_scores["usda"], 3),
                 "proposed_block": proposed.block_text, "rules": rules,
                 "version": version, "fit_cases": len(fit_cases),
                 "usda_cases": len(usda_cases), "scored_via": scored_via,
