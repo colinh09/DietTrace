@@ -339,6 +339,39 @@ def test_micro_panel_scores_full_tier() -> None:
     assert result.score > 0.9
 
 
+def test_micro_panel_na_for_full_tier_without_micros() -> None:
+    """A full-tier case with no micro ground truth is n/a, not a crash.
+
+    The ``not micros`` guard is the second arm of the dispatch: the docstring
+    promises "any case without an expected micro panel" returns n/a, and the
+    guard is load-bearing — an empty panel would otherwise divide a mean by
+    ``len(per_micro) == 0``. Mutation-verified: dropping ``or not micros`` makes
+    this raise ``ZeroDivisionError``.
+    """
+    output = {"totals": [{"code": "307", "name": "Sodium", "amount": 70.0, "unit": "mg"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1, "micros": {}}
+
+    result = micro_panel_accuracy(output, expected, {"nutrient_tier": "full"})
+
+    assert result.label == "n/a"
+    assert result.score == 1.0
+
+
+def test_micro_panel_na_when_micros_key_absent() -> None:
+    """A case carrying no ``micros`` key at all (and no tier) is n/a, not a crash.
+
+    Exercises the same ``not micros`` guard via the ``_expected_value(...) or {}``
+    coercion when ``micros`` is absent rather than empty, with metadata omitted.
+    """
+    output = {"totals": [{"code": "307", "name": "Sodium", "amount": 70.0, "unit": "mg"}]}
+    expected = {"calories": 1, "protein_g": 1, "fat_g": 1, "carb_g": 1}
+
+    result = micro_panel_accuracy(output, expected)
+
+    assert result.label == "n/a"
+    assert result.score == 1.0
+
+
 # --- fiber/sodium/sugar single-nutrient evaluators (10.2) ---------------------
 
 
