@@ -195,7 +195,7 @@ export function AgentFeed({
   return (
     <div className="rail-events" aria-label="Agent activity">
       {running && (
-        <div className="revent revent-thinking revent-shimmer">
+        <div className="revent revent-thinking">
           <span className="revent-dot accent" aria-hidden="true" style={{ color: "var(--accent)" }}>
             <RefreshCw size={11} className="revent-ic" />
           </span>

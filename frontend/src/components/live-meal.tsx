@@ -45,12 +45,7 @@ export function LiveMeal({ entry }: { entry: LiveEntry }) {
                       <div className="tstep-body">
                         <div className="tstep-line-btn">
                           <span className="tstep-fn mono">{stepLabel(s.step)}</span>
-                          <span className="tstep-arrow">
-                            {s.summary}
-                            {s.status === "running" && !/[.…]\s*$/.test(s.summary ?? "")
-                              ? " …"
-                              : ""}
-                          </span>
+                          <span className="tstep-arrow">{s.summary}</span>
                         </div>
                       </div>
                     </li>

@@ -125,7 +125,7 @@ function RetuneLive({
       {rules.length > 0 && (
         <div className="rt-rule">
           <span>
-            <b>New rule DietTrace wrote — </b>
+            <b>New rule DietTrace learned — </b>
             {rules[0].rule}
           </span>
         </div>
