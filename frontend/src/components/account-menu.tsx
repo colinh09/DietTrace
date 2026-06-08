@@ -7,8 +7,9 @@
 // this level — siblings of the dropdown — so closing the menu never unmounts an
 // open modal.
 import { useEffect, useRef, useState } from "react";
-import { RotateCcw, User } from "lucide-react";
+import { LogIn, LogOut, RotateCcw, User } from "lucide-react";
 import { getSetup, type Setup } from "@/lib/setup";
+import { useAuth } from "@/lib/auth";
 import { RecapModal } from "@/components/recap-modal";
 import { ResetDialog } from "@/components/reset-dialog";
 import { Modal } from "@/components/modal";
@@ -28,16 +29,21 @@ function accountLabel(setup: Setup | null): { name: string; sub: string } {
 export function AccountMenu({
   onViewDay,
   onReset,
+  onAuthChange,
 }: {
   // Navigate the page to a given ISO day (the persona recap's "see the dataset").
   onViewDay?: (iso: string) => void;
   // Fired after a confirmed reset wipes the user's data.
   onReset?: () => void;
+  // Fired after a sign-in/out so the page can reload data for the new bucket.
+  onAuthChange?: () => void;
 }) {
+  const { user, configured, signInWithGoogle, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [personaOpen, setPersonaOpen] = useState(false);
   const [setup, setSetupState] = useState<Setup | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
   const acctRef = useRef<HTMLDivElement>(null);
 
   // Close the menu on an outside click (the modals carry their own scrim).
@@ -52,7 +58,14 @@ export function AccountMenu({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
-  const label = accountLabel(setup ?? getSetup());
+  // A signed-in Firebase user labels the menu; otherwise fall back to the saved
+  // onboarding snapshot (persona / own setup / anonymous).
+  const label = user
+    ? {
+        name: user.displayName ?? user.email ?? "Account",
+        sub: user.email ?? "Signed in",
+      }
+    : accountLabel(setup ?? getSetup());
 
   const openPersona = () => {
     setSetupState(getSetup());
@@ -62,6 +75,22 @@ export function AccountMenu({
   const openReset = () => {
     setResetOpen(true);
     setMenuOpen(false);
+  };
+
+  // Sign in/out from inside the menu. Guarded so a missed Firebase config or a
+  // closed popup never throws; the page refetches data for the new bucket after.
+  const runAuth = async (fn: () => Promise<void>) => {
+    if (authBusy) return;
+    setMenuOpen(false);
+    setAuthBusy(true);
+    try {
+      await fn();
+      onAuthChange?.();
+    } catch {
+      /* popup closed / network — leave state as-is, the user can retry */
+    } finally {
+      setAuthBusy(false);
+    }
   };
 
   return (
@@ -75,14 +104,24 @@ export function AccountMenu({
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
         >
-          {label.name.charAt(0).toUpperCase()}
+          {user?.photoURL ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="avatar-img" src={user.photoURL} alt="" />
+          ) : (
+            label.name.charAt(0).toUpperCase()
+          )}
         </button>
         {menuOpen && (
           <div className="acct-menu" role="menu">
             <div className="acct-menu-head">
-              <span className="acct-menu-avatar" aria-hidden="true">
-                {label.name.charAt(0).toUpperCase()}
-              </span>
+              {user?.photoURL ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="acct-menu-avatar acct-menu-avatar-img" src={user.photoURL} alt="" />
+              ) : (
+                <span className="acct-menu-avatar" aria-hidden="true">
+                  {label.name.charAt(0).toUpperCase()}
+                </span>
+              )}
               <span className="acct-menu-id">
                 <span className="acct-menu-name">{label.name}</span>
                 <span className="acct-menu-sub">{label.sub}</span>
@@ -97,6 +136,34 @@ export function AccountMenu({
               <User size={16} className="acct-menu-ic" aria-hidden="true" />
               Persona details
             </button>
+            {configured && (
+              <>
+                <div className="acct-menu-sep" />
+                {user ? (
+                  <button
+                    type="button"
+                    className="acct-menu-item"
+                    role="menuitem"
+                    onClick={() => runAuth(signOut)}
+                    disabled={authBusy}
+                  >
+                    <LogOut size={16} className="acct-menu-ic" aria-hidden="true" />
+                    Sign out
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="acct-menu-item"
+                    role="menuitem"
+                    onClick={() => runAuth(signInWithGoogle)}
+                    disabled={authBusy}
+                  >
+                    <LogIn size={16} className="acct-menu-ic" aria-hidden="true" />
+                    Sign in
+                  </button>
+                )}
+              </>
+            )}
             <div className="acct-menu-sep" />
             <button
               type="button"

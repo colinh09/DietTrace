@@ -856,15 +856,9 @@ body {
 .reset-session-btn { color: var(--faint); }
 .reset-session-btn:hover { color: var(--amber-ink); background: var(--amber-soft); }
 .reset-session-btn.confirming { color: var(--amber-ink); background: var(--amber-soft); font-weight: 600; }
-/* Auth: sign-in button + signed-in user chip */
-.auth-signin { color: var(--accent-ink); font-weight: 600; border: 1px solid var(--line-strong); }
-.auth-signin:hover { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-.auth-user { display: inline-flex; align-items: center; gap: 7px; padding: 3px 4px 3px 3px; }
-.auth-avatar { width: 22px; height: 22px; border-radius: 100px; object-fit: cover; }
-.auth-avatar-fallback { display: inline-flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent-ink); font-size: 11px; font-weight: 700; font-family: var(--ui-font); }
-.auth-name { font-size: 13px; font-weight: 500; color: var(--ink); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.auth-signout { display: inline-flex; align-items: center; justify-content: center; color: var(--faint); background: none; border: none; cursor: pointer; padding: 4px; border-radius: 6px; transition: background .14s, color .14s; }
-.auth-signout:hover { color: var(--ink); background: var(--accent-softer); }
+/* Auth: a signed-in user's photo replaces the avatar glyph in the navbar + menu. */
+.avatar-img { width: 100%; height: 100%; border-radius: 100px; object-fit: cover; }
+.acct-menu-avatar-img { object-fit: cover; }
 @media (max-width: 720px) { .hdr-nav { gap: 0; } .nav-item { padding: 6px 8px; font-size: 13px; } .nav-sep { margin: 0 3px; } }
 
 /* ── Account avatar + dropdown (Persona details + Reset fold in here) ── */
@@ -1183,6 +1177,11 @@ body {
 .ob-btn-primary:disabled { opacity: .5; cursor: default; }
 .ob-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--card); color: var(--accent-ink); border: 1px solid var(--line-strong); border-radius: 11px; padding: 13px 20px; font-family: var(--ui-font); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }
 .ob-btn-secondary:hover { background: var(--accent-softer); border-color: var(--accent); }
+/* Sign-in screen: the Google button (white, branded) + the reassuring fine print. */
+.si-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 11px; padding: 13px 20px; font-family: var(--ui-font); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }
+.si-google:hover:not(:disabled) { background: var(--card); border-color: var(--accent); }
+.si-google:disabled { opacity: .55; cursor: default; }
+.si-fine { margin-top: 16px; font-size: 11.5px; line-height: 1.5; color: var(--faint); }
 .ob-skip { display: block; margin: 16px auto 0; background: none; border: none; color: var(--faint); font-family: var(--ui-font); font-size: 12px; cursor: pointer; padding: 6px; transition: color .14s; }
 .ob-skip:hover { color: var(--muted-ink); }
 .ob-form { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }

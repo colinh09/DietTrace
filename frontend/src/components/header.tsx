@@ -8,7 +8,6 @@
 // the day-summary card below, not here.
 import { Sparkle } from "lucide-react";
 import { AccountMenu } from "@/components/account-menu";
-import { AuthButton } from "@/components/auth-button";
 
 interface HeaderProps {
   // The viewed day — the seed uses it as the reference for "today".
@@ -53,8 +52,11 @@ export function Header({
         </button>
       </nav>
       <div className="hdr-end">
-        <AuthButton onAuthChange={onAuthChange} />
-        <AccountMenu onViewDay={onViewDay} onReset={onReset ?? onSeeded} />
+        <AccountMenu
+          onViewDay={onViewDay}
+          onReset={onReset ?? onSeeded}
+          onAuthChange={onAuthChange}
+        />
       </div>
     </header>
   );

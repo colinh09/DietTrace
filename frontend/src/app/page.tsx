@@ -34,6 +34,9 @@ import {
 import { clearOnboarded, isOnboardedFlag, markOnboarded } from "@/lib/onboarding";
 import { clearSetup } from "@/lib/setup";
 import { fromISODate, isSameDay, shiftDate, toISODate } from "@/lib/date";
+import { useAuth } from "@/lib/auth";
+import { chooseAnon, hasChosenAnon } from "@/lib/auth-gate";
+import { SignIn } from "@/components/sign-in";
 
 export default function Home() {
   const [date, setDate] = useState(() => new Date());
@@ -66,6 +69,18 @@ export default function Home() {
   // already has a saved profile or logged meals (a seeded judge, a returning
   // signed-in user) is treated as onboarded so they never re-see the welcome.
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  // The Firebase sign-in gate. Inert unless Firebase is configured: `user` is
+  // null when signed out / anonymous, `authLoading` holds the first paint, and
+  // `anonChosen` records "continue without an account" so a reload skips the gate.
+  const { user, loading: authLoading, configured: authConfigured } = useAuth();
+  // Lazy + SSR-safe: `hasChosenAnon` guards `window`, so this is false on the
+  // server and reads localStorage on the client without a hydration mismatch
+  // (the gate paints "busy" while auth resolves, regardless of this value).
+  const [anonChosen, setAnonChosen] = useState(hasChosenAnon);
+  const continueAnon = useCallback(() => {
+    chooseAnon();
+    setAnonChosen(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -313,6 +328,15 @@ export default function Home() {
     },
     [loadHistory, loadAnalysis, bumpLearning],
   );
+
+  // Sign-in gate — the app's entry point when Firebase is wired. Hold the paint
+  // while auth resolves, then show the dedicated sign-in screen to an
+  // unauthenticated user who hasn't opted into the anonymous path. When Firebase
+  // is unconfigured this gate is inert and the app runs fully anonymous.
+  if (authConfigured && authLoading)
+    return <div className="ob-page" aria-busy="true" />;
+  if (authConfigured && !user && !anonChosen)
+    return <SignIn onContinueAnon={continueAnon} />;
 
   // Hold the paint until the gate decides (avoids flashing the app then the
   // welcome). A returning user resolves synchronously from the localStorage flag.
