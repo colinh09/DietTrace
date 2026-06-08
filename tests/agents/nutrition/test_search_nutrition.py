@@ -108,3 +108,19 @@ def test_overlay_miss_falls_through_to_ranked_search(repository) -> None:
     match = search_nutrition(repository, "avocado", overlay={"banana": EGG_FDC_ID})
     assert match is not None
     assert match.fdc_id == AVOCADO_FDC_ID  # not pinned → ranked search decides
+
+
+def test_overlay_pin_to_missing_fdc_id_falls_through(repository) -> None:
+    """A stale overlay pin (fdc_id absent from the DB) degrades to ranked search.
+
+    Curated overlays can drift out of sync with the data — a pinned common name
+    can point at an fdc_id that no longer exists in the read layer. The lookup
+    must stay fail-soft: when ``repository.get`` can't hydrate the pin,
+    it falls through to the ranked search and still resolves the food, rather
+    than raising or returning ``None``.
+    """
+    # 999999 is not in the fixture DB, so the pin can't hydrate. Had the stale
+    # pin been trusted, the match would carry 999999; instead it resolves avocado.
+    match = search_nutrition(repository, "avocado", overlay={"avocado": 999999})
+    assert match is not None
+    assert match.fdc_id == AVOCADO_FDC_ID  # ranked search resolves it normally
