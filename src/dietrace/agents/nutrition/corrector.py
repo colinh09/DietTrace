@@ -48,15 +48,13 @@ class ProposedBlock(BaseModel):
 
 
 def _format_corrections(corrections: list[dict[str, Any]]) -> str:
-    """Render the feedback set (with ids + emphasis) for the prompt."""
+    """Render the feedback set (with ids) for the prompt."""
     lines = []
     for c in corrections:
         cid = c.get("id", "?")
-        weight = float(c.get("weight", 1.0) or 1.0)
-        emphasis = f" [emphasis x{weight:g}]" if weight != 1.0 else ""
         meal = c.get("meal_text")
         ctx = f" (on: {meal})" if meal else ""
-        lines.append(f"- #{cid}{emphasis}: {c.get('feedback_text', '')}{ctx}")
+        lines.append(f"- #{cid}: {c.get('feedback_text', '')}{ctx}")
     return "\n".join(lines) if lines else "(none)"
 
 

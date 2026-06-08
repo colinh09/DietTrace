@@ -121,8 +121,7 @@ RUNNER = Persona(
     feedback=[
         # Facet 1: pre-run carbs run high.
         {"feedback_text": "my pre-run oats are way bigger than this — closer to 90 g of carbs",
-         "meal_text": "oatmeal before my morning run",
-         "weight": 2.0},
+         "meal_text": "oatmeal before my morning run"},
         # Facet 2: post-run recovery runs high on BOTH protein and fats.
         {"feedback_text": "after a long run my recovery meals are way bigger — nearly "
                           "double the protein, plus a lot more healthy fat like avocado "
@@ -171,8 +170,7 @@ BODYBUILDER = Persona(
         # learns from a meal it's then graded on — the gate stays honest.
         {"feedback_text": "after lifting I eat way more protein than this — my post-workout "
                           "chicken is more like 10-12 oz, not a small serving",
-         "meal_text": "a post-lift chicken and rice bowl",
-         "weight": 2.0},
+         "meal_text": "a post-lift chicken and rice bowl"},
         {"feedback_text": "my post-workout protein shakes are double scoops — way more "
                           "protein than you logged",
          "meal_text": "a protein shake after lifting"},

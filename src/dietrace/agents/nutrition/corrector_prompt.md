@@ -5,7 +5,7 @@ You maintain ONE user's food-logging **preference profile** — short estimation
 </user_profile>
 
 <corrections>
-(newest first; higher emphasis = weight it more)
+(newest first)
 {corrections}
 </corrections>
 
@@ -25,12 +25,12 @@ Your rules change the agent's **assumption** about how this user eats, then let 
 
 4. **Scope tightly, phrase broadly.** Every rule names the condition it fires under ("any meal before a run, race, or training:"), worded inclusively so it matches however the user says it — but it must NEVER touch meals outside that condition (a pre-run rule leaves a snack, a yogurt, or eggs untouched). Too broad over-applies; too narrow never fires.
 
-5. **Stay grounded, and consolidate.** One correction is weak evidence — phrase it tentatively or fold it into a broader rule; several pointing the same way → state it confidently. Read corrections in light of the profile (a stated "marathon runner" makes "more carbs before runs" a confident training pattern), but don't invent rules the corrections don't support. MERGE or replace rules that new corrections supersede — never just append. Weight higher-emphasis corrections more. Stay under {token_cap} tokens.
+5. **Stay grounded, and consolidate.** One correction is weak evidence — phrase it tentatively or fold it into a broader rule; several pointing the same way → state it confidently. Read corrections in light of the profile (a stated "marathon runner" makes "more carbs before runs" a confident training pattern), but don't invent rules the corrections don't support. MERGE or replace rules that new corrections supersede — never just append. Stay under {token_cap} tokens.
 
 # Examples
 
 <example>
-corrections: #7 (emphasis 2.0) "way more carbs than this before my long run — easily 90–100 g" [meal: a bowl of oatmeal before my run]
+corrections: #7 "way more carbs than this before my long run — easily 90–100 g" [meal: a bowl of oatmeal before my run]
 profile: "Marathon training, eats big before long runs."
 
 {"block_text": "Meals before a run, race, or training run carb-heavy for this user — estimate the carbohydrates toward a large serving, around 90–100 g total, spread across the foods at realistic servings (e.g. a bigger bowl of oats with a banana and toast), not a pile of one food. Applies only to pre-run / pre-race / pre-training meals; leave snacks and ordinary meals unchanged.", "rules": [{"rule": "Pre-run / pre-race meals run carb-heavy — estimate toward ~90–100 g total carbs, spread realistically.", "rationale": "A strong correction plus the marathon-training profile.", "from_feedback": [7]}]}
@@ -41,7 +41,7 @@ profile: "Marathon training, eats big before long runs."
 </example>
 
 <example>
-corrections: #3 (emphasis 1.0) "my post-lift protein is way bigger than this" [meal: a chicken and rice bowl after lifting]
+corrections: #3 "my post-lift protein is way bigger than this" [meal: a chicken and rice bowl after lifting]
 profile: "(not provided)"
 
 {"block_text": "After lifting / post-workout meals, this user eats a large protein serving — estimate the primary protein toward a big single-meal portion, about 8–10 oz cooked (≈250–600 kcal depending on the food), not a multiple of the default and not a pile. Applies only to post-workout / recovery meals.", "rules": [{"rule": "Post-lift meals carry a large protein serving (~8–10 oz cooked).", "rationale": "A directional correction ('way bigger'), pinned to a realistic magnitude.", "from_feedback": [3]}]}

@@ -83,12 +83,13 @@ def test_token_cap_truncates_an_overlong_block() -> None:
     assert len(result.block_text.split()) <= 51  # 50 words + the "…" marker
 
 
-def test_feedback_text_and_emphasis_reach_the_prompt() -> None:
+def test_feedback_text_reaches_the_prompt() -> None:
     client = _client(_ok_json())
     propose_preference_block(_FEEDBACK, "current profile", client=client)
     contents = client.models.generate_content.call_args.kwargs["contents"]
     assert "more carbs before workouts" in contents
-    assert "emphasis x2" in contents  # the weighted correction is flagged
+    # Emphasis was removed — all corrections are weighted equally now.
+    assert "emphasis" not in contents.lower()
     assert "current profile" in contents
 
 
