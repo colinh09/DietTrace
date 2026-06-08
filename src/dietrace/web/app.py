@@ -1750,51 +1750,47 @@ def create_app(
             errors: list[Exception] = []
 
             def run_fit() -> None:
-                # FIT, in two passes so the panel fills in REAL TIME:
-                # 1) a local per-meal re-score, streamed one row at a time (the live
-                #    fill — the Phoenix experiment below is atomic and can't stream).
-                # 2) the same meals run as a Phoenix experiment, read back over MCP;
-                #    those authoritative rows are re-emitted (the panel updates in
-                #    place, now with base→tuned kcal) and drive the gate verdict.
+                # FIT: score the user's confirmed meals as Phoenix experiments and read
+                # the per-meal results back over MCP (the agent reading its own eval).
+                # Fall back to local per-meal scoring when Phoenix/MCP is unavailable.
                 try:
-                    q.put({"type": "phase", "phase": "fit", "n": len(fit_cases),
-                           "label": "Re-scoring the meals you confirmed — "
-                                    "with your rule vs without"})
-                    for i, c in enumerate(fit_cases):
-                        before, after = score_case_traced(c, "fit")
-                        fit_before.append(before)
-                        fit_after.append(after)
-                        q.put({"type": "score", "set": "fit", "i": i + 1,
-                               "n": len(fit_cases), "text": c["text"],
-                               "expected": round(c["calories"]),
-                               "before": before, "after": after})
-
+                    fit_phoenix = None
                     if phoenix_fit_scorer is not None and fit_cases:
                         q.put({"type": "phase", "phase": "fit", "n": len(fit_cases),
-                               "label": "Confirming in a Phoenix experiment — "
+                               "label": "Running your meals as a Phoenix experiment — "
                                         "scored in Arize, read back over MCP"})
                         fit_phoenix = phoenix_fit_scorer(
                             user, current_block, proposed.block_text, logger_fn, fit_cases
                         )
-                        if fit_phoenix is not None:
-                            shared["scored_via"] = "phoenix"
-                            shared["experiment_url"] = fit_phoenix.get("experiment_url", "")
-                            rows = fit_phoenix.get("rows", [])
-                            pb = [r["before"] for r in rows if r.get("before") is not None]
-                            pa = [r["after"] for r in rows if r.get("after") is not None]
-                            if pb and pa:
-                                # Arize's numbers are authoritative for the verdict.
-                                fit_before[:] = pb
-                                fit_after[:] = pa
-                            for r in rows:
-                                q.put({"type": "score", "set": "fit", "i": 0,
-                                       "n": len(rows), "text": r.get("text", ""),
-                                       "expected": r.get("expected", 0),
-                                       "before": r.get("before"), "after": r.get("after"),
-                                       "base_kcal": r.get("base_kcal"),
-                                       "tuned_kcal": r.get("tuned_kcal")})
-                            q.put({"type": "phoenix",
-                                   "experiment_url": shared["experiment_url"]})
+                    if fit_phoenix is not None:
+                        shared["scored_via"] = "phoenix"
+                        shared["experiment_url"] = fit_phoenix.get("experiment_url", "")
+                        rows = fit_phoenix.get("rows", [])
+                        for i, r in enumerate(rows):
+                            b, a = r.get("before"), r.get("after")
+                            if b is not None:
+                                fit_before.append(b)
+                            if a is not None:
+                                fit_after.append(a)
+                            q.put({"type": "score", "set": "fit", "i": i + 1,
+                                   "n": len(rows), "text": r.get("text", ""),
+                                   "expected": r.get("expected", 0), "before": b,
+                                   "after": a, "base_kcal": r.get("base_kcal"),
+                                   "tuned_kcal": r.get("tuned_kcal")})
+                        q.put({"type": "phoenix",
+                               "experiment_url": shared["experiment_url"]})
+                    else:
+                        q.put({"type": "phase", "phase": "fit", "n": len(fit_cases),
+                               "label": "Re-scoring the meals you confirmed — "
+                                        "with your rule vs without"})
+                        for i, c in enumerate(fit_cases):
+                            before, after = score_case_traced(c, "fit")
+                            fit_before.append(before)
+                            fit_after.append(after)
+                            q.put({"type": "score", "set": "fit", "i": i + 1,
+                                   "n": len(fit_cases), "text": c["text"],
+                                   "expected": round(c["calories"]),
+                                   "before": before, "after": after})
                     q.put({"type": "set_done", "set": "fit",
                            "before": mean(fit_before), "after": mean(fit_after),
                            "delta": round(mean(fit_after) - mean(fit_before), 3),

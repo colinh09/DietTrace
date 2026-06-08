@@ -433,24 +433,24 @@ export function LearningObservability({
           e.rows.map((r) => ({ set: r.set, text: r.text, before: null, after: null })),
         );
       } else if (e.type === "score") {
-        // Fill the row of this set whose meal text matches. Rows arrive out of
-        // order, and a fit row may be re-emitted with authoritative Phoenix kcal
-        // after a local estimate streamed first — so match by text (not index) and
-        // keep any kcal already on the row when an event doesn't carry it.
-        setLiveRows((rows) =>
-          rows.map((row) =>
-            row.set === e.set && row.text === e.text
+        // Fill the i-th row of this set (1-based) with its scores.
+        setLiveRows((rows) => {
+          let seen = 0;
+          return rows.map((row) => {
+            if (row.set !== e.set) return row;
+            seen += 1;
+            return seen === e.i
               ? {
                   ...row,
                   before: e.before,
                   after: e.after,
                   expected: e.expected,
-                  baseKcal: e.base_kcal ?? row.baseKcal ?? null,
-                  tunedKcal: e.tuned_kcal ?? row.tunedKcal ?? null,
+                  baseKcal: e.base_kcal ?? null,
+                  tunedKcal: e.tuned_kcal ?? null,
                 }
-              : row,
-          ),
-        );
+              : row;
+          });
+        });
       } else if (e.type === "done") {
         setResult(e);
         if (e.ok) {
