@@ -1408,10 +1408,7 @@ body {
 .rail-status { display: flex; flex-direction: column; gap: 7px; }
 .rail-live { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600;
   font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); }
-.rail-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); position: relative; }
-.rail-live-dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%;
-  background: var(--accent); opacity: .4; animation: rail-ping 1.8s cubic-bezier(0, 0, .2, 1) infinite; }
-@keyframes rail-ping { 0% { transform: scale(.6); opacity: .5; } 80%, 100% { transform: scale(2); opacity: 0; } }
+.rail-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .rail-state { font-size: 12.5px; color: var(--muted-ink); }
 .rail-state b { color: var(--ink); font-weight: 500; }
 .rail-state .dots { display: inline-flex; gap: 2px; margin-left: 4px; }
