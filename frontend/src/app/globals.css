@@ -250,14 +250,14 @@ body {
 /* Glance zone (3rd band column): kcal remaining + a 7-day sparkline. Earns the
    card's width that used to be dead whitespace. */
 .dm-glance { flex: none; width: clamp(210px, 25vw, 290px); align-self: stretch; display: flex;
-  flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   padding-left: clamp(12px, 2.4vw, 30px); border-left: 1px solid var(--line); text-align: center; }
 .dm-remain { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; align-items: baseline; justify-content: center; }
 .dm-remain-num { font-size: 24px; font-weight: 600; line-height: 1.1;
   letter-spacing: -0.01em; color: var(--macro-cal); }
 .dm-remain-lab { font-size: 14px; color: var(--muted-ink); }
 .dm-stats { display: inline-flex; flex-direction: column; gap: 9px; margin: 0 auto;
-  padding-top: 18px; border-top: 1px solid var(--line); }
+  padding-top: 9px; border-top: 1px solid var(--line); }
 .dm-stat { display: flex; align-items: baseline; gap: 9px; }
 .dm-stat-num { font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--accent-ink);
   min-width: 17px; text-align: right; font-variant-numeric: tabular-nums; }
