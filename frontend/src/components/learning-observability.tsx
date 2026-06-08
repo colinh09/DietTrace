@@ -24,7 +24,6 @@ import {
 import { Modal } from "@/components/modal";
 import {
   deleteLearningFeedback,
-  editLearningFeedback,
   getPreferences,
   getProfile,
   learningRetuneStream,
@@ -531,10 +530,6 @@ export function LearningObservability({
 
   const removeCorrection = (id: number) =>
     deleteLearningFeedback(id).then(refresh).catch(() => {});
-  const toggleEmphasis = (f: FeedbackItem) =>
-    editLearningFeedback(f.id, { weight: f.weight > 1 ? 1 : 2 })
-      .then(refresh)
-      .catch(() => {});
 
   const corrections = prefs?.corrections ?? 0;
   const newCorr = prefs?.new_corrections ?? 0;
@@ -634,7 +629,7 @@ export function LearningObservability({
             <div className="agent-state-stat">
               <span className="agent-state-num">{confirmations}</span>
               <span className="agent-state-cap">
-                answer-key meals · <b>{custom}</b> from you · {seeded} seeded
+                meals in your dataset · <b>{custom}</b> from you · {seeded} seeded
               </span>
             </div>
             <div className="agent-state-stat">
@@ -647,12 +642,12 @@ export function LearningObservability({
           </div>
           {latest && (
             <p className="agent-state-latest">
-              <span className="mono">latest decision:</span> {latest.reason}
+              <b>Latest decision:</b> {latest.reason}
               {latest.detail ? ` (${latest.detail})` : ""}
             </p>
           )}
           <p className="agent-state-mcp">
-            Answer-key meals are synced to your Phoenix dataset over MCP.
+            Your dataset is synced to Phoenix over MCP.
           </p>
 
           <div className="lo">
@@ -865,9 +860,9 @@ export function LearningObservability({
         ) : (
           <>
             <p className="lo-hint">
-              What you told DietTrace it got wrong. Star one to mark it important.
-              Update only learns from <b>new</b> ones — those it&apos;s already
-              learned show <span className="lo-done-inline">✓ learned</span>.
+              What you told DietTrace it got wrong. An update only learns from{" "}
+              <b>new</b> ones — those it&apos;s already learned show{" "}
+              <span className="lo-done-inline">✓ learned</span>.
             </p>
             <ul className="lo-corr-list">
               {feedback.map((f) => (
@@ -887,20 +882,6 @@ export function LearningObservability({
                     <div className="lo-corr-text">“{f.feedback_text}”</div>
                   </div>
                   <div className="lo-corr-actions">
-                    <button
-                      type="button"
-                      className={"lo-corr-emph" + (f.weight > 1 ? " on" : "")}
-                      aria-pressed={f.weight > 1}
-                      aria-label={f.weight > 1 ? "important (click to undo)" : "mark as important"}
-                      title={
-                        f.weight > 1
-                          ? "Marked important — DietTrace weights this more. Click to undo."
-                          : "Mark important — DietTrace weights this correction more"
-                      }
-                      onClick={() => toggleEmphasis(f)}
-                    >
-                      {f.weight > 1 ? "★" : "☆"}
-                    </button>
                     <button
                       type="button"
                       className="lo-corr-del"
