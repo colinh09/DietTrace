@@ -14,7 +14,7 @@ describe("AgentDecision", () => {
       />,
     );
     const line = screen.getByRole("status");
-    expect(line).toHaveTextContent(/answer key/i);
+    expect(line).toHaveTextContent(/your dataset/i);
     expect(line).toHaveTextContent(/clean meal accepted/i);
     expect(line).toHaveAttribute("data-op", "add_dataset_point");
   });

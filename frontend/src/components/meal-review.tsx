@@ -42,7 +42,7 @@ export function MealReview({
         onCorrected?.();
         onAgentEvent?.({
           op: "add_dataset_point",
-          reason: "you confirmed it — added to your answer key",
+          reason: "you confirmed it — added to your dataset",
           mealText,
           phoenix: "wrote 1 point to your Phoenix dataset",
         });
@@ -60,14 +60,14 @@ export function MealReview({
       .finally(() => setSaving(false));
   };
 
-  // Terminal, locked state — once confirmed it's an answer key; no more changes
+  // Terminal, locked state — once confirmed it's in your dataset; no more changes
   // or undos (a later change would un-confirm it and break the XOR with feedback).
   if (mode === "confirmed") {
     return (
       <div className="review-confirmed">
         <Check size={14} aria-hidden="true" />
         <span>
-          Confirmed — saved as an answer key. DietTrace will check its future
+          Confirmed — saved to your dataset. DietTrace will check its future
           updates against this meal, but never peeks at it while learning.
         </span>
       </div>
@@ -84,7 +84,7 @@ export function MealReview({
           <span className="review-sub">
             {mode === "ask"
               ? "A quick check so DietTrace only learns from meals you've confirmed are right."
-              : "Adjust a portion if something's off — otherwise confirm it as your answer key."}
+              : "Adjust a portion if something's off — otherwise confirm it for your dataset."}
           </span>
         </div>
       )}
@@ -143,9 +143,8 @@ export function MealReview({
             onCorrected?.();
             onAgentEvent?.({
               op: "bank_feedback",
-              reason: res.stored_as_preference
-                ? "learned a rule from your correction"
-                : "saved your correction to learn from on the next update",
+              reason:
+                "this will be used to adapt your nutrition agent to your style of logging",
               mealText,
             });
             // Feedback is the primary retune trigger — if this correction tipped

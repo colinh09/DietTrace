@@ -83,10 +83,14 @@ describe("LearningObservability", () => {
     expect(screen.getAllByText(/90%/).length).toBeGreaterThan(0);
   });
 
-  it("lists the full eval set up front and fills rows as scores stream", async () => {
+  it("shows the rule + status live but no premature score panels", async () => {
+    // Both sets run as atomic Phoenix experiments (no trickle), so the live view is
+    // status + the new rule only — the per-meal panels appear in the collapsible
+    // results AFTER, not as a half-baked preview during the run.
     let finish: () => void = () => {};
     vi.mocked(api.learningRetuneStream).mockImplementation(async (onEvent) => {
-      onEvent({ type: "phase", phase: "fit", label: "Re-scoring your meals…" });
+      onEvent({ type: "phase", phase: "fit", label: "Running an experiment in Arize…" });
+      onEvent({ type: "rule", rules: [{ rule: "Pre-run carbs run high", rationale: "x", from_feedback: [1] }] });
       onEvent({
         type: "manifest",
         rows: [
@@ -94,19 +98,18 @@ describe("LearningObservability", () => {
           { set: "usda", text: "a medium banana" },
         ],
       });
-      onEvent({ type: "score", set: "fit", i: 1, n: 1, text: "oatmeal before my long run", expected: 520, before: 0.6, after: 0.9 });
       await new Promise<void>((r) => { finish = r; });
     });
     await openState();
     fireEvent.click(await screen.findByRole("button", { name: /^update$/i }));
 
+    // The rule + Arize status show; the Base/Tuned panels do NOT (no preview).
     await waitFor(() =>
-      expect(screen.getByText("a medium banana")).toBeInTheDocument(),
+      expect(screen.getByText(/Pre-run carbs run high/)).toBeInTheDocument(),
     );
-    expect(screen.getByText("oatmeal before my long run")).toBeInTheDocument();
-    // Two side-by-side panels (Fit to you · USDA), each with Base/Tuned columns.
-    expect(screen.getAllByText("Base")).toHaveLength(2);
-    expect(screen.getAllByText("Tuned")).toHaveLength(2);
+    expect(screen.getByText(/Running an experiment in Arize/)).toBeInTheDocument();
+    expect(screen.queryAllByText("Base")).toHaveLength(0);
+    expect(screen.queryByText("a medium banana")).not.toBeInTheDocument();
     finish();
   });
 
@@ -145,7 +148,7 @@ describe("LearningObservability", () => {
 
   it("expands the test set", async () => {
     await openState();
-    const toggle = await screen.findByRole("button", { name: /answer key/i });
+    const toggle = await screen.findByRole("button", { name: /your dataset/i });
     expect(screen.queryByText(/oatmeal before my long run/)).not.toBeInTheDocument();
     fireEvent.click(toggle);
     const list = screen.getByText(/oatmeal before my long run/);

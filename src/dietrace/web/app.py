@@ -1378,7 +1378,7 @@ def create_app(
                 )
                 seeded_decisions.append({
                     "op": "add_dataset_point",
-                    "reason": "confirmed as ground truth — added to the held-out dataset",
+                    "reason": "you confirmed it — added to your dataset",
                     "meal_text": m["text"],
                 })
         for f in persona.feedback:
@@ -1387,7 +1387,8 @@ def create_app(
             )
             seeded_decisions.append({
                 "op": "bank_feedback",
-                "reason": "banked your correction to learn from on the next re-tune",
+                "reason": "this will be used to adapt your nutrition agent to your "
+                          "style of logging",
                 "meal_text": f.get("meal_text") or f["feedback_text"],
             })
 
@@ -1767,8 +1768,8 @@ def create_app(
                     fit_phoenix = None
                     if phoenix_fit_scorer is not None and fit_cases:
                         q.put({"type": "phase", "phase": "fit", "n": len(fit_cases),
-                               "label": "Setting up an experiment in Arize — scoring "
-                                        "your meals, read back over MCP…"})
+                               "label": "Running an experiment in Arize — it'll pull "
+                                        "the results when it finishes…"})
                         fit_phoenix = phoenix_fit_scorer(
                             user, current_block, proposed.block_text, logger_fn, fit_cases
                         )
@@ -1820,8 +1821,8 @@ def create_app(
                     usda_phoenix = None
                     if phoenix_usda_scorer is not None and usda_cases:
                         q.put({"type": "phase", "phase": "usda", "n": len(usda_cases),
-                               "label": "Setting up an experiment in Arize — scoring "
-                                        "everyday foods, read back over MCP…"})
+                               "label": "Running an experiment in Arize — it'll pull "
+                                        "the results when it finishes…"})
                         usda_phoenix = phoenix_usda_scorer(
                             user, current_block, proposed.block_text, logger_fn,
                             usda_cases,

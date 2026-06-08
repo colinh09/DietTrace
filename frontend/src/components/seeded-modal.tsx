@@ -83,7 +83,7 @@ export function SeededModal({
           <div className="sm-sub mono">Confirmed meals · {datasetDayLabel}</div>
           <p className="sm-line">
             <b>{result.confirmations}</b> meals you confirmed — logged on the
-            previous day and kept aside as an answer key DietTrace is checked
+            previous day and kept aside in your dataset, which DietTrace is checked
             against (it never sees them while learning).
           </p>
           {onViewDataset && (

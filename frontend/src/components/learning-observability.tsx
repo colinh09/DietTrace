@@ -106,12 +106,10 @@ function RetuneLive({
   rules: PreferenceRule[];
   rows: LiveRow[];
 }) {
-  const fit = rows.filter((r) => r.set === "fit");
-  const usda = rows.filter((r) => r.set === "usda");
-  // Don't show the panels until the experiment is actually producing scores — an
-  // empty Meal/Base/Tuned grid while the rule is still being written / the run is
-  // being set up is a half-baked preview. Until then, the headline is the status.
-  const hasScores = rows.some((r) => r.before != null);
+  // No live preview panels: both sets are scored as atomic Phoenix experiments (no
+  // trickle), so showing an empty/half-filled grid is pointless. The live view is
+  // just the status + the new rule; the per-meal results appear in the collapsible
+  // "See your experiment results" under the Updated event once Arize is read back.
   const allDone = rows.length > 0 && rows.every((r) => r.before != null);
   return (
     <div className="rt-live">
@@ -131,22 +129,6 @@ function RetuneLive({
             <b>New rule DietTrace wrote — </b>
             {rules[0].rule}
           </span>
-        </div>
-      )}
-      {hasScores && (
-        <div className="rt-panels">
-          <ScorePanel
-            title="Your Dataset"
-            tone="var(--accent)"
-            goal="meals you confirmed · should improve"
-            rows={fit}
-          />
-          <ScorePanel
-            title="USDA / everyday"
-            tone="var(--macro-carb)"
-            goal="reference foods · must stay accurate"
-            rows={usda}
-          />
         </div>
       )}
     </div>
@@ -324,7 +306,7 @@ function ExperimentResults({
       {open && (
         <div className="exp-results-body">
           <p className="exp-results-sub">
-            {fit.length + usda.length} meals scored in Arize, read back over MCP.
+            {fit.length + usda.length} meals scored in Arize.
           </p>
           <div className="rt-panels">
             <ScorePanel
@@ -730,7 +712,7 @@ export function LearningObservability({
             <ul>
               <li>
                 <b>Your Dataset</b> — the meals you confirmed, kept <i>out</i> of
-                learning so the test stays honest (your answer key).
+                learning so the test stays honest (your dataset).
               </li>
               <li>
                 <b>USDA accuracy</b> — a curated set of standard reference foods,
@@ -919,7 +901,7 @@ export function LearningObservability({
           >
             {showData ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             <span className="dash-card-head mono">
-              your answer key · {confirmations} meal{confirmations === 1 ? "" : "s"}
+              your dataset · {confirmations} meal{confirmations === 1 ? "" : "s"}
             </span>
           </button>
           <p className="lo-dataset-note">

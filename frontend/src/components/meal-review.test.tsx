@@ -25,7 +25,7 @@ describe("MealReview", () => {
     expect(screen.queryByLabelText(/free-form feedback/i)).not.toBeInTheDocument();
   });
 
-  it("'looks right' → 'would you change anything?' → confirm adds it as an answer key", async () => {
+  it("'looks right' → 'would you change anything?' → confirm adds it to your dataset", async () => {
     vi.mocked(api.confirmMeal).mockResolvedValue({ ok: true, id: 1, confirmations: 6 });
     render(<MealReview mealText="oatmeal" perItem={perItem} totals={totals} />);
 
@@ -37,7 +37,7 @@ describe("MealReview", () => {
     await waitFor(() =>
       expect(api.confirmMeal).toHaveBeenCalledWith("oatmeal", perItem, totals),
     );
-    expect(await screen.findByText(/answer key/i)).toBeInTheDocument();
+    expect(await screen.findByText(/your dataset/i)).toBeInTheDocument();
   });
 
   it("reveals the correction box on 'something's off'", () => {
@@ -56,7 +56,7 @@ describe("MealReview", () => {
     expect(screen.getByLabelText(/grams of oats/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /save as confirmed/i }));
     await waitFor(() => expect(api.confirmMeal).toHaveBeenCalled());
-    expect(await screen.findByText(/answer key/i)).toBeInTheDocument();
+    expect(await screen.findByText(/your dataset/i)).toBeInTheDocument();
   });
 
   it("locks once confirmed — no undo or change affordance remains", async () => {
@@ -65,7 +65,7 @@ describe("MealReview", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /looks right/i }));
     fireEvent.click(await screen.findByRole("button", { name: /confirm it/i }));
-    await screen.findByText(/answer key/i);
+    await screen.findByText(/your dataset/i);
     // Terminal state: no buttons to nudge, undo, or re-open the correction box.
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

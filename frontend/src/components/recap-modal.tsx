@@ -218,11 +218,11 @@ export function RecapModal({
             </div>
             <div className="rc-stat">
               <span className="rc-stat-val">{confirmations}</span>
-              <span className="rc-stat-label">kept aside as an answer key</span>
+              <span className="rc-stat-label">kept aside in your dataset</span>
             </div>
           </div>
           <p className="rc-foot">
-            Your answer key is the meals you’ve confirmed — checked against, never
+            Your dataset is the meals you’ve confirmed — checked against, never
             learned from, so DietTrace’s grade on you stays honest.
             {isPersona && onViewDay && (
               <button

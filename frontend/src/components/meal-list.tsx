@@ -153,7 +153,7 @@ function MealRow({
           {/* A dataset point keeps its confidence chip — the badge is an extra
               tag alongside it, not a replacement. */}
           {isDataset && (
-            <Tooltip label="A meal you confirmed as right. DietTrace keeps it aside as an answer key — it can't peek at it while learning, only check itself against it afterward.">
+            <Tooltip label="A meal you confirmed as right. DietTrace keeps it aside in your dataset — it can't peek at it while learning, only check itself against it afterward.">
               <span className="dataset-badge">
                 <span className="dataset-badge-dot" aria-hidden="true" />
                 confirmed meal
@@ -203,7 +203,7 @@ function MealRow({
         <div className="meal-detail">
           {isDataset && (
             <div className="dataset-explain">
-              <b>Your confirmed answer key.</b> This is a meal you confirmed, at your
+              <b>In your dataset.</b> This is a meal you confirmed, at your
               true intake. Every update re-checks DietTrace against it to prove a
               learned change actually fits you — but it’s never used to teach
               DietTrace, so the check stays honest.

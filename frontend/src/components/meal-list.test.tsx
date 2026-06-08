@@ -319,7 +319,8 @@ describe("MealList", () => {
 
     // Expanding shows its held-out role AND the full per-item breakdown.
     expandMeal(row);
-    expect(within(row).getByText(/Your confirmed answer key/i)).toBeInTheDocument();
+    // Scope to the explain heading (the chip's tooltip also says "in your dataset").
+    expect(row.querySelector(".dataset-explain")).toHaveTextContent(/In your dataset/i);
     expect(within(row).getByText(/Rice, white, cooked/)).toBeInTheDocument();
   });
 

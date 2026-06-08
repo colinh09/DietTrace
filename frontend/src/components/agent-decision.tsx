@@ -11,7 +11,7 @@ import type { SupervisorDecision } from "@/lib/api";
 
 const LABELS: Record<SupervisorDecision["op"], string> = {
   bank_feedback: "Saved your feedback",
-  add_dataset_point: "Added to the answer key",
+  add_dataset_point: "Added to your dataset",
   retune: "Updated",
 };
 
