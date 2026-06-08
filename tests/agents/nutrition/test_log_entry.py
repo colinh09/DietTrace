@@ -11,6 +11,8 @@ The done criterion is per-item *and* total values for a 2-item meal; the foods
 are built directly with round per-100 g numbers so the arithmetic is exact.
 """
 
+import math
+
 import pytest
 
 from dietrace.agents.nutrition.log_entry import (
@@ -114,3 +116,36 @@ def test_totals_carry_nutrient_metadata() -> None:
 def test_missing_nutrient_total_is_none() -> None:
     """A code absent from every item has no total."""
     assert _meal().total("999") is None
+
+
+class TestNonFiniteOrNonPositiveGrams:
+    """``log_entry`` is exposed as an ADK ``FunctionTool`` (agent.py) the model
+    calls directly with its own ``grams`` (``float(item["grams"])``), bypassing
+    ``estimate_portion``'s guard. A NaN/inf gram weight scales every nutrient to
+    a non-finite amount, and a negative weight *subtracts* from the meal totals —
+    either way one bad item poisons every downstream macro total. The food is
+    resolved to a gram weight before this step, so a non-finite/non-positive
+    weight is unusable: the item is dropped (like a food that cannot be resolved)
+    rather than corrupting the meal. Mirrors the non-finite fail-soft guards in
+    ``parse_meal``/``estimate_portion``/``check_against_goals``.
+    """
+
+    @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), -50.0, 0.0])
+    def test_bad_grams_item_is_dropped_totals_stay_clean(self, bad: float) -> None:
+        """An item with non-finite/non-positive grams is omitted; the good item's
+        totals are exactly its own panel — finite and uncorrupted."""
+        meal = log_entry([MealItem(food=_egg(), grams=bad), MealItem(food=_egg(), grams=100.0)])
+
+        assert len(meal.per_item) == 1
+        assert meal.per_item[0].grams == pytest.approx(100.0)
+        protein = meal.total(_PROTEIN).amount
+        assert math.isfinite(protein)
+        assert protein == pytest.approx(12.0)
+        assert math.isfinite(meal.total(_ENERGY).amount)
+
+    def test_all_items_bad_yields_empty_meal(self) -> None:
+        """If every item's grams is unusable the meal is empty, not a NaN-poisoned one."""
+        meal = log_entry([MealItem(food=_egg(), grams=float("nan"))])
+
+        assert meal.per_item == []
+        assert meal.totals == []

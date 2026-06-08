@@ -17,6 +17,8 @@ per-100 g energy is scaled like any other nutrient.
 
 from __future__ import annotations
 
+import math
+
 from pydantic import BaseModel
 
 from dietrace.nutrition.models import ConversionFactors, Food, Nutrient
@@ -122,6 +124,14 @@ def log_entry(items: list[MealItem]) -> LoggedMeal:
     Each item's panel is its food's per-100 g nutrients scaled by grams, with
     energy taken from Atwater factors when present. Totals sum the per-item
     panels code by code, preserving each nutrient's name and unit.
+
+    An item whose ``grams`` is non-finite (NaN/±inf) or non-positive is dropped:
+    this step is also an ADK ``FunctionTool`` the model calls directly with its
+    own grams, and such a weight scales every nutrient to a non-finite amount
+    (or, when negative, *subtracts* from the totals) — one bad item would poison
+    every downstream macro. The food was already resolved to a gram weight, so an
+    unusable weight means the item is omitted rather than corrupting the meal
+    (mirrors the non-finite guard in ``estimate_portion``/``parse_meal``).
     """
     per_item = [
         LoggedItem(
@@ -132,6 +142,7 @@ def log_entry(items: list[MealItem]) -> LoggedMeal:
             nutrients=_scaled_panel(item.food, item.grams),
         )
         for item in items
+        if math.isfinite(item.grams) and item.grams > 0
     ]
 
     totals: dict[str, Nutrient] = {}
