@@ -66,7 +66,7 @@ export function OverviewModal({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} labelledBy="overview-title">
       <div className="ov">
         <header className="ov-head">
-          <span className="ov-eyebrow mono">Overview</span>
+          <span className="ov-eyebrow mono">How it works</span>
           <h1 id="overview-title" className="ov-title">
             An AI nutritionist graded on accuracy
           </h1>
@@ -75,6 +75,11 @@ export function OverviewModal({ onClose }: { onClose: () => void }) {
             own work on every meal, and learns how <i>you</i> eat — and we test
             every change so personalizing for you never makes it less accurate
             overall. Below: how accurate it is, and how much to trust your numbers.
+          </p>
+          <p className="ov-source">
+            The percentages below come from DietTrace&apos;s eval suite: every
+            estimate is scored against known USDA calories as a Phoenix experiment,
+            so the accuracy is measured, not claimed.
           </p>
         </header>
 
