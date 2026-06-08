@@ -294,8 +294,13 @@ def build_nutrition_agent(
 ) -> NutritionAgent:
     """Build a :class:`NutritionAgent`, initializing Phoenix tracing if configured.
 
-    ``init_tracer`` is fail-soft: a no-op without ``PHOENIX_API_KEY``, so
-    this is safe to call offline and in tests.
+    Tracing is best-effort: ``init_tracer`` is a no-op without
+    ``PHOENIX_API_KEY``, and any setup error (e.g. a misconfigured collector
+    endpoint) is swallowed here — exactly as the web lifespan does — so a tracing
+    problem never blocks agent construction offline, in tests, or in production.
     """
-    init_tracer(service_name)
+    try:
+        init_tracer(service_name)
+    except Exception:
+        pass
     return NutritionAgent(repository, client)

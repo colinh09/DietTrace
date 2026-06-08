@@ -193,3 +193,19 @@ def test_build_factory_is_fail_soft_without_phoenix(repository, monkeypatch) -> 
 
     assert isinstance(agent, NutritionAgent)
     assert [t.name for t in agent.tools] == _PIPELINE
+
+
+def test_build_factory_survives_tracing_misconfig(repository, monkeypatch) -> None:
+    """A Phoenix misconfig must not block agent construction.
+
+    With PHOENIX_API_KEY set but PHOENIX_COLLECTOR_ENDPOINT missing, init_tracer
+    raises RuntimeError; the factory should swallow it like the web lifespan does,
+    so the agent still builds rather than crashing on a tracing setup error.
+    """
+    monkeypatch.setenv("PHOENIX_API_KEY", "test-key")
+    monkeypatch.delenv("PHOENIX_COLLECTOR_ENDPOINT", raising=False)
+
+    agent = build_nutrition_agent(repository, client=_client(None))
+
+    assert isinstance(agent, NutritionAgent)
+    assert [t.name for t in agent.tools] == _PIPELINE
