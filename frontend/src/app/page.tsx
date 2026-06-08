@@ -35,6 +35,7 @@ import {
 import { clearOnboarded, isOnboardedFlag, markOnboarded } from "@/lib/onboarding";
 import { clearSetup } from "@/lib/setup";
 import { fromISODate, isSameDay, shiftDate, toISODate } from "@/lib/date";
+import { foldRetuneIntoFeed } from "@/lib/feed";
 import { useAuth } from "@/lib/auth";
 import { chooseAnon, hasChosenAnon } from "@/lib/auth-gate";
 import { SignIn } from "@/components/sign-in";
@@ -307,9 +308,12 @@ export default function Home() {
 
   // A finished re-tune's outcome drops into the same persisted feed (so it survives
   // a reload too, not just the live per-meal events).
-  const handleRetuneComplete = useCallback((event: AgentEvent) => {
-    setAgentEvents((cur) => [event, ...cur].slice(0, 30));
-  }, []);
+  const handleRetuneComplete = useCallback(
+    (event: AgentEvent, shipped?: boolean, retuneNo?: number | null) => {
+      setAgentEvents((cur) => foldRetuneIntoFeed(cur, event, shipped, retuneNo));
+    },
+    [],
+  );
 
   // After a reset wipes the user server-side, re-trigger onboarding so a clean
   // slate always starts from the welcome flow. Shared by both Reset entry points

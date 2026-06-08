@@ -91,7 +91,7 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
         <h1 className="acc-title" id="obs-modal-title">How DietTrace stays accurate</h1>
         <p className="acc-sub">
           DietTrace is seeded on a hand-checked USDA dataset to be accurate up front.
-          Then every meal it logs is traced and scored in Arize Phoenix — and your
+          Then every meal it logs is traced and scored in Phoenix — and your
           corrections teach it to match how you actually eat.
         </p>
       </section>
@@ -139,7 +139,7 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
       <section className="acc-block">
         <div className="acc-block-head mono">how DietTrace checks its own work</div>
         <p className="acc-note">
-          How DietTrace keeps itself honest — each step runs in Arize Phoenix:
+          How DietTrace keeps itself honest — each step runs in Phoenix:
         </p>
         <ol className="trace-list acc-loop">
           {report.loop.map((s, i) => (
@@ -183,10 +183,10 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
         </span>
         <span className="acc-link">
           {report.source === "live"
-            ? `Live from Arize Phoenix · ${report.experiments} experiment${
+            ? `Live from Phoenix · ${report.experiments} experiment${
                 report.experiments === 1 ? "" : "s"
               }`
-            : "Measured on Arize Phoenix"}
+            : "Measured on Phoenix"}
         </span>
       </section>
     </>

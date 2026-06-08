@@ -38,9 +38,9 @@ describe("AccuracyPage", () => {
     );
     expect(screen.getByText("60%")).toBeInTheDocument(); // calorie accuracy headline
     expect(screen.getByText(/how DietTrace checks its own work/i)).toBeInTheDocument();
-    // The data is shown in-UI and labeled as live from Arize (no external link).
+    // The data is shown in-UI and labeled as live from Phoenix (no external link).
     expect(
-      screen.getByText("Live from Arize Phoenix · 3 experiments"),
+      screen.getByText("Live from Phoenix · 3 experiments"),
     ).toBeInTheDocument();
     // The accuracy-over-time trend renders.
     expect(screen.getByText(/accuracy over time · 3 experiments/i)).toBeInTheDocument();
@@ -48,7 +48,7 @@ describe("AccuracyPage", () => {
       screen.getByRole("img", { name: /accuracy across experiments/i }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /View on Arize Phoenix/i }),
+      screen.queryByRole("link", { name: /View on Phoenix/i }),
     ).not.toBeInTheDocument();
   });
 });

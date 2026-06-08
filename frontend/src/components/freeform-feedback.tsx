@@ -139,8 +139,8 @@ export function FreeformFeedback({
                 <li className={"fp-step" + (result.added_to_arize ? "" : " fp-muted")}>
                   <Check size={12} className="fp-check" />{" "}
                   {result.added_to_arize
-                    ? "Logged to Arize as a confirmed example"
-                    : "Arize logging skipped (not configured)"}
+                    ? "Logged to Phoenix as a confirmed example"
+                    : "Phoenix logging skipped (not configured)"}
                 </li>
               </ol>
               <span className="freeform-process-foot">

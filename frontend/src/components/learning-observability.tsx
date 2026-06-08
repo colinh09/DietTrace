@@ -270,7 +270,7 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
           <li>It re-ran the <b>USDA</b> set so personalizing can&apos;t hurt general accuracy.</li>
           <li>
             It applies only if <b>your-meal accuracy improves</b> and USDA holds (within{" "}
-            {Math.round(v.eps * 100)}%). All as Arize evals.
+            {Math.round(v.eps * 100)}%). All as Phoenix evals.
           </li>
         </ol>
       )}
@@ -306,7 +306,7 @@ function ExperimentResults({
       {open && (
         <div className="exp-results-body">
           <p className="exp-results-sub">
-            {fit.length + usda.length} meals scored in Arize.
+            {fit.length + usda.length} meals scored in Phoenix.
           </p>
           <div className="rt-panels">
             <ScorePanel
@@ -329,7 +329,7 @@ function ExperimentResults({
               target="_blank"
               rel="noopener noreferrer"
             >
-              open the experiment in Arize ↗
+              open the experiment in Phoenix ↗
             </a>
           )}
         </div>
@@ -352,7 +352,11 @@ export function LearningObservability({
   agentEvents?: AgentEvent[];
   // When a gated eval finishes, the outcome is handed up to the page so it lives in
   // the single persisted feed (survives reload) rather than panel-local state.
-  onRetuneComplete?: (event: AgentEvent) => void;
+  onRetuneComplete?: (
+    event: AgentEvent,
+    shipped?: boolean,
+    retuneNo?: number | null,
+  ) => void;
 }) {
   const [prefs, setPrefs] = useState<PreferencesResponse | null>(null);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
@@ -460,28 +464,34 @@ export function LearningObservability({
               ? `your-meal accuracy ${pct(e.current.fit)} → ${pct(e.proposed.fit)}`
               : undefined;
           const rule = e.rules?.[0]?.rule;
-          onRetuneComplete?.({
-            id: `retune-${Date.now()}`,
-            ts: Date.now(),
-            op: "retune",
-            reason: e.shipped
-              ? (rule ?? "a new rule is now in effect")
-              : "no change — it wasn't more accurate",
-            detail: fit,
-            phoenix:
-              e.scored_via === "phoenix" && fit
-                ? `read experiment · ${fit}`
-                : undefined,
-            when: "now",
-            // Persist the per-meal results ON the event so they survive a reload.
-            experiment:
-              e.scored_via === "phoenix"
-                ? {
-                    rows: liveRowsRef.current,
-                    experimentUrl: e.experiment_url,
-                  }
-                : undefined,
-          });
+          onRetuneComplete?.(
+            {
+              id: `retune-${Date.now()}`,
+              ts: Date.now(),
+              op: "retune",
+              reason: e.shipped
+                ? (rule ?? "a new rule is now in effect")
+                : "no change — it wasn't more accurate",
+              detail: fit,
+              phoenix:
+                e.scored_via === "phoenix" && fit
+                  ? `read experiment · ${fit}`
+                  : undefined,
+              when: "now",
+              // Persist the per-meal results ON the event so they survive a reload.
+              experiment:
+                e.scored_via === "phoenix"
+                  ? {
+                      rows: liveRowsRef.current,
+                      experimentUrl: e.experiment_url,
+                    }
+                  : undefined,
+            },
+            // On a SHIP, this retune consumed every pending correction — let the page
+            // flip those feedback events to "used in retune N" (the bumped version).
+            e.shipped,
+            e.version,
+          );
         }
       }
     };
@@ -570,7 +580,7 @@ export function LearningObservability({
               target="_blank"
               rel="noopener noreferrer"
             >
-              Your meals scored as a Phoenix experiment — view in Arize ↗
+              Your meals scored as a Phoenix experiment — view in Phoenix ↗
             </a>
           )}
         </>
