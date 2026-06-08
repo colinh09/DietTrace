@@ -299,7 +299,8 @@ body {
 .meals-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
 
 .meal { border-bottom: 1px solid var(--line); }
-.meal.open { background: linear-gradient(var(--accent-softer), transparent 64px); border-radius: 10px; }
+.meal.open { background: var(--rail-bg); box-shadow: inset 0 0 0 1px var(--line);
+  border: none; border-radius: 14px; margin: 10px 0; }
 .meal-head { display: flex; align-items: center; gap: 10px; padding: var(--meal-py) 8px; cursor: pointer; border-radius: 10px; transition: background .12s; }
 .meal-head:hover { background: var(--accent-softer); }
 .meal.open .meal-head:hover { background: transparent; }
@@ -606,7 +607,8 @@ body {
   .layout { grid-template-columns: minmax(0, 1.46fr) minmax(388px, 520px); }
 }
 
-.dash { position: sticky; top: 26px; display: flex; flex-direction: column; gap: 15px; }
+.dash { position: sticky; top: 26px; display: flex; flex-direction: column; gap: 15px;
+  background: var(--rail-bg); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
 .dash-head { display: flex; align-items: baseline; justify-content: space-between; padding: 2px 2px 4px; }
 .dash-title { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
 .dash-link { font-size: 12px; color: var(--accent-ink); text-decoration: none; }
@@ -1352,8 +1354,7 @@ body {
    Items → Why portions → [Agent's work | Review] → Why this confidence
    ============================================================ */
 .drawer { padding: 2px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
-.tile { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px;
-  padding: 16px 18px; }
+.tile { background: var(--surface); border-radius: 12px; padding: 16px 18px; }
 .tile-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .tile-eyebrow { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
   text-transform: uppercase; color: var(--faint); margin-bottom: 12px; }
