@@ -127,6 +127,34 @@ def test_powerful_mode_failsoft_to_deterministic_on_bad_json() -> None:
     assert out.op == OP_BANK_FEEDBACK  # fell back to the deterministic policy
 
 
+def test_powerful_mode_strips_json_fence_around_llm_decision() -> None:
+    """A Gemini response that wraps its JSON in a ```json … ``` fence must still be
+    honored. Without the fence stripper the wrapped payload fails ``json.loads`` and
+    powerful mode silently degrades to the deterministic policy — so the LLM op (here
+    ``add_dataset_point``) would be lost and the deterministic ``bank_feedback`` would
+    win instead. (Same fence-strip gap class pinned in corrector/parse_meal.)"""
+    from dietrace.agents.supervisor.decide import decide_op
+
+    client = _FakeLLM('```json\n{"op": "add_dataset_point", "rationale": "fenced"}\n```')
+    cfg = SupervisorConfig(mode="powerful", max_runs_per_day=5)
+    # Deterministically this would bank (was_corrected); the fenced LLM op must override.
+    out = decide_op(DecisionSignals(was_corrected=True), cfg, client=client)
+    assert out.op == OP_ADD_DATASET_POINT
+    assert out.reason == "fenced"
+
+
+def test_powerful_mode_strips_bare_fence_around_llm_decision() -> None:
+    """A plain ``` … ``` fence (no language tag) is stripped too, so the model's op
+    is honored rather than dropped to the deterministic fallback."""
+    from dietrace.agents.supervisor.decide import decide_op
+
+    client = _FakeLLM('```\n{"op": "retune", "rationale": "bare fence"}\n```')
+    cfg = SupervisorConfig(mode="powerful", max_runs_per_day=5)
+    out = decide_op(DecisionSignals(new_feedback=9, dataset_points=9), cfg, client=client)
+    assert out.op == OP_RETUNE
+    assert out.reason == "bare fence"
+
+
 def test_powerful_mode_without_client_is_deterministic() -> None:
     from dietrace.agents.supervisor.decide import decide_op
 
