@@ -41,7 +41,7 @@ describe("MealTrace", () => {
 
   it("shows each item's kcal in the read-only table", () => {
     render(<MealTrace trace={trace} perItem={perItem} mealText="chicken and a bowl" />);
-    const row = screen.getByText("chicken breast, grilled").closest(".item-grid") as HTMLElement;
+    const row = screen.getByText("chicken breast, grilled").closest("tr") as HTMLElement;
     expect(within(row).getByText("231")).toBeInTheDocument();
   });
 
@@ -83,14 +83,14 @@ describe("MealTrace", () => {
       { name: "source_quality", score: 1.0, note: "✓ high-trust sources" },
     ];
     render(<MealTrace trace={trace} perItem={perItem} axes={axes} confidence={0.75} />);
-    const warnRow = screen.getByText(/1 of 2 food\(s\) dropped/i).closest(".conf-calc-row");
-    expect(warnRow).toHaveClass("warn");
+    const warnRow = screen.getByText(/1 of 2 food\(s\) dropped/i).closest(".cb-row");
+    expect(warnRow?.querySelector(".cb-fill")).toHaveClass("lo");
     expect(screen.getByText(/75% confidence/i)).toBeInTheDocument();
   });
 
   // ── Portion reasoning recap ───
 
-  it("shows the 'why these foods & portions' card when basis is present", () => {
+  it("shows the 'why these portions' card when basis is present", () => {
     const itemsWithBasis: LoggedItem[] = [
       {
         fdc_id: 1,
@@ -101,12 +101,12 @@ describe("MealTrace", () => {
       },
     ];
     render(<MealTrace trace={[]} perItem={itemsWithBasis} />);
-    expect(screen.getByText(/why these foods/i)).toBeInTheDocument();
+    expect(screen.getByText(/why these portions/i)).toBeInTheDocument();
     expect(screen.getByText(/reference serving/i)).toBeInTheDocument();
   });
 
-  it("renders no 'why these foods' card when portion_basis is absent", () => {
+  it("renders no 'why these portions' card when portion_basis is absent", () => {
     render(<MealTrace trace={trace} perItem={perItem} />);
-    expect(screen.queryByText(/why these foods/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/why these portions/i)).not.toBeInTheDocument();
   });
 });

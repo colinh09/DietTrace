@@ -30,9 +30,17 @@ describe("DayMacros", () => {
     expect(screen.getByText("P")).toBeInTheDocument();
     expect(screen.getByText("C")).toBeInTheDocument();
     expect(screen.getByText("F")).toBeInTheDocument();
-    expect(screen.getByText("180 / 150 g")).toBeInTheDocument();
-    expect(screen.getByText("50 / 200 g")).toBeInTheDocument();
-    expect(screen.getByText("13 / 65 g")).toBeInTheDocument();
+    // The consumed number sits in a <b> (so it reads dark, not faint), so the
+    // value text spans nodes — match on the bar-value's normalized text content.
+    const barVal = (t: string) =>
+      screen.getByText(
+        (_c, el) =>
+          el?.classList.contains("dm-bar-val") === true &&
+          el.textContent?.replace(/\s+/g, " ").trim() === t,
+      );
+    expect(barVal("180 / 150 g")).toBeInTheDocument();
+    expect(barVal("50 / 200 g")).toBeInTheDocument();
+    expect(barVal("13 / 65 g")).toBeInTheDocument();
   });
 
   it("renders a calorie ring and a labeled bar per macro", () => {
@@ -55,7 +63,13 @@ describe("DayMacros", () => {
     const { container } = render(<DayMacros goals={[]} />);
     // The calorie ring center reads 0; each macro bar reads "0 / 0 g".
     expect(within(calZone(container)).getByText("0")).toBeInTheDocument();
-    expect(screen.getAllByText("0 / 0 g")).toHaveLength(3);
+    expect(
+      screen.getAllByText(
+        (_c, el) =>
+          el?.classList.contains("dm-bar-val") === true &&
+          el.textContent?.replace(/\s+/g, " ").trim() === "0 / 0 g",
+      ),
+    ).toHaveLength(3);
   });
 
   it("rounds fractional amounts for display", () => {

@@ -132,7 +132,7 @@ export function DayMacros({
                   <span className="dm-bar-lab">{label}</span>
                 </span>
                 <span className="dm-bar-val tnum">
-                  {Math.round(consumed)} / {Math.round(target)} g
+                  <b>{Math.round(consumed)}</b> / {Math.round(target)} g
                 </span>
               </div>
               <div

@@ -1,11 +1,9 @@
 "use client";
 
-// A logged meal's breakdown + correction. The per-item table shows what was
-// logged; below it, a single free-form feedback box is the ONE way to correct —
-// you tell DietTrace in plain language ("the fries are double what I'd eat") and
-// it interprets + applies it (no fiddly gram editing). Behind a quiet toggle:
-// the agent's ordered steps, a plain-English recap of WHY it picked these foods
-// and portions, and the confidence calculation (each axis → the average).
+// A logged meal's breakdown + correction, as an expanded "mini-dashboard": a
+// tinted drawer of floating white tiles — Items (what was logged) → Why these
+// portions → [Agent's work | Review] side by side → Why this confidence. The one
+// way to correct is the conversational review (plain language, no gram editing).
 import { Globe, History } from "lucide-react";
 import type { ConfidenceAxis, LoggedItem, Nutrient, TraceStep } from "@/lib/api";
 import { MealReview } from "@/components/meal-review";
@@ -20,25 +18,6 @@ export function StepGlyph({ step }: { step?: string }) {
   return <span className="step-dot" aria-hidden="true" />;
 }
 
-function StepLine({ step, isLast }: { step: TraceStep; isLast: boolean }) {
-  return (
-    <li className="tstep">
-      <div className="tstep-rail">
-        <span className="tstep-glyph">
-          <StepGlyph step={step.step} />
-        </span>
-        {!isLast && <span className="tstep-line" />}
-      </div>
-      <div className="tstep-body">
-        <div className="tstep-line-btn">
-          <span className="tstep-fn mono">{step.step}</span>
-          <span className="tstep-arrow">{step.summary}</span>
-        </div>
-      </div>
-    </li>
-  );
-}
-
 const fmt = new Intl.NumberFormat("en-US");
 
 // Plain-English labels for the eval axes — the raw names are jargon.
@@ -48,87 +27,6 @@ const AXIS_LABELS: Record<string, string> = {
   portion_sanity: "Sensible portions",
   calorie_plausibility: "Calories add up",
 };
-
-// One read-only item row in the breakdown table.
-function ItemRow({ item }: { item: LoggedItem }) {
-  const base = macrosOf(item.nutrients);
-  const cell = (v: number) => fmt.format(Math.round(v));
-  return (
-    <div className="item-grid">
-      <div className="item-name">
-        <span className="item-name-txt">{item.description}</span>
-      </div>
-      <div className="num mono tnum dim">{Math.round(item.grams)} g</div>
-      <div className="num mono tnum">{cell(base.kcal)}</div>
-      <div className="num mono tnum dim">{cell(base.protein)}</div>
-      <div className="num mono tnum dim">{cell(base.carb)}</div>
-      <div className="num mono tnum dim">{cell(base.fat)}</div>
-    </div>
-  );
-}
-
-// "Why these foods & portions" — a plain-English recap per item (body only; the
-// card supplies the heading).
-function PortionRecapBody({ perItem }: { perItem: LoggedItem[] }) {
-  return (
-    <ul className="recap-list">
-      {perItem.map((it, i) => (
-        <li key={`${it.fdc_id}-${i}`} className="recap-row">
-          <span className="recap-food">{it.description}</span>
-          <span className="recap-why">
-            {it.portion_basis || `${Math.round(it.grams)} g`}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// "Why this confidence" — the actual calculation: every axis with its score +
-// a bar, then the average that produces the headline percentage (body only).
-function ConfidenceBody({
-  axes,
-  confidence,
-}: {
-  axes: ConfidenceAxis[];
-  confidence?: number;
-}) {
-  const mean =
-    confidence != null
-      ? confidence
-      : axes.reduce((s, a) => s + a.score, 0) / Math.max(1, axes.length);
-  return (
-    <div className="conf-calc">
-      <div className="conf-calc-intro">
-        Four automatic checks DietTrace runs on every meal — no human, no
-        guessing. The score is their average.
-      </div>
-      <ul className="conf-calc-list">
-        {axes.map((axis) => {
-          const pass = axis.note.startsWith("✓");
-          return (
-            <li key={axis.name} className={"conf-calc-row " + (pass ? "pass" : "warn")}>
-              <span className="conf-calc-name">{AXIS_LABELS[axis.name] ?? axis.name.replace(/_/g, " ")}</span>
-              <span className="conf-calc-bar">
-                <span
-                  className="conf-calc-fill"
-                  style={{ width: `${Math.round(axis.score * 100)}%` }}
-                />
-              </span>
-              <span className="conf-calc-score mono tnum">
-                {Math.round(axis.score * 100)}%
-              </span>
-              <span className="conf-calc-note">{axis.note.replace(/^[✓⚠]\s*/, "")}</span>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="conf-calc-total mono">
-        average of {axes.length} checks = <b>{Math.round(mean * 100)}% confidence</b>
-      </div>
-    </div>
-  );
-}
 
 export function MealTrace({
   trace,
@@ -162,68 +60,146 @@ export function MealTrace({
   // review (it's already the user's confirmed ground truth).
   readOnly?: boolean;
 }) {
-  // The expanded meal is one bubble of sub-bubble cards — each part of the
-  // agent's accountability in its own card, mirroring the Observability column.
-  return (
-    <div className="mealtrace">
-      {/* What was logged. */}
-      <section className="mt-card">
-        <div className="mt-card-head mono">items</div>
-        <div className="item-grid item-head">
-          <div />
-          <div className="num">grams</div>
-          <div className="num">kcal</div>
-          <div className="num">P</div>
-          <div className="num">C</div>
-          <div className="num">F</div>
-        </div>
-        {perItem.map((item, i) => (
-          <ItemRow key={`${item.fdc_id}-${i}`} item={item} />
+  const confAxes = axes ?? [];
+  const mean =
+    confidence != null
+      ? confidence
+      : confAxes.length
+        ? confAxes.reduce((s, a) => s + a.score, 0) / confAxes.length
+        : 0;
+  const showReview = Boolean(mealText) && !readOnly;
+  const cell = (v: number) => fmt.format(Math.round(v));
+
+  // The agent's ordered work, as the dotted-timeline motif.
+  const work = (
+    <div className="tile">
+      <span className="tile-eyebrow">Agent&apos;s work</span>
+      <div className="dtrace">
+        {trace.map((step, i) => (
+          <div className="tnode" key={i}>
+            <span
+              className={"tnode-dot" + (step.step === "web_search" ? " amber" : "")}
+              aria-hidden="true"
+            />
+            <div className="tnode-key mono">{step.step}</div>
+            <div className="tnode-body">{step.summary}</div>
+          </div>
         ))}
-      </section>
+      </div>
+    </div>
+  );
 
-      {/* Review: confirm it (grows the dataset) or correct it (teaches it, XOR). */}
-      {mealText && !readOnly && (
-        <section className="mt-card">
-          <div className="mt-card-head mono">review</div>
-          <MealReview
-            mealId={mealId}
-            mealText={mealText}
-            perItem={perItem}
-            totals={totals ?? []}
-            onCorrected={onCorrected}
-            onAgentEvent={onAgentEvent}
-          />
-        </section>
-      )}
+  return (
+    <div className="drawer">
+      {/* What was logged — the items table. */}
+      <div className="tile">
+        <span className="tile-eyebrow">Items</span>
+        <table className="items">
+          <thead>
+            <tr>
+              <th>Food</th>
+              <th>Grams</th>
+              <th>Kcal</th>
+              <th>P</th>
+              <th>C</th>
+              <th>F</th>
+            </tr>
+          </thead>
+          <tbody>
+            {perItem.map((item, i) => {
+              const m = macrosOf(item.nutrients);
+              return (
+                <tr key={`${item.fdc_id}-${i}`}>
+                  <td>
+                    <span className="food">{item.description}</span>
+                  </td>
+                  <td className="tnum">{Math.round(item.grams)} g</td>
+                  <td className="tnum">
+                    <span className="kcal">{cell(m.kcal)}</span>
+                  </td>
+                  <td className="tnum">{cell(m.protein)}</td>
+                  <td className="tnum">{cell(m.carb)}</td>
+                  <td className="tnum">{cell(m.fat)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-      {/* The agent's ordered work. */}
-      <section className="mt-card">
-        <div className="mt-card-head mono">agent&apos;s work</div>
-        <ol className="trace-list">
-          {trace.map((step, i) => (
-            <StepLine key={i} step={step} isLast={i === trace.length - 1} />
-          ))}
-        </ol>
-      </section>
-
-      {/* Why these foods & portions. */}
+      {/* Why these portions — annotates the grams above. */}
       {perItem.some((it) => it.portion_basis) && (
-        <section className="mt-card">
-          <div className="mt-card-head mono">why these foods &amp; portions</div>
-          <PortionRecapBody perItem={perItem} />
-        </section>
+        <div className="tile">
+          <span className="tile-eyebrow">Why these portions</span>
+          {perItem.map((it, i) => (
+            <div className="why-line" key={`${it.fdc_id}-${i}`}>
+              <b>{it.description}</b>
+              <span className="why-arrow">
+                {" — "}
+                {it.portion_basis || `${Math.round(it.grams)} g`}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
 
-      {/* Why this confidence. */}
-      {axes && axes.length > 0 ? (
-        <section className="mt-card">
-          <div className="mt-card-head mono">why this confidence</div>
-          <ConfidenceBody axes={axes} confidence={confidence} />
-        </section>
+      {/* Agent's work | Review — side by side when there's a review to give. */}
+      {showReview ? (
+        <div className="tile-row">
+          {work}
+          <div className="tile review-tile">
+            <span className="tile-eyebrow">Review</span>
+            <MealReview
+              mealId={mealId}
+              mealText={mealText as string}
+              perItem={perItem}
+              totals={totals ?? []}
+              onCorrected={onCorrected}
+              onAgentEvent={onAgentEvent}
+            />
+          </div>
+        </div>
+      ) : (
+        work
+      )}
+
+      {/* Why this confidence — the four checks + the average. */}
+      {confAxes.length > 0 ? (
+        <div className="tile">
+          <span className="tile-eyebrow">Why this confidence</span>
+          <p className="cb-intro">
+            Four automatic checks DietTrace runs on every meal — no human, no
+            guessing. The score is their average.
+          </p>
+          <div className="cb-rows wide">
+            {confAxes.map((axis) => {
+              const lo = !axis.note.startsWith("✓");
+              const pct = Math.round(axis.score * 100);
+              return (
+                <div className="cb-row" key={axis.name}>
+                  <span className="cb-lab">
+                    {AXIS_LABELS[axis.name] ?? axis.name.replace(/_/g, " ")}
+                  </span>
+                  <span className="cb-pct tnum">{pct}%</span>
+                  <span className="cb-bar">
+                    <span
+                      className={"cb-fill" + (lo ? " lo" : "")}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </span>
+                  <span className="cb-note">{axis.note.replace(/^[✓⚠]\s*/, "")}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="cb-avg">
+            average of {confAxes.length} checks ={" "}
+            <b>{Math.round(mean * 100)}% confidence</b>
+          </div>
+        </div>
       ) : reasons && reasons.length > 0 ? (
-        <section className="mt-card">
-          <div className="mt-card-head mono">why this confidence</div>
+        <div className="tile">
+          <span className="tile-eyebrow">Why this confidence</span>
           <ul className="conf-reasons-list">
             {reasons.map((reason, i) => (
               <li key={i} className="conf-reason">
@@ -231,7 +207,7 @@ export function MealTrace({
               </li>
             ))}
           </ul>
-        </section>
+        </div>
       ) : null}
     </div>
   );
