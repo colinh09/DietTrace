@@ -293,3 +293,20 @@ def test_demo_seed_goals_not_set_without_goal_store(tmp_path) -> None:
     assert body["seeded"] is True
     assert body["goals_set"] is False
     assert body["meals"] == len(DEMO_MEALS)
+
+
+def test_persona_corrections_are_disjoint_from_dataset_points() -> None:
+    """A seeded correction must NOT target a held-out dataset point — otherwise the
+    corrector learns from a meal it's then graded on (training on the test set), which
+    skews the gate and the retune-trigger counts. Keep corrections and dataset points
+    disjoint, for every persona."""
+    from dietrace.web.demo_seed import BODYBUILDER, RUNNER
+
+    for persona in (RUNNER, BODYBUILDER):
+        dataset_meals = {c["meal_text"] for c in persona.confirmations}
+        correction_meals = {f["meal_text"] for f in persona.feedback}
+        overlap = dataset_meals & correction_meals
+        assert not overlap, (
+            f"{persona.key}: corrections overlap held-out dataset points "
+            f"(training on the test): {overlap}"
+        )

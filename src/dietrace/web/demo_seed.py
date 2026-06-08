@@ -166,12 +166,16 @@ BODYBUILDER = Persona(
     # to learn), plus non-workout guards the learned rule must NOT change.
     confirmations=_load_confirmations("demo_seed_bodybuilder.json"),
     feedback=[
-        {"feedback_text": "I eat way bigger protein portions after lifting — my ground "
-                          "turkey serving is more like 12 oz, not a small portion",
-         "meal_text": "a big serving of ground turkey with rice and peppers after lifting",
+        # Post-lift protein runs big. Corrections are on meals that are NOT held-out
+        # dataset points (kept DISJOINT, like the runner's), so the corrector never
+        # learns from a meal it's then graded on — the gate stays honest.
+        {"feedback_text": "after lifting I eat way more protein than this — my post-workout "
+                          "chicken is more like 10-12 oz, not a small serving",
+         "meal_text": "a post-lift chicken and rice bowl",
          "weight": 2.0},
-        {"feedback_text": "my post-workout protein servings are about double what you logged",
-         "meal_text": "a sirloin steak with a baked potato after the evening gym session"},
+        {"feedback_text": "my post-workout protein shakes are double scoops — way more "
+                          "protein than you logged",
+         "meal_text": "a protein shake after lifting"},
     ],
 )
 
