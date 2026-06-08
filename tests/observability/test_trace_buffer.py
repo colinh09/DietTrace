@@ -113,6 +113,32 @@ def test_eviction_caps_at_max_and_drops_oldest() -> None:
     assert buf.get_trace(trace_ids[-1]) != []
 
 
+def test_spans_per_trace_capped_keeping_most_recent() -> None:
+    """One runaway trace can't grow unbounded: spans per trace_id are capped,
+    keeping the most recent and dropping the oldest (the documented invariant
+    that a long-running process never grows unbounded must hold per-trace too)."""
+    from dietrace.observability.trace_buffer import _MAX_SPANS_PER_TRACE
+
+    buf = BufferingSpanProcessor()
+    tracer = _provider_with(buf).get_tracer("test")
+
+    overflow = 50
+    with tracer.start_as_current_span("root") as root:
+        trace_id = f"{root.get_span_context().trace_id:032x}"
+        for i in range(_MAX_SPANS_PER_TRACE + overflow):
+            with tracer.start_as_current_span(f"child-{i}"):
+                pass
+
+    records = buf.get_trace(trace_id)
+    assert len(records) == _MAX_SPANS_PER_TRACE
+    names = {r["name"] for r in records}
+    # Oldest children evicted; the most recent ones (and the root, which ends
+    # last) are retained.
+    assert "child-0" not in names
+    assert f"child-{_MAX_SPANS_PER_TRACE + overflow - 1}" in names
+    assert "root" in names
+
+
 def test_clear_empties_the_buffer() -> None:
     buf = BufferingSpanProcessor()
     tracer = _provider_with(buf).get_tracer("test")

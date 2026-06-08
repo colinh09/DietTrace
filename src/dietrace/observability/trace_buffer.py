@@ -4,7 +4,9 @@ Powers the web "reasoning" panel — it renders the most recent agent
 runs without a Phoenix round-trip. Spans are still exported to Phoenix when
 configured; this buffer is a parallel, in-memory observer with a hard cap so a
 long-running process can never grow unbounded. Least-recently-touched traces are
-evicted once the cap is reached (LRU via OrderedDict).
+evicted once the trace cap is reached (LRU via OrderedDict), and within any one
+trace the span list is itself capped (oldest spans dropped) so a single runaway
+trace — a retry storm or an agent loop — cannot grow without limit either.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from typing import Any
 from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor
 
 _MAX_TRACES = 100
+_MAX_SPANS_PER_TRACE = 500
 _ATTR_VALUE_TRUNCATE = 500
 
 
@@ -33,7 +36,12 @@ class BufferingSpanProcessor(SpanProcessor):
         trace_id = f"{span.get_span_context().trace_id:032x}"
         record = _span_to_dict(span)
         with self._lock:
-            self._traces.setdefault(trace_id, []).append(record)
+            spans = self._traces.setdefault(trace_id, [])
+            spans.append(record)
+            if len(spans) > _MAX_SPANS_PER_TRACE:
+                # Drop the oldest spans, keeping the most recent within the cap so
+                # one runaway trace can never grow unbounded.
+                del spans[: len(spans) - _MAX_SPANS_PER_TRACE]
             self._traces.move_to_end(trace_id)
             while len(self._traces) > _MAX_TRACES:
                 self._traces.popitem(last=False)
