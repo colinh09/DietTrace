@@ -90,3 +90,29 @@ def test_feedback_text_and_emphasis_reach_the_prompt() -> None:
     assert "more carbs before workouts" in contents
     assert "emphasis x2" in contents  # the weighted correction is flagged
     assert "current profile" in contents
+
+
+def test_parses_a_json_fenced_proposal() -> None:
+    # Gemini commonly wraps structured JSON in a ```json … ``` code block; the
+    # fence-stripper must peel it before json.loads or every such response is lost.
+    fenced = "```json\n" + _ok_json() + "\n```"
+    result = propose_preference_block(_FEEDBACK, "", client=_client(fenced))
+    assert isinstance(result, ProposedBlock)
+    assert "carbs run high" in result.block_text
+
+
+def test_parses_a_plain_fenced_proposal() -> None:
+    # A bare ``` … ``` fence (no language tag) must strip the same way.
+    fenced = "```\n" + _ok_json() + "\n```"
+    result = propose_preference_block(_FEEDBACK, "", client=_client(fenced))
+    assert isinstance(result, ProposedBlock)
+    assert "carbs run high" in result.block_text
+
+
+def test_parses_a_leading_fence_without_a_trailing_fence() -> None:
+    # A truncated response with an opening fence but no closing one must still
+    # parse — exercises the "no trailing ```" arm of the stripper.
+    fenced = "```json\n" + _ok_json()
+    result = propose_preference_block(_FEEDBACK, "", client=_client(fenced))
+    assert isinstance(result, ProposedBlock)
+    assert "carbs run high" in result.block_text
