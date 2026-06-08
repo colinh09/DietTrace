@@ -30,14 +30,14 @@ describe("DayMacros", () => {
     expect(screen.getByText("13 / 65 g")).toBeInTheDocument();
   });
 
-  it("renders a progress ring for calories and each macro", () => {
+  it("renders a calorie ring and a labeled bar per macro", () => {
     render(<DayMacros goals={goals} />);
-    // calories + P + C + F = four rings, each an accessible <svg role="img">.
-    const rings = screen.getAllByRole("img");
-    expect(rings).toHaveLength(4);
+    // calories ring + P/C/F bars = four accessible graphics (role="img").
+    const graphics = screen.getAllByRole("img");
+    expect(graphics).toHaveLength(4);
 
-    // Each ring's label encodes consumed-of-target; an over-target macro still
-    // reports its true numbers (the fill clamps, the label doesn't lie).
+    // Each label encodes consumed-of-target; an over-target macro still reports
+    // its true numbers (the fill clamps, the label doesn't lie).
     expect(
       screen.getByRole("img", { name: /calories: 1000 of 2000/i }),
     ).toBeInTheDocument();
@@ -48,8 +48,9 @@ describe("DayMacros", () => {
 
   it("falls back to zeros when a macro is missing", () => {
     render(<DayMacros goals={[]} />);
-    // The calorie ring center + the three macro ring centers all read zero.
-    expect(screen.getAllByText("0")).toHaveLength(4);
+    // The calorie ring center reads 0; each macro bar reads "0 / 0 g".
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getAllByText("0 / 0 g")).toHaveLength(3);
   });
 
   it("rounds fractional amounts for display", () => {

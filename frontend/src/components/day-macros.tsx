@@ -105,14 +105,27 @@ export function DayMacros({ goals }: { goals: GoalProgress[] }) {
           const goal = byCode.get(code);
           const consumed = goal?.consumed ?? 0;
           const target = goal?.target ?? 0;
+          const pct = Math.round(frac(consumed, target) * 100);
           return (
-            <div className="dm-macro" key={key}>
-              <Ring consumed={consumed} target={target} size={84} stroke={8} label={label} tone={tone}>
-                <span className="dm-macro-key" style={{ color: tone }}>{key}</span>
-                <span className="dm-macro-val tnum">{Math.round(consumed)}</span>
-              </Ring>
-              <div className="dm-macro-goal tnum">
-                {Math.round(consumed)} / {Math.round(target)} g
+            <div className="dm-bar-row" key={key}>
+              <div className="dm-bar-top">
+                <span className="dm-bar-name">
+                  <span className="dm-bar-key" style={{ color: tone }}>{key}</span>
+                  <span className="dm-bar-lab">{label}</span>
+                </span>
+                <span className="dm-bar-val tnum">
+                  {Math.round(consumed)} / {Math.round(target)} g
+                </span>
+              </div>
+              <div
+                className="dm-bar"
+                role="img"
+                aria-label={`${label}: ${Math.round(consumed)} of ${Math.round(target)}`}
+              >
+                <div
+                  className="dm-bar-fill"
+                  style={{ width: `${pct}%`, background: tone }}
+                />
               </div>
             </div>
           );
