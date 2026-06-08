@@ -133,9 +133,10 @@ def score_fit_via_phoenix(
 ) -> dict[str, Any] | None:  # pragma: no cover - live
     """Score the user's confirmed-meal set as base/tuned Phoenix experiments.
 
-    *fit_cases* are the local confirmations (``{text, calories}``) — used to
-    get-or-create the user's Phoenix dataset so the experiment has ground truth to
-    score against even on a fresh/seeded user. Returns ``{"current", "proposed",
+    *fit_cases* are the local confirmations (``{text, calories}``) — each retune
+    rebuilds the user's Phoenix dataset to exactly mirror them so the experiment has
+    the *current* ground truth to score against, even on a fresh/seeded user, with no
+    stale examples drifting onto the wrong meal. Returns ``{"current", "proposed",
     "experiment_url", "rows"}`` — mean fit accuracies (base/tuned) pulled over MCP
     plus per-meal rows ``{text, expected, before, after}`` for the rail — or ``None``
     on any failure so the caller falls back to local scoring.
@@ -151,40 +152,22 @@ def score_fit_via_phoenix(
         client = _phoenix_client()
         if client is None:
             return None
-        # Sync the user's Phoenix dataset to the local confirmations: create it if
-        # missing, add any confirmed meals not yet in it (the /confirm MCP writes may
-        # not have landed, and a seeded persona never writes them). So the experiment
-        # scores ALL the user's confirmed meals, not a stale subset.
+        # REBUILD the user's Phoenix dataset to EXACTLY mirror the current local
+        # confirmations. create_dataset on an existing name replaces its examples
+        # with a fresh version, so a meal can never end up scored against the wrong
+        # truth — the bug the stale "add only what's missing by text" sync caused as
+        # confirmations changed across sessions. No confirmations → no fit set.
         name = user_dataset_name(user)
         fit_by_text = {c["text"]: c for c in (fit_cases or []) if c.get("text")}
-        dataset = None
-        try:
-            dataset = client.datasets.get_dataset(dataset=name)
-        except Exception:
-            dataset = None
-        existing: set[str] = set()
-        if dataset is not None:
-            for ex in getattr(dataset, "examples", None) or []:
-                inp = ex["input"] if isinstance(ex, dict) else getattr(ex, "input", {})
-                if (inp or {}).get("text"):
-                    existing.add(inp["text"])
-        missing = [c for t, c in fit_by_text.items() if t not in existing]
-        if dataset is None:
-            if not fit_by_text:
-                return None
-            dataset = client.datasets.create_dataset(
-                name=name,
-                inputs=[{"text": c["text"]} for c in fit_by_text.values()],
-                outputs=[{"calories": c["calories"]} for c in fit_by_text.values()],
-                dataset_description="DietTrace user confirmed meals — the gate's fit set",
-            )
-        elif missing:
-            client.datasets.add_examples_to_dataset(
-                dataset=name,
-                inputs=[{"text": c["text"]} for c in missing],
-                outputs=[{"calories": c["calories"]} for c in missing],
-            )
-            dataset = client.datasets.get_dataset(dataset=name)  # refresh w/ new examples
+        if not fit_by_text:
+            return None
+        cases = list(fit_by_text.values())
+        dataset = client.datasets.create_dataset(
+            name=name,
+            inputs=[{"text": c["text"]} for c in cases],
+            outputs=[{"calories": c["calories"]} for c in cases],
+            dataset_description="DietTrace user confirmed meals — the gate's fit set",
+        )
         if not getattr(dataset, "example_count", 0):
             return None
 
