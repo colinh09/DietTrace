@@ -500,3 +500,58 @@ def test_fenced_block_without_trailing_fence_is_parsed() -> None:
     assert isinstance(result, StructuredFeedback)
     assert result.kind == "add_item"
     assert result.adjustment == pytest.approx(150.0)
+
+
+def test_apply_portion_adjust_non_finite_multiplier_is_dropped() -> None:
+    """A non-finite multiplier (NaN) is dropped, not clamped to the MAX cap.
+
+    json.loads accepts the literal NaN/Infinity and a pydantic float field admits
+    them, so a garbled Gemini response can carry adjustment=NaN. min/max clamping
+    would silently let it through as the MAX multiplier (20x), poisoning the meal's
+    grams; the food must instead be left unchanged (same isfinite fail-soft applied
+    in parse_meal / web_nutrition / estimate_portion / feedback).
+    """
+    fb = StructuredFeedback(
+        kind="portion_adjust",
+        target_food="fries",
+        adjustment=float("nan"),
+        scope="this_food",
+        rationale="garbled multiplier must not become the 20x cap",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert result[0]["grams"] == pytest.approx(300.0)  # unchanged, not 300x20
+    assert result[1]["grams"] == pytest.approx(200.0)  # burger unchanged
+
+
+def test_apply_portion_adjust_non_finite_target_grams_is_dropped() -> None:
+    """A non-finite absolute target (inf) is ignored rather than clamped to MAX grams.
+
+    An infinite target_grams would otherwise pin the food to the 5000 g cap; with
+    no usable absolute and no multiplier, the item must be left unchanged.
+    """
+    fb = StructuredFeedback(
+        kind="portion_adjust",
+        target_food="fries",
+        target_grams=float("inf"),
+        adjustment=None,
+        scope="this_food",
+        rationale="infinite absolute target must not become the 5000 g cap",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert result[0]["grams"] == pytest.approx(300.0)  # unchanged, not 5000
+    assert result[1]["grams"] == pytest.approx(200.0)  # burger unchanged
+
+
+def test_apply_add_item_non_finite_adjustment_uses_zero() -> None:
+    """A non-finite add-item gram weight (NaN) degrades to 0 g, not the 5000 g cap."""
+    fb = StructuredFeedback(
+        kind="add_item",
+        target_food="mystery food",
+        adjustment=float("nan"),
+        scope="this_meal",
+        rationale="garbled gram weight must not become the 5000 g cap",
+    )
+    result = apply_feedback(_ITEMS, fb)
+    assert len(result) == 3
+    assert result[-1]["food"] == "mystery food"
+    assert result[-1]["grams"] == pytest.approx(0.0)  # unknown, not 5000

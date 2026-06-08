@@ -81,6 +81,14 @@ ALLERGEN_CONFLICT = [
     "I have a shellfish allergy and ate shellfish tonight",
 ]
 
+# Allergy declared and the allergen named twice, but NOT eaten — no eating verb.
+# An allergen conflict requires the person to actually log eating the allergen, so
+# the eating-verb gate must keep these clear.
+ALLERGEN_DECLARED_NOT_EATEN = [
+    "I'm allergic to walnuts, and the walnuts from the backyard tree go to the squirrels.",
+    "I'm allergic to shellfish, but the shellfish tank at the aquarium is my favorite exhibit.",
+]
+
 
 @pytest.mark.parametrize("text", BENIGN)
 def test_benign_logs_never_flag(text):
@@ -173,3 +181,14 @@ def test_safe_result_is_fresh_copy():
 def test_be_sick_without_force_myself_does_not_flag(text):
     result = safety_check(text)
     assert result["flagged"] is False
+
+
+@pytest.mark.parametrize("text", ALLERGEN_DECLARED_NOT_EATEN)
+def test_allergen_named_but_not_eaten_does_not_flag(text):
+    # Declaring an allergy and mentioning the allergen twice is not a conflict
+    # unless the person logs eating it — the eating-verb gate must hold. Removing
+    # `not _EATING_VERB.search(text)` from `_has_allergen_conflict` flags these.
+    result = safety_check(text)
+    assert result["flagged"] is False
+    assert result["category"] is None
+    assert result["message"] == ""

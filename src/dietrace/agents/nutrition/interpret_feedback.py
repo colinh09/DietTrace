@@ -26,6 +26,7 @@ deterministically (no LLM involvement):
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -180,6 +181,15 @@ _MAX_MULTIPLIER = 20.0
 _MAX_ADD_GRAMS = 5000.0
 
 
+def _finite_or_none(value: float | None) -> float | None:
+    """Return *value* if it is a finite number, else None — a non-finite LLM-supplied
+    number (NaN/Infinity) is treated as not given rather than clamped to a cap.
+    """
+    if value is None or not math.isfinite(value):
+        return None
+    return value
+
+
 def _target_indices(items: list[dict[str, Any]], target: str) -> set[int]:
     """Indices of items matching *target*. Prefer exact (case-insensitive) matches;
     fall back to substring ONLY when it matches exactly one item — so "rice" never
@@ -200,10 +210,15 @@ def _apply_portion_adjust(
 ) -> list[dict[str, Any]]:
     if not feedback.target_food:
         return items
+    # json.loads admits the literal NaN/Infinity and a pydantic float field accepts
+    # them, so a garbled LLM number could reach here; drop a non-finite value rather
+    # than letting min/max clamp it silently to the MAX cap (poisoning the grams).
+    target_grams = _finite_or_none(feedback.target_grams)
+    adjustment = _finite_or_none(feedback.adjustment)
     # An absolute gram target ("about 30 grams") sets the portion directly;
     # otherwise fall back to the relative multiplier ("half", "a third").
-    absolute = feedback.target_grams is not None
-    if not absolute and feedback.adjustment is None:
+    absolute = target_grams is not None
+    if not absolute and adjustment is None:
         return items
     idxs = _target_indices(items, feedback.target_food)
     result = []
@@ -211,9 +226,9 @@ def _apply_portion_adjust(
         if i in idxs:
             item = dict(item)
             if absolute:
-                item["grams"] = max(0.0, min(_MAX_ADD_GRAMS, feedback.target_grams))
+                item["grams"] = max(0.0, min(_MAX_ADD_GRAMS, target_grams))
             else:
-                multiplier = max(0.0, min(_MAX_MULTIPLIER, feedback.adjustment))
+                multiplier = max(0.0, min(_MAX_MULTIPLIER, adjustment))
                 item["grams"] = max(0.0, item.get("grams", 0.0) * multiplier)
         result.append(item)
     return result
@@ -231,6 +246,7 @@ def _apply_remove_item(
 def _apply_add_item(
     items: list[dict[str, Any]], feedback: StructuredFeedback
 ) -> list[dict[str, Any]]:
-    grams = max(0.0, min(_MAX_ADD_GRAMS, feedback.adjustment or 0.0))
+    # A non-finite gram weight (NaN/Infinity) degrades to 0 g (unknown), not the cap.
+    grams = max(0.0, min(_MAX_ADD_GRAMS, _finite_or_none(feedback.adjustment) or 0.0))
     new_item = {"food": feedback.target_food, "grams": grams}
     return list(items) + [new_item]
