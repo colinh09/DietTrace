@@ -312,14 +312,14 @@ describe("MealList", () => {
 
     // Badged as a dataset point AND keeping its confidence chip (the badge is an
     // extra tag, not a replacement), with real macros.
-    expect(within(row).getByText(/dataset point/i)).toBeInTheDocument();
+    expect(within(row).getByText(/confirmed meal/i)).toBeInTheDocument();
     expect(row.querySelector(".conf-chip")).not.toBeNull();
     expect(within(row).getByText(/418/)).toBeInTheDocument();
     expect(within(row).getByText(/P 8/)).toBeInTheDocument();
 
     // Expanding shows its held-out role AND the full per-item breakdown.
     expandMeal(row);
-    expect(within(row).getByText(/Held-out ground truth/i)).toBeInTheDocument();
+    expect(within(row).getByText(/Your confirmed answer key/i)).toBeInTheDocument();
     expect(within(row).getByText(/Rice, white, cooked/)).toBeInTheDocument();
   });
 

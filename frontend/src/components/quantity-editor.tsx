@@ -73,7 +73,7 @@ export function QuantityEditor({
             cancel
           </button>
           <button type="button" className="qe-save" onClick={save} disabled={saving}>
-            {saving ? "saving…" : "Save as reference"}
+            {saving ? "saving…" : "Save as confirmed"}
           </button>
         </span>
       </div>

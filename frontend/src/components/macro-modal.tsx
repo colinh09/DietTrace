@@ -242,8 +242,8 @@ export function MacroModal({
   const ev = plan?.eval;
   const checked = ev
     ? ev.pass
-      ? "Plan checked: consistent ✓ · within safe range ✓"
-      : "AI suggestion adjusted to stay consistent + within safe range."
+      ? "Plan checked: the numbers add up ✓ · within a safe range ✓"
+      : "We nudged the AI's suggestion so the numbers add up and stay in a safe range."
     : null;
 
   return (

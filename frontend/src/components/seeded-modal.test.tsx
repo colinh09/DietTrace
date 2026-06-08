@@ -81,7 +81,7 @@ describe("SeededModal", () => {
         onClose={onClose}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /see the dataset/i }));
+    fireEvent.click(screen.getByRole("button", { name: /see the confirmed meals/i }));
     expect(onViewDataset).toHaveBeenCalledWith("2026-06-05");
     expect(onClose).toHaveBeenCalled();
   });

@@ -68,13 +68,13 @@ export function OverviewModal({ onClose }: { onClose: () => void }) {
         <header className="ov-head">
           <span className="ov-eyebrow mono">Overview</span>
           <h1 id="overview-title" className="ov-title">
-            An AI nutritionist held accountable by evals
+            An AI nutritionist graded on accuracy
           </h1>
           <p className="ov-sub">
             DietTrace logs meals from plain English against USDA data, grades its
-            own work on every meal, and learns how <i>you</i> eat — with each change
-            gated by evals so personalizing never costs general accuracy. Below:
-            how accurate it is, and how much to trust your numbers.
+            own work on every meal, and learns how <i>you</i> eat — and we test
+            every change so personalizing for you never makes it less accurate
+            overall. Below: how accurate it is, and how much to trust your numbers.
           </p>
         </header>
 

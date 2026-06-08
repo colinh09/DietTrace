@@ -45,7 +45,7 @@ describe("OverviewModal", () => {
 
     // The project intro.
     expect(
-      screen.getByText(/held accountable by evals/i),
+      screen.getByText(/graded on accuracy/i),
     ).toBeInTheDocument();
 
     // Both reports render together — no tab switching.

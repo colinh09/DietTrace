@@ -198,7 +198,7 @@ export function RecapModal({
             </ul>
           ) : (
             <p className="su-empty">
-              Not tuned yet — re-tune in the panel to turn your corrections into
+              Not tuned yet — update in the panel to turn your corrections into
               rules it follows.
             </p>
           )}
@@ -218,12 +218,12 @@ export function RecapModal({
             </div>
             <div className="rc-stat">
               <span className="rc-stat-val">{confirmations}</span>
-              <span className="rc-stat-label">in your test set</span>
+              <span className="rc-stat-label">kept aside as an answer key</span>
             </div>
           </div>
           <p className="rc-foot">
-            Your test set is the meals you’ve confirmed — scored against, never
-            learned from, so the agent’s grade on you stays honest.
+            Your answer key is the meals you’ve confirmed — checked against, never
+            learned from, so DietTrace’s grade on you stays honest.
             {isPersona && onViewDay && (
               <button
                 type="button"
@@ -234,7 +234,7 @@ export function RecapModal({
                 }}
               >
                 {" "}
-                See the dataset →
+                See the confirmed meals →
               </button>
             )}
           </p>

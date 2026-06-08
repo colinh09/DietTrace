@@ -20,6 +20,22 @@ export function StepGlyph({ step }: { step?: string }) {
 
 const fmt = new Intl.NumberFormat("en-US");
 
+// Plain-English labels for the raw backend step identifiers shown to users.
+// Falls back to prettifying (underscores → spaces) for anything unmapped.
+const STEP_LABELS: Record<string, string> = {
+  parse_meal: "Read your meal",
+  search_nutrition: "Looked up nutrition",
+  estimate_portion: "Estimated portions",
+  log_entry: "Logged it",
+  web_search: "Searched the web",
+  recall: "Remembered your preferences",
+};
+
+export function stepLabel(step?: string): string {
+  if (!step) return "";
+  return STEP_LABELS[step] ?? step.replace(/_/g, " ");
+}
+
 // Plain-English labels for the eval axes — the raw names are jargon.
 const AXIS_LABELS: Record<string, string> = {
   resolution_completeness: "Foods found",
@@ -81,7 +97,7 @@ export function MealTrace({
               className={"tnode-dot" + (step.step === "web_search" ? " amber" : "")}
               aria-hidden="true"
             />
-            <div className="tnode-key mono">{step.step}</div>
+            <div className="tnode-key mono">{stepLabel(step.step)}</div>
             <div className="tnode-body">{step.summary}</div>
           </div>
         ))}

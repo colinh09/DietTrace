@@ -70,7 +70,7 @@ const STEPS: Step[] = [
   },
   {
     key: "lifestyle",
-    q: "Last one — tell me about your lifestyle, eating habits, goals… anything that helps me read your meals. (You can skip this.)",
+    q: "Last one — tell me about your lifestyle, eating habits, goals… anything that helps me understand what you eat. (You can skip this.)",
     kind: "text",
   },
 ];
@@ -239,7 +239,7 @@ export function Onboarding({
                 <span className="ob-choice-body">
                   <span className="ob-choice-title">See it in action</span>
                   <span className="ob-choice-desc">
-                    {busy ? "Loading…" : "Load a demo and explore the personas"}
+                    {busy ? "Loading…" : "Load a demo and explore the sample profiles"}
                   </span>
                 </span>
                 <ArrowRight size={16} aria-hidden="true" />
@@ -257,7 +257,7 @@ export function Onboarding({
                 <span className="ob-choice-body">
                   <span className="ob-choice-title">Set up your own</span>
                   <span className="ob-choice-desc">
-                    Chat with the agent — under a minute
+                    Chat with your nutritionist — under a minute
                   </span>
                 </span>
                 <ArrowRight size={16} aria-hidden="true" />

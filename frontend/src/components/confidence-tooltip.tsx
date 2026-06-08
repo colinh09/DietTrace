@@ -62,9 +62,9 @@ export function ConfidenceTooltip({
           })}
         </span>
         <span className="tip-foot">
-          It checks how cleanly each food resolved, the source, and calorie
-          sanity — not the exact portion. If a gram weight looks off, just tell
-          DietTrace below.{" "}
+          It checks how confidently each food was identified, where the data
+          came from, and whether the calories add up — not the exact portion. If
+          a gram weight looks off, just tell DietTrace below.{" "}
           <span className="tip-link">Learn more →</span>
         </span>
       </span>

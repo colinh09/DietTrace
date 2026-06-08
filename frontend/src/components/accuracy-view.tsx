@@ -20,7 +20,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 const _LINES = [
   { key: "calorie", label: "calorie", color: "var(--accent-ink)" },
   { key: "macro", label: "macro", color: "var(--accent)" },
-  { key: "within_tolerance", label: "±15%", color: "var(--muted-ink)" },
+  { key: "within_tolerance", label: "within 15%", color: "var(--muted-ink)" },
   { key: "portion", label: "portion", color: "var(--faint)" },
 ] as const;
 
@@ -90,7 +90,7 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
       <section className="acc-hero">
         <h1 className="acc-title" id="obs-modal-title">How DietTrace stays accurate</h1>
         <p className="acc-sub">
-          The agent is seeded on a hand-checked USDA dataset to be accurate up front.
+          DietTrace is seeded on a hand-checked USDA dataset to be accurate up front.
           Then every meal it logs is traced and scored in Arize Phoenix — and your
           corrections teach it to match how you actually eat.
         </p>
@@ -99,7 +99,7 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
       <section className="acc-stats">
         <Stat label="Calorie accuracy" value={pct(report.headline.calorie_accuracy)} />
         <Stat label="Macro accuracy" value={pct(report.headline.macro_accuracy)} />
-        <Stat label="Within ±15%" value={pct(report.headline.within_tolerance)} />
+        <Stat label="Within 15% of actual" value={pct(report.headline.within_tolerance)} />
       </section>
 
       <section className="acc-block">
@@ -137,9 +137,9 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
       )}
 
       <section className="acc-block">
-        <div className="acc-block-head mono">the self-supervision loop</div>
+        <div className="acc-block-head mono">how DietTrace checks its own work</div>
         <p className="acc-note">
-          How the base agent keeps itself honest — each step runs in Arize Phoenix:
+          How DietTrace keeps itself honest — each step runs in Arize Phoenix:
         </p>
         <ol className="trace-list acc-loop">
           {report.loop.map((s, i) => (
@@ -164,22 +164,22 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
       {report.macros && (
         <section className="acc-block">
           <div className="acc-block-head mono">
-            macro planner · {report.macros.dataset.cases} cases
+            macro planner · {report.macros.dataset.cases} test meals
             {report.macros.experiments != null
               ? ` · ${report.macros.experiments} experiment${report.macros.experiments === 1 ? "" : "s"}`
               : ""}
           </div>
           <p className="acc-note">
             Your macro targets get the same accountability: every plan is checked for
-            safe protein/fat ranges and calorie (Atwater) consistency. All{" "}
-            {report.macros.dataset.cases} seed plans pass.
+            safe protein/fat ranges and that the calories match the protein, carbs &
+            fat. All {report.macros.dataset.cases} seed plans pass.
           </p>
         </section>
       )}
 
       <section className="acc-foot">
         <span>
-          Scored on {report.dataset.cases} cases from {report.dataset.source}.
+          Checked against {report.dataset.cases} test meals from {report.dataset.source}.
         </span>
         <span className="acc-link">
           {report.source === "live"

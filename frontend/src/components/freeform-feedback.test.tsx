@@ -90,7 +90,7 @@ describe("FreeformFeedback", () => {
     await waitFor(() => {
       expect(screen.getByText(/DietTrace learned/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/standing preference saved/i)).toBeInTheDocument();
+    expect(screen.getByText(/a rule saved/i)).toBeInTheDocument();
     expect(screen.getByText(/applies to future meals/i)).toBeInTheDocument();
   });
 

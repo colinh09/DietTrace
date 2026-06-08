@@ -21,11 +21,11 @@ describe("Header", () => {
   it("folds Persona details + Reset into the account menu, not the tabs", () => {
     render(<Header date={may30} />);
     // Constant chrome: the destructive + modal-opener actions aren't tabs.
-    expect(screen.queryByText(/persona details/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/your details/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/reset everything/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /account/i }));
-    expect(screen.getByText(/persona details/i)).toBeInTheDocument();
+    expect(screen.getByText(/your details/i)).toBeInTheDocument();
     expect(screen.getByText(/reset everything/i)).toBeInTheDocument();
   });
 

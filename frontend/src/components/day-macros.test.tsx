@@ -116,11 +116,11 @@ describe("DayMacros", () => {
     const zone = glance(container);
     const stats = within(zone).getByLabelText(/learning progress/i);
     expect(within(stats).getByText("3")).toBeInTheDocument();
-    expect(within(stats).getByText(/feedbacks banked/i)).toBeInTheDocument();
+    expect(within(stats).getByText(/corrections you've made/i)).toBeInTheDocument();
     expect(within(stats).getByText("2")).toBeInTheDocument();
-    expect(within(stats).getByText(/re-tunes shipped/i)).toBeInTheDocument();
+    expect(within(stats).getByText(/updates made/i)).toBeInTheDocument();
     expect(within(stats).getByText("6")).toBeInTheDocument();
-    expect(within(stats).getByText(/in your dataset/i)).toBeInTheDocument();
+    expect(within(stats).getByText(/confirmed meals/i)).toBeInTheDocument();
   });
 
   it("falls back to zero counts before the stats have loaded", () => {

@@ -45,7 +45,7 @@ describe("Dashboard", () => {
       />,
     );
     expect(screen.getByText("two eggs")).toBeInTheDocument();
-    expect(screen.getByText(/added to the held-out dataset/i)).toBeInTheDocument();
+    expect(screen.getByText(/added to the answer key/i)).toBeInTheDocument();
   });
 
   it("opens the agent-state modal from the icon", async () => {

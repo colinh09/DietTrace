@@ -76,7 +76,7 @@ describe("LearningObservability", () => {
       });
     });
     await openState();
-    fireEvent.click(await screen.findByRole("button", { name: /re-tune/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^update$/i }));
 
     await waitFor(() => expect(screen.getByText(/Kept/)).toBeInTheDocument());
     expect(screen.getByText(/On your meals/)).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe("LearningObservability", () => {
       await new Promise<void>((r) => { finish = r; });
     });
     await openState();
-    fireEvent.click(await screen.findByRole("button", { name: /re-tune/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^update$/i }));
 
     await waitFor(() =>
       expect(screen.getByText("a medium banana")).toBeInTheDocument(),
@@ -140,12 +140,12 @@ describe("LearningObservability", () => {
     });
     await openState();
     expect(await screen.findByText(/0 of 1 fresh correction/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /re-tune/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^update$/i })).toBeDisabled();
   });
 
   it("expands the test set", async () => {
     await openState();
-    const toggle = await screen.findByRole("button", { name: /test set/i });
+    const toggle = await screen.findByRole("button", { name: /answer key/i });
     expect(screen.queryByText(/oatmeal before my long run/)).not.toBeInTheDocument();
     fireEvent.click(toggle);
     const list = screen.getByText(/oatmeal before my long run/);

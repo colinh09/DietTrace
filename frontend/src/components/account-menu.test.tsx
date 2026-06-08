@@ -25,22 +25,22 @@ describe("AccountMenu", () => {
   it("hides the account actions behind the avatar until it's opened", () => {
     render(<AccountMenu />);
     expect(screen.getByRole("button", { name: /account/i })).toBeInTheDocument();
-    // Persona details + Reset are folded into the menu — not in the chrome.
-    expect(screen.queryByText(/persona details/i)).not.toBeInTheDocument();
+    // Your details + Reset are folded into the menu — not in the chrome.
+    expect(screen.queryByText(/your details/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/reset everything/i)).not.toBeInTheDocument();
   });
 
-  it("opens the menu with Persona details and a Reset action", () => {
+  it("opens the menu with Your details and a Reset action", () => {
     render(<AccountMenu />);
     fireEvent.click(screen.getByRole("button", { name: /account/i }));
-    expect(screen.getByText(/persona details/i)).toBeInTheDocument();
+    expect(screen.getByText(/your details/i)).toBeInTheDocument();
     expect(screen.getByText(/reset everything/i)).toBeInTheDocument();
   });
 
   it("opens the persona-details surface from the menu", () => {
     render(<AccountMenu />);
     fireEvent.click(screen.getByRole("button", { name: /account/i }));
-    fireEvent.click(screen.getByText(/persona details/i));
+    fireEvent.click(screen.getByText(/your details/i));
     // With no saved setup (empty localStorage) the calm empty state shows.
     expect(screen.getByText(/nothing set up yet/i)).toBeInTheDocument();
   });

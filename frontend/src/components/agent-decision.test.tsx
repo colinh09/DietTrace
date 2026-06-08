@@ -14,7 +14,7 @@ describe("AgentDecision", () => {
       />,
     );
     const line = screen.getByRole("status");
-    expect(line).toHaveTextContent(/held-out dataset/i);
+    expect(line).toHaveTextContent(/answer key/i);
     expect(line).toHaveTextContent(/clean meal accepted/i);
     expect(line).toHaveAttribute("data-op", "add_dataset_point");
   });
@@ -23,7 +23,7 @@ describe("AgentDecision", () => {
     render(
       <AgentDecision decision={{ op: "retune", reason: "enough new signal" }} />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent(/re-tuned/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/updated/i);
   });
 
   it("renders nothing when no decision is present", () => {
@@ -45,7 +45,7 @@ describe("AgentFeed", () => {
     const feed = screen.getByLabelText("Agent activity");
     expect(feed.querySelectorAll(".revent")).toHaveLength(2);
     expect(screen.getByText("an apple")).toBeInTheDocument();
-    expect(screen.getByText(/re-tuned/i)).toBeInTheDocument();
+    expect(screen.getByText(/updated/i)).toBeInTheDocument();
     expect(screen.getByText("two eggs")).toBeInTheDocument();
   });
 

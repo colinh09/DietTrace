@@ -5,7 +5,7 @@
 // (parse → search/portion per food → totals) — before the row settles into a
 // normal logged meal. Mirrors the MealTrace step rail so it reads identically.
 import type { StreamEvent } from "@/lib/api";
-import { StepGlyph } from "@/components/meal-trace";
+import { StepGlyph, stepLabel } from "@/components/meal-trace";
 
 export interface LiveEntry {
   text: string;
@@ -32,7 +32,7 @@ export function LiveMeal({ entry }: { entry: LiveEntry }) {
           <div className="meal-exp" data-open="true">
             <div className="meal-exp-inner">
               <div className="mealtrace">
-                <div className="mealtrace-head mono">the agent&apos;s work</div>
+                <div className="mealtrace-head mono">Agent&apos;s work</div>
                 <ol className="trace-list">
                   {steps.map((s, i) => (
                     <li key={i} className="tstep">
@@ -44,7 +44,7 @@ export function LiveMeal({ entry }: { entry: LiveEntry }) {
                       </div>
                       <div className="tstep-body">
                         <div className="tstep-line-btn">
-                          <span className="tstep-fn mono">{s.step}</span>
+                          <span className="tstep-fn mono">{stepLabel(s.step)}</span>
                           <span className="tstep-arrow">
                             {s.summary}
                             {s.status === "running" && !/[.…]\s*$/.test(s.summary ?? "")

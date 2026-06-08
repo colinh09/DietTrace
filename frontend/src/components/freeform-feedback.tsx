@@ -30,7 +30,7 @@ function learnedLabel(result: FreeformFeedbackResult): string {
     case "add_item":
       return `added ${result.target_food}${result.adjustment != null ? ` (${Math.round(result.adjustment)} g)` : ""}`;
     case "standing_rule":
-      return `standing preference saved: ${result.rationale || result.target_food}`;
+      return `a rule saved: ${result.rationale || result.target_food}`;
     default:
       return result.rationale || String(result.kind ?? "");
   }
@@ -117,21 +117,21 @@ export function FreeformFeedback({
               so it's clear how feedback becomes ground truth the agent re-tests on. */}
           {result.kind === "standing_rule" ? (
             <span className="freeform-pref-note">
-              saved as a standing preference — applies to future meals
+              saved as a rule — applies to future meals
             </span>
           ) : (
             <>
               <ol className="freeform-process">
                 <li className="fp-step">
-                  <Check size={12} className="fp-check" /> Interpreted your words
-                  with Gemini (no fiddly gram editing)
+                  <Check size={12} className="fp-check" /> Read your words (no
+                  fiddly gram editing)
                 </li>
                 <li className="fp-step">
                   <Check size={12} className="fp-check" /> Recalculated this meal
                   &amp; the day total
                 </li>
                 <li className="fp-step">
-                  <Check size={12} className="fp-check" /> Banked as ground truth
+                  <Check size={12} className="fp-check" /> Saved as a confirmed example
                   {result.corrections != null
                     ? ` — correction #${result.corrections}`
                     : ""}
@@ -139,13 +139,13 @@ export function FreeformFeedback({
                 <li className={"fp-step" + (result.added_to_arize ? "" : " fp-muted")}>
                   <Check size={12} className="fp-check" />{" "}
                   {result.added_to_arize
-                    ? "Logged to Arize as an eval example"
+                    ? "Logged to Arize as a confirmed example"
                     : "Arize logging skipped (not configured)"}
                 </li>
               </ol>
               <span className="freeform-process-foot">
-                Hit <b>Re-tune</b> in the Observability panel to score the agent
-                on what you just taught it.
+                Open the accuracy panel and tap <b>Update</b> to see DietTrace
+                re-check itself on what you just taught it.
               </span>
             </>
           )}

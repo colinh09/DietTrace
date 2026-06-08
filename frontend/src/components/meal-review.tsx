@@ -42,7 +42,7 @@ export function MealReview({
         onCorrected?.();
         onAgentEvent?.({
           op: "add_dataset_point",
-          reason: "you confirmed it — added to your held-out dataset",
+          reason: "you confirmed it — added to your answer key",
           mealText,
           phoenix: "wrote 1 point to your Phoenix dataset",
         });
@@ -65,8 +65,8 @@ export function MealReview({
       <div className="review-confirmed">
         <Check size={14} aria-hidden="true" />
         <span>
-          Confirmed — saved as a held-out reference. DietTrace scores its future
-          re-tunes against this meal, but never sees it while learning.
+          Confirmed — saved as an answer key. DietTrace will check its future
+          updates against this meal, but never peeks at it while learning.
         </span>
         <span className="review-confirmed-more">
           <button
@@ -93,7 +93,8 @@ export function MealReview({
       <div className="review-head">
         <span className="review-q">Does this look right?</span>
         <span className="review-sub">
-          A quick check so DietTrace only learns from meals you&apos;ve vetted.
+          A quick check so DietTrace only learns from meals you&apos;ve confirmed
+          are right.
         </span>
       </div>
 
@@ -134,8 +135,8 @@ export function MealReview({
             onAgentEvent?.({
               op: "bank_feedback",
               reason: res.stored_as_preference
-                ? "learned a standing rule from your correction"
-                : "banked your correction to learn from on the next re-tune",
+                ? "learned a rule from your correction"
+                : "saved your correction to learn from on the next update",
               mealText,
             });
             // Feedback is the primary retune trigger — if this correction tipped

@@ -159,15 +159,15 @@ export function DayMacros({
         <div className="dm-stats" aria-label="Learning progress">
           <div className="dm-stat">
             <span className="dm-stat-num tnum">{stats?.corrections ?? 0}</span>
-            <span className="dm-stat-lab">feedbacks banked</span>
+            <span className="dm-stat-lab">corrections you&apos;ve made</span>
           </div>
           <div className="dm-stat">
             <span className="dm-stat-num tnum">{stats?.version ?? 0}</span>
-            <span className="dm-stat-lab">re-tunes shipped</span>
+            <span className="dm-stat-lab">updates made</span>
           </div>
           <div className="dm-stat">
             <span className="dm-stat-num tnum">{stats?.confirmations ?? 0}</span>
-            <span className="dm-stat-lab">in your dataset</span>
+            <span className="dm-stat-lab">confirmed meals</span>
           </div>
         </div>
       </div>

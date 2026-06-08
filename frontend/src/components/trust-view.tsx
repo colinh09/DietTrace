@@ -8,6 +8,15 @@ import type { FeedbackItem, TrustReport } from "@/lib/api";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
+// Friendly labels for raw source keys shown to the user.
+const SOURCE_LABELS: Record<string, string> = {
+  usda: "USDA database",
+  llm: "AI estimate",
+  web: "Web source",
+};
+const sourceLabel = (key: string) =>
+  SOURCE_LABELS[key] ?? key.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="acc-stat">
@@ -67,7 +76,7 @@ export function TrustView({
                       key={source}
                       className={`trust-srcseg src-${source}`}
                       style={{ width: pct(n / sourceTotal) }}
-                      title={`${source}: ${n}`}
+                      title={`${sourceLabel(source)}: ${n}`}
                     />
                   ))}
                 </div>
@@ -75,7 +84,7 @@ export function TrustView({
                   {sources.map(([source, n]) => (
                     <span className="trust-srckey" key={source}>
                       <span className={`trust-dot src-${source}`} />
-                      <span className="trust-srcname">{source}</span>
+                      <span className="trust-srcname">{sourceLabel(source)}</span>
                       <span className="trust-srcnum mono tnum">{pct(n / sourceTotal)}</span>
                     </span>
                   ))}
@@ -113,9 +122,9 @@ export function TrustView({
         <section className="acc-block">
           <div className="acc-block-head mono">corrections you&apos;ve taught</div>
           <p className="acc-sub trust-corr-intro">
-            Plain-language fixes feeding the learning loop. Re-tune in “Your
-            agent” to fold these into a rule — gated so they only ship if they
-            actually fit you.
+            Quick corrections in your own words. Update in “Your agent” to turn
+            these into a rule — we only apply it if it actually matches how you
+            eat.
           </p>
           <ul className="trust-corr">
             {corrections.map((c) => (

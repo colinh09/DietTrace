@@ -74,17 +74,17 @@ export function SeededModal({
           <p className="sm-note">{p.hook_note}</p>
           <p className="sm-note sm-note-soft">
             They’re on today — edit a portion, suggest a food, or correct the
-            under-count, then re-tune.
+            under-count, then update.
           </p>
         </section>
 
         {/* the held-out dataset — visible on the previous day */}
         <section className="sm-section">
-          <div className="sm-sub mono">Your dataset · {datasetDayLabel}</div>
+          <div className="sm-sub mono">Confirmed meals · {datasetDayLabel}</div>
           <p className="sm-line">
             <b>{result.confirmations}</b> meals you confirmed — logged on the
-            previous day and held out as the test set the agent is scored against
-            (it never sees them while learning).
+            previous day and kept aside as an answer key DietTrace is checked
+            against (it never sees them while learning).
           </p>
           {onViewDataset && (
             <button
@@ -95,7 +95,7 @@ export function SeededModal({
                 onClose();
               }}
             >
-              See the dataset on {datasetDayLabel} →
+              See the confirmed meals on {datasetDayLabel} →
             </button>
           )}
         </section>
@@ -118,12 +118,13 @@ export function SeededModal({
           <ol className="sm-steps">
             <li>
               Correct the under-counted meal on today (tell it in plain words),
-              then log a meal — the supervisor re-tunes on its own once there&apos;s
-              enough signal. It should learn: <i>{p.learns}</i>
+              then log a meal — DietTrace updates itself automatically once
+              you&apos;ve corrected enough meals. It should learn: <i>{p.learns}</i>
             </li>
             <li>
               Watch the <b>agent activity</b> feed on the right, and open{" "}
-              <b>⚙ state</b> to see the dataset, the verdict, and what it learned.
+              <b>⚙ Status</b> to see what it was tested on, the result, and what
+              it learned.
             </li>
           </ol>
         </section>

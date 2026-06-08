@@ -23,7 +23,7 @@ function accountLabel(setup: Setup | null): { name: string; sub: string } {
     return { name: key.replace(/\b\w/g, (c) => c.toUpperCase()), sub: "Demo persona" };
   }
   if (setup?.kind === "own") return { name: "You", sub: "Your setup" };
-  return { name: "You", sub: "Anonymous session" };
+  return { name: "You", sub: "Guest" };
 }
 
 export function AccountMenu({
@@ -134,7 +134,7 @@ export function AccountMenu({
               onClick={openPersona}
             >
               <User size={16} className="acct-menu-ic" aria-hidden="true" />
-              Persona details
+              Your details
             </button>
             {configured && (
               <>

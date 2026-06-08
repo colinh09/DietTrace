@@ -37,7 +37,7 @@ describe("AccuracyPage", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getByText("60%")).toBeInTheDocument(); // calorie accuracy headline
-    expect(screen.getByText(/the self-supervision loop/i)).toBeInTheDocument();
+    expect(screen.getByText(/how DietTrace checks its own work/i)).toBeInTheDocument();
     // The data is shown in-UI and labeled as live from Arize (no external link).
     expect(
       screen.getByText("Live from Arize Phoenix · 3 experiments"),

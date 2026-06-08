@@ -113,14 +113,14 @@ function RetuneLive({
         ) : (
           <span className="lm-spinner" aria-hidden="true" />
         )}
-        Re-tuning · {allDone ? "complete" : "live"}
+        Updating · {allDone ? "complete" : "live"}
       </div>
       <div className="rt-headline">{phase}</div>
       {rules.length > 0 && (
         <div className="rt-rule">
           <Sparkles size={14} className="lm-rule-icon" aria-hidden="true" />
           <span>
-            <b>New rule the corrector wrote — </b>
+            <b>New rule DietTrace wrote — </b>
             {rules[0].rule}
           </span>
         </div>
@@ -207,8 +207,8 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
       result.reason === "not_enough_corrections"
         ? `Give DietTrace at least ${result.need} correction${result.need === 1 ? "" : "s"} first (you have ${result.have}).`
         : result.reason === "no_new_corrections"
-          ? "Nothing new to fold in — every correction is already learned. Make a new correction, then re-tune."
-          : "The corrector couldn't propose a change — try again.";
+          ? "Nothing new to fold in — every correction is already learned. Make a new correction, then update."
+          : "DietTrace couldn't propose a change — try again.";
     return <div className="lm-retune-note">{msg}</div>;
   }
   const cur = result.current as RetuneScores;
@@ -230,7 +230,7 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
       <div className="lm-scores">
         <div className="lm-scores-legend">
           Calorie accuracy, <b>before</b>{" "}
-          <span className="lm-score-arrow">→</span> <b>after</b> re-tuning:
+          <span className="lm-score-arrow">→</span> <b>after</b> updating:
         </div>
         <ScoreBar
           label="On your meals"
@@ -274,14 +274,14 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
       </button>
       {why && (
         <ol className="lm-why">
-          <li>The corrector turned your corrections into <b>general rules</b>.</li>
+          <li>DietTrace turned your corrections into <b>general rules</b>.</li>
           <li>
-            The agent re-logged your confirmed meals <b>with</b> the rules and{" "}
-            <b>without</b> — scored against your own numbers.
+            DietTrace re-logged your confirmed meals <b>with</b> the rules and{" "}
+            <b>without</b> — checked against your own numbers.
           </li>
           <li>It re-ran the <b>USDA</b> set so personalizing can&apos;t hurt general accuracy.</li>
           <li>
-            It ships only if <b>fit improves</b> and USDA holds (within{" "}
+            It applies only if <b>your-meal accuracy improves</b> and USDA holds (within{" "}
             {Math.round(v.eps * 100)}%). All as Arize evals.
           </li>
         </ol>
@@ -447,7 +447,7 @@ export function LearningObservability({
         if (e.ok) {
           const fit =
             e.current && e.proposed
-              ? `fit ${pct(e.current.fit)} → ${pct(e.proposed.fit)}`
+              ? `your-meal accuracy ${pct(e.current.fit)} → ${pct(e.proposed.fit)}`
               : undefined;
           const rule = e.rules?.[0]?.rule;
           onRetuneComplete?.({
@@ -456,9 +456,9 @@ export function LearningObservability({
             op: "retune",
             reason: e.shipped
               ? rule
-                ? `shipped: ${rule}`
-                : "shipped a new rule"
-              : "no change — the gate held the line",
+                ? `applied: ${rule}`
+                : "applied a new rule"
+              : "no change — it wasn't more accurate",
             detail: fit,
             phoenix:
               e.scored_via === "phoenix" && fit
@@ -556,7 +556,7 @@ export function LearningObservability({
       <AgentFeed events={feedEvents} running={retuning} />
       {feedEvents.length === 0 && !retuning && (
         <p className="agent-feed-empty">
-          Log a meal and the supervisor&apos;s decisions show up here.
+          Log a meal and DietTrace&apos;s decisions show up here.
         </p>
       )}
       {/* After a Phoenix-scored re-tune: the finished experiment's per-meal results,
@@ -575,14 +575,14 @@ export function LearningObservability({
             <div className="agent-state-stat">
               <span className="agent-state-num">{confirmations}</span>
               <span className="agent-state-cap">
-                held-out points · <b>{custom}</b> from you · {seeded} seeded
+                answer-key meals · <b>{custom}</b> from you · {seeded} seeded
               </span>
             </div>
             <div className="agent-state-stat">
               <span className="agent-state-num">{newCorr}</span>
               <span className="agent-state-cap">
                 of {corrections} correction{corrections === 1 ? "" : "s"} not yet
-                incorporated
+                learned
               </span>
             </div>
           </div>
@@ -593,7 +593,7 @@ export function LearningObservability({
             </p>
           )}
           <p className="agent-state-mcp">
-            Held-out points are synced to your Phoenix dataset over MCP.
+            Answer-key meals are synced to your Phoenix dataset over MCP.
           </p>
 
           <div className="lo">
@@ -601,17 +601,17 @@ export function LearningObservability({
       <section className="dash-card lo-retune">
         <div className="dash-card-head mono">self-tuning · agent-driven</div>
         <p className="lo-counts">
-          The supervisor re-tunes on its own once there&apos;s enough signal: it learns
+          DietTrace updates on its own once there are enough corrections: it learns
           from your <b>{corrections}</b> correction{corrections === 1 ? "" : "s"}, then
-          tests itself on <b>{confirmations}</b> of your meal{confirmations === 1 ? "" : "s"} before keeping any change.
+          checks itself on <b>{confirmations}</b> of your meal{confirmations === 1 ? "" : "s"} before keeping any change.
         </p>
         <p className={"lo-fresh" + (ready ? " ready" : "")} aria-live="polite">
           <span className="lo-fresh-dot" aria-hidden="true" />
           {ready
-            ? `${newCorr} fresh correction${newCorr === 1 ? "" : "s"} — ready to re-tune`
+            ? `${newCorr} fresh correction${newCorr === 1 ? "" : "s"} — ready to update`
             : `${newCorr} of ${minCorr} fresh correction${minCorr === 1 ? "" : "s"} — ${
                 newCorr === 0 ? "correct a meal" : "one more"
-              } to re-tune`}
+              } to update`}
         </p>
         <div className="lo-retune-action">
           <button
@@ -624,12 +624,12 @@ export function LearningObservability({
                 ? ""
                 : corrections === 0
                   ? "Correct a meal first"
-                  : "All corrections are already learned — make a new one to re-tune"
+                  : "All corrections are already learned — make a new one to update"
             }
           >
-            {retuning ? "re-tuning…" : "Re-tune"}
+            {retuning ? "updating…" : "Update"}
           </button>
-          <span className="lo-mode-seg" role="group" aria-label="Re-tune depth">
+          <span className="lo-mode-seg" role="group" aria-label="Update depth">
             <button
               type="button"
               className={"lo-mode-opt" + (mode === "quick" ? " on" : "")}
@@ -652,7 +652,7 @@ export function LearningObservability({
         </div>
         <p className="lo-mode-hint">
           {mode === "quick"
-            ? "Quick: a sample of standard foods — fast, good for demos."
+            ? "Quick: a sample of standard foods — fast."
             : "Full: the entire standard set — slower, best accuracy."}
         </p>
 
@@ -668,27 +668,27 @@ export function LearningObservability({
         {explain && (
           <div className="lo-explain">
             <p>
-              Re-tuning takes the corrections you gave on your logged meals and
-              folds them into the food-logging agent, so it estimates portions
+              Updating takes the corrections you gave on your logged meals and
+              folds them into DietTrace, so it estimates portions
               <i> your</i> way.
             </p>
             <p>
-              To make sure it adapts to you <b>without overfitting</b> — without
+              To make sure it adapts to you <b>without just memorizing your meals</b> — without
               getting worse at logging ordinary foods — it re-scores two sets and
-              ships the change only if both hold up:
+              applies the change only if both hold up:
             </p>
             <ul>
               <li>
                 <b>Fit to you</b> — the meals you confirmed, kept <i>out</i> of
-                learning so the test stays honest (your held-out ground truth).
+                learning so the test stays honest (your answer key).
               </li>
               <li>
                 <b>USDA accuracy</b> — a curated set of standard reference foods,
-                so general accuracy can&apos;t regress.
+                so general accuracy can&apos;t get worse.
               </li>
             </ul>
             <p>
-              Each row below is one meal&apos;s <b>calorie accuracy</b> — the agent{" "}
+              Each row below is one meal&apos;s <b>calorie accuracy</b> — DietTrace{" "}
               <b>before → after</b> tuning (100% = matches the known calories).{" "}
               <span className="lm-tag mono lm-set-fit">you</span> = a meal you
               confirmed · <span className="lm-tag mono lm-set-usda">usda</span> = a
@@ -696,9 +696,9 @@ export function LearningObservability({
               everyday foods hold.
             </p>
             <p>
-              <b>Quick</b> checks a sample of standard foods (fast — good for
-              demos); <b>Full</b> checks the whole set (slower — best accuracy,
-              the strongest guard against overfitting).
+              <b>Quick</b> checks a sample of standard foods (fast);{" "}
+              <b>Full</b> checks the whole set (slower — best accuracy,
+              the strongest guard against just memorizing your meals).
             </p>
           </div>
         )}
@@ -706,7 +706,7 @@ export function LearningObservability({
         {/* The live streaming view lives in the rail (always visible); here the
             modal just shows the ship verdict once the re-tune is done. */}
         {retuning && (
-          <p className="lo-mode-hint">Re-tuning live — watch it in the rail →</p>
+          <p className="lo-mode-hint">Updating live — watch it in the rail →</p>
         )}
         {result && !retuning && <RetuneResult result={result} />}
 
@@ -727,8 +727,8 @@ export function LearningObservability({
         {!retuning && !result && !block && (
           <p className="lo-empty">
             {ready
-              ? "Re-tune to turn your corrections into a rule the agent follows — it's only kept if your meals get more accurate."
-              : "Tell the agent what it got wrong on a meal, then re-tune to watch it learn."}
+              ? "Update to turn your corrections into a rule DietTrace follows — it's only kept if your meals get more accurate."
+              : "Tell DietTrace what it got wrong on a meal, then update to watch it learn."}
           </p>
         )}
       </section>
@@ -749,8 +749,8 @@ export function LearningObservability({
           )}
         </div>
         <p className="lo-hint">
-          Your goals &amp; eating style, in your words. The corrector reads this
-          when it tunes the agent — so what it learns fits who you are.
+          Your goals &amp; eating style, in your words. DietTrace reads this
+          when it tunes — so what it learns fits who you are.
         </p>
         {editingProfile ? (
           <div className="lo-context-edit-box">
@@ -789,7 +789,7 @@ export function LearningObservability({
           </blockquote>
         ) : (
           <p className="lo-empty">
-            No context yet. Add your goals &amp; eating style so the agent tunes
+            No context yet. Add your goals &amp; eating style so DietTrace tunes
             to you, not a generic average.
           </p>
         )}
@@ -800,14 +800,14 @@ export function LearningObservability({
         <div className="dash-card-head mono">your corrections</div>
         {feedback.length === 0 ? (
           <p className="lo-empty">
-            None yet. Tell the agent what it got wrong on any meal — your fixes
+            None yet. Tell DietTrace what it got wrong on any meal — your fixes
             land here.
           </p>
         ) : (
           <>
             <p className="lo-hint">
-              What you told the agent it got wrong. Star one to mark it important.
-              Re-tune only learns from <b>new</b> ones — those it&apos;s already
+              What you told DietTrace it got wrong. Star one to mark it important.
+              Update only learns from <b>new</b> ones — those it&apos;s already
               learned show <span className="lo-done-inline">✓ learned</span>.
             </p>
             <ul className="lo-corr-list">
@@ -817,7 +817,7 @@ export function LearningObservability({
                     <div className="lo-corr-meal">
                       {f.meal_text || "general note"}
                       {f.processed && (
-                        <span className="lo-corr-done mono" title="Already learned — a re-tune won't re-learn it">
+                        <span className="lo-corr-done mono" title="Already learned — an update won't re-learn it">
                           ✓ learned
                         </span>
                       )}
@@ -835,8 +835,8 @@ export function LearningObservability({
                       aria-label={f.weight > 1 ? "important (click to undo)" : "mark as important"}
                       title={
                         f.weight > 1
-                          ? "Marked important — the agent weights this more. Click to undo."
-                          : "Mark important — the agent weights this correction more"
+                          ? "Marked important — DietTrace weights this more. Click to undo."
+                          : "Mark important — DietTrace weights this correction more"
                       }
                       onClick={() => toggleEmphasis(f)}
                     >
@@ -869,12 +869,12 @@ export function LearningObservability({
           >
             {showData ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             <span className="dash-card-head mono">
-              your test set · {confirmations} meal{confirmations === 1 ? "" : "s"}
+              your answer key · {confirmations} meal{confirmations === 1 ? "" : "s"}
             </span>
           </button>
           <p className="lo-dataset-note">
             Meals you&apos;ve confirmed as right, synced to your Phoenix dataset over
-            MCP. Every re-tune is tested on these — but never learns from them — so
+            MCP. Every update is checked against these — but never learns from them — so
             the test stays honest.
           </p>
           {showData && (

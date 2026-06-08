@@ -10,9 +10,9 @@ import { Database, MessageSquare, RefreshCw } from "lucide-react";
 import type { SupervisorDecision } from "@/lib/api";
 
 const LABELS: Record<SupervisorDecision["op"], string> = {
-  bank_feedback: "Banked your feedback",
-  add_dataset_point: "Added to the held-out dataset",
-  retune: "Re-tuned",
+  bank_feedback: "Saved your feedback",
+  add_dataset_point: "Added to the answer key",
+  retune: "Updated",
 };
 
 function OpIcon({ op }: { op: SupervisorDecision["op"] }) {
@@ -118,7 +118,7 @@ export function AgentFeed({
           <div className="revent-head">
             <span className="revent-label">Thinking…</span>
           </div>
-          <div className="revent-reason">testing a new rule against your meals in Phoenix</div>
+          <div className="revent-reason">checking a new rule against your meals in Phoenix</div>
         </div>
       )}
       {GROUP_ORDER.map((g) =>

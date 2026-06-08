@@ -92,7 +92,7 @@ function MealRow({
   // tooltip says so and points at the fix.
   const confTitle =
     `${conf.level} confidence (${conf.pct}%) — DietTrace's automatic quality check: ` +
-    "how cleanly it resolved each food, the source, and calorie sanity. It does " +
+    "how cleanly it identified each food, the source, and calorie sanity. It does " +
     "not verify the portion, so if a gram weight looks off, just tell DietTrace " +
     "below in plain words and it'll fix it.";
 
@@ -153,16 +153,16 @@ function MealRow({
           {/* A dataset point keeps its confidence chip — the badge is an extra
               tag alongside it, not a replacement. */}
           {isDataset && (
-            <Tooltip label="A meal you confirmed — held out as ground truth to test the agent. It never sees this while learning; it's only scored against it.">
+            <Tooltip label="A meal you confirmed as right. DietTrace keeps it aside as an answer key — it can't peek at it while learning, only check itself against it afterward.">
               <span className="dataset-badge">
                 <span className="dataset-badge-dot" aria-hidden="true" />
-                dataset point
+                confirmed meal
               </span>
             </Tooltip>
           )}
-          {/* A meal you've corrected — its feedback feeds the next re-tune. */}
+          {/* A meal you've corrected — its feedback feeds the next update. */}
           {meal.has_feedback && (
-            <Tooltip label="You gave feedback on this meal. The corrector folds it into the agent's rule on the next re-tune.">
+            <Tooltip label="You gave feedback on this meal. DietTrace folds it into its rules the next time it updates.">
               <span className="feedback-badge">
                 <span className="feedback-badge-dot" aria-hidden="true" />
                 feedback
@@ -203,10 +203,10 @@ function MealRow({
         <div className="meal-detail">
           {isDataset && (
             <div className="dataset-explain">
-              <b>Held-out ground truth.</b> This is a meal you confirmed, at your
-              true intake. Every re-tune re-scores the agent against it to prove a
-              learned change actually fits you — but it’s never used to teach the
-              agent, so the test stays honest.
+              <b>Your confirmed answer key.</b> This is a meal you confirmed, at your
+              true intake. Every update re-checks DietTrace against it to prove a
+              learned change actually fits you — but it’s never used to teach
+              DietTrace, so the check stays honest.
             </div>
           )}
           {detail ? (
