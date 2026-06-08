@@ -1400,3 +1400,55 @@ body {
 .cb-note { grid-column: 1 / -1; font-size: 11px; color: var(--faint); margin-top: -2px; }
 .cb-avg { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted-ink); }
 .cb-avg b { font-family: var(--mono); color: var(--accent-ink); }
+
+/* ============================================================
+   Agent rail — live status + trace-timeline events + Phoenix MCP nodes
+   ============================================================ */
+.rail-status { display: flex; flex-direction: column; gap: 7px; }
+.rail-live { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600;
+  font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); }
+.rail-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); position: relative; }
+.rail-live-dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%;
+  background: var(--accent); opacity: .4; animation: rail-ping 1.8s cubic-bezier(0, 0, .2, 1) infinite; }
+@keyframes rail-ping { 0% { transform: scale(.6); opacity: .5; } 80%, 100% { transform: scale(2); opacity: 0; } }
+.rail-state { font-size: 12.5px; color: var(--muted-ink); }
+.rail-state b { color: var(--ink); font-weight: 500; }
+.rail-state .dots { display: inline-flex; gap: 2px; margin-left: 4px; }
+.rail-state .dots i { width: 3px; height: 3px; border-radius: 50%; background: var(--accent);
+  display: inline-block; animation: rail-blink 1.4s infinite both; }
+.rail-state .dots i:nth-child(2) { animation-delay: .2s; }
+.rail-state .dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes rail-blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+/* event groups */
+.rail-group { margin-top: 14px; }
+.rail-group-lab { font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--faint); margin-bottom: 6px; padding-left: 24px; }
+
+/* a rail event as a trace node (the dotted-spine motif) */
+.revent { position: relative; padding: 9px 0 9px 24px; }
+.revent::before { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 1.5px;
+  background: repeating-linear-gradient(var(--line-strong) 0 3px, transparent 3px 7px); }
+.revent:first-child::before { top: 14px; }
+.revent:last-child::before { bottom: auto; height: 14px; }
+.revent-dot { position: absolute; left: 0; top: 12px; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--rail-bg); border: 2px solid var(--faint); box-sizing: border-box; z-index: 1;
+  display: flex; align-items: center; justify-content: center; }
+.revent-dot.accent { border-color: var(--accent); }
+.revent-dot.amber { border-color: var(--amber); }
+.revent-dot.phoenix { border-color: var(--macro-carb); }
+.revent-ic { width: 13px; height: 13px; }
+.revent-head { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 8px; }
+.revent-label { font-size: 13px; font-weight: 600; font-family: var(--serif); color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.revent-time { font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.revent-meal { font-size: 12px; color: var(--ink); margin-top: 2px; }
+.revent-reason { font-size: 12px; color: var(--muted-ink); line-height: 1.45; margin-top: 2px; }
+
+/* Phoenix MCP node: blue tag + code line */
+.phoenix-line { display: flex; align-items: center; gap: 8px; margin-top: 7px; flex-wrap: wrap; }
+.phoenix-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 100px;
+  background: rgba(91, 124, 158, .10); font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em;
+  color: #4A6781; font-weight: 600; white-space: nowrap; flex: none; }
+.phoenix-tag .pdot { width: 5px; height: 5px; border-radius: 50%; background: var(--macro-carb); }
+.phoenix-code { font-family: var(--mono); font-size: 10.5px; color: var(--macro-carb); letter-spacing: .01em; }

@@ -44,10 +44,16 @@ export function MealReview({
           op: "add_dataset_point",
           reason: "you confirmed it — added to your held-out dataset",
           mealText,
+          phoenix: "wrote 1 point to your Phoenix dataset",
         });
         // Growing the held-out set can tip the supervisor into a retune.
         if (res?.supervisor?.op === "retune") {
-          onAgentEvent?.({ op: "retune", reason: res.supervisor.reason, mealText });
+          onAgentEvent?.({
+            op: "retune",
+            reason: res.supervisor.reason,
+            mealText,
+            phoenix: res.supervisor.phoenix,
+          });
         }
       })
       .catch(() => {})
@@ -132,7 +138,12 @@ export function MealReview({
             // Feedback is the primary retune trigger — if this correction tipped
             // the supervisor over, run the gated eval now.
             if (res.supervisor?.op === "retune") {
-              onAgentEvent?.({ op: "retune", reason: res.supervisor.reason, mealText });
+              onAgentEvent?.({
+            op: "retune",
+            reason: res.supervisor.reason,
+            mealText,
+            phoenix: res.supervisor.phoenix,
+          });
             }
           }}
         />

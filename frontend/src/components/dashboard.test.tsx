@@ -29,7 +29,7 @@ beforeEach(() => {
 describe("Dashboard", () => {
   it("renders the agent-activity rail with a state button", () => {
     render(<Dashboard reloadSignal={0} />);
-    expect(screen.getByText(/agent activity/i)).toBeInTheDocument();
+    expect(screen.getByText(/watching your log/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /agent state/i }),
     ).toBeInTheDocument();

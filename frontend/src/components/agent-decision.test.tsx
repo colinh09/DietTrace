@@ -42,8 +42,8 @@ describe("AgentFeed", () => {
         ]}
       />,
     );
-    const feed = screen.getByRole("list");
-    expect(feed.querySelectorAll("li")).toHaveLength(2);
+    const feed = screen.getByLabelText("Agent activity");
+    expect(feed.querySelectorAll(".revent")).toHaveLength(2);
     expect(screen.getByText("an apple")).toBeInTheDocument();
     expect(screen.getByText(/re-tuned/i)).toBeInTheDocument();
     expect(screen.getByText("two eggs")).toBeInTheDocument();

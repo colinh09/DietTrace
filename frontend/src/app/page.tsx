@@ -257,7 +257,12 @@ export default function Home() {
   // "retune" decision (feedback is the primary trigger) instead runs the gated
   // eval, exactly like a /log decision — its outcome lands in the feed via the panel.
   const pushAgentEvent = useCallback(
-    (e: { op: AgentEvent["op"]; reason: string; mealText?: string }) => {
+    (e: {
+      op: AgentEvent["op"];
+      reason: string;
+      mealText?: string;
+      phoenix?: string | null;
+    }) => {
       if (e.op === "retune") {
         setRetuneSignal((n) => n + 1);
         return;

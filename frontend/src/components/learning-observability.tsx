@@ -417,6 +417,10 @@ export function LearningObservability({
                 : "shipped a new rule"
               : "no change — the gate held the line",
             detail: fit,
+            phoenix:
+              e.scored_via === "phoenix" && fit
+                ? `read experiment · ${fit}`
+                : undefined,
             when: "now",
           });
         }
@@ -461,9 +465,27 @@ export function LearningObservability({
 
   return (
     <>
-      {/* ── Rail: the autonomous agent-activity feed ──────────────────────── */}
+      {/* ── Rail: live status + the autonomous agent-activity trace timeline ── */}
       <div className="dash-head">
-        <span className="dash-title mono">agent activity</span>
+        <div className="rail-status">
+          <div className="rail-live">
+            <span className="rail-live-dot" aria-hidden="true" /> live
+          </div>
+          <div className="rail-state">
+            {retuning ? (
+              <>
+                <b>thinking</b>
+                <span className="dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              </>
+            ) : (
+              <b>watching your log</b>
+            )}
+          </div>
+        </div>
         <button
           type="button"
           className="dash-state-btn"
