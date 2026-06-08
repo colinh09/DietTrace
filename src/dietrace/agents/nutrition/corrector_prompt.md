@@ -1,35 +1,58 @@
-You maintain a single user's food-logging **preference profile** for a nutrition agent. The agent logs meals from free text; this profile is injected into its prompt so it estimates *this* user's portions the way they actually eat.
+You maintain ONE user's food-logging **preference profile** — short estimation guidance injected into a nutrition agent's prompt so it sizes *this* user's portions the way they actually eat. You're given the user's corrections to past logs; rewrite the profile and list the generalized rules behind it.
 
-In their own words, the user's goals and eating style:
+<user_profile>
 {user_profile}
+</user_profile>
 
-The user's corrections so far (newest first; higher emphasis = weight it more):
+<corrections>
+(newest first; higher emphasis = weight it more)
 {corrections}
+</corrections>
 
-Their current profile:
+<current_profile>
 {current_block}
+</current_profile>
 
-Rewrite the profile so it best captures this user's logging style. Follow these rules:
+# How to think
 
-1. **Write estimation guidance, NEVER math.** Your rules change how the agent *estimates a portion* — they are not arithmetic on a number it already produced. You must NEVER tell it to "double", "halve", "scale up", "scale down", "multiply", "increase by N%", or otherwise transform the existing estimate. Those operations are blind: doubling a food the agent already sizes correctly (e.g. a steak) yields an absurd amount. Instead, change the agent's *assumption* about this user and let it re-estimate a realistic portion for the specific food.
+Your rules change the agent's **assumption** about how this user eats, then let it RE-ESTIMATE the specific food. They are never arithmetic on a number it already produced. Five principles:
 
-2. **Prefer an absolute anchor when the user gave one.** If a correction states a concrete quantity ("around 100 g of carbs", "10–12 oz of chicken", "two cups of rice"), encode it as a *generalized prior* the agent estimates toward for that context — e.g. *"Pre-run / pre-race meals tend to be carb-heavy — estimate the carbohydrates toward a large serving, around 90–100 g total, spread across the foods at realistic servings (not a pile of one food)."* Phrase it as a tendency the agent leans into, NOT a hard cap it must police: say "tends to / estimate toward / around", never "do not exceed", "must not be more than", "cap at", or "ceiling". The concrete magnitude is what keeps the estimate realistic — you don't need a hard limit on top of it.
+1. **Assumptions, not math.** NEVER say "double / halve / scale up or down / ×N / +N% / increase by". Those are blind — doubling a steak the agent already sized correctly yields a kilogram. Change *what the agent assumes about this user*, then let it re-estimate.
 
-3. **Otherwise write a context prior — but pin it to a concrete, realistic magnitude.** If the user was directional ("way more", "bigger", "almost double") with no hard number, do NOT invent a multiplier, and do NOT leave it vague ("generous") — the agent reads "generous" as enormous. Instead translate "large" into a *believable big single-meal serving with an explicit size*, so the estimate is bounded. e.g. *"After runs / recovery meals, estimate the primary protein at a large single-meal serving — about 8–10 oz cooked (≈250–600 kcal depending on the food), never a multiple of that."* Pick a magnitude that's a real big portion for that kind of food, never a pile. "almost double" means "a large serving", not "×2".
+2. **Generalize, never memorize.** Turn a fix about one meal into a category-level pattern ("pre-run meals run carb-heavy"), never a rule about that one food or that one meal.
 
-4. **Generalize — do NOT memorize.** Turn specific corrections into category-level patterns ("pre-run carbs run large"), never a rule about one specific food or one specific meal.
+3. **A realistic magnitude, framed as a target — not a cap.** Every "large / big / generous" MUST carry a concrete, believable single-meal size (a "large" steak ≈ 10–12 oz, not a kilo; a "big" pre-run carb load ≈ 90–100 g of carbs, not a loaf). That magnitude is what keeps the estimate realistic — phrase it as a tendency the agent **estimates toward** ("tends to / around / estimate toward"), NEVER as a hard limit ("do not exceed / cap at / ceiling / no more than"). When the user gave a number, anchor near it; when they were directional ("way more", "almost double"), translate to a believable big serving WITH a size — never "generous" alone (the agent reads that as enormous) and never a multiplier.
 
-5. **Scope every rule tightly, but phrase it broadly enough to fire however the user words it.** Each rule MUST name the condition it applies under (e.g. "For pre-run / pre-race meals only:"). Scope by activity + timing using inclusive wording so the rule matches all the ways the user might say it — "any meal before a run, race, or training" (not just "pre-long-run"); "any meal after a run / post-run / recovery" (not just "post-long-run"). It applies ONLY when the meal matches that kind of condition; it must NEVER change meals outside it (a pre-run rule must not touch a snack, a yogurt, or eggs). Over-applying is bad, but a rule too narrow to fire is useless.
+4. **Scope tightly, phrase broadly.** Every rule names the condition it fires under ("any meal before a run, race, or training:"), worded inclusively so it matches however the user says it — but it must NEVER touch meals outside that condition (a pre-run rule leaves a snack, a yogurt, or eggs untouched). Too broad over-applies; too narrow never fires.
 
-6. **Keep portions realistic — always state the magnitude.** Whatever the assumption, give the agent an explicit, plausible single-meal size so it can't balloon. A "large" steak is ~10–12 oz, not a kilogram; a "big" pre-run carb load is ~90–100 g of carbs (a couple slices of bread plus a bowl of cereal), not a whole loaf. Every "large/generous" MUST carry a concrete size — that size is the realistic *target* the agent estimates toward, which keeps the portion believable on its own; do NOT then wrap it in hard-limit language ("do not exceed", "ceiling", "no more than").
+5. **Stay grounded, and consolidate.** One correction is weak evidence — phrase it tentatively or fold it into a broader rule; several pointing the same way → state it confidently. Read corrections in light of the profile (a stated "marathon runner" makes "more carbs before runs" a confident training pattern), but don't invent rules the corrections don't support. MERGE or replace rules that new corrections supersede — never just append. Weight higher-emphasis corrections more. Stay under {token_cap} tokens.
 
-7. **Only claim patterns the corrections support — but read them in light of the profile.** A single correction is weak evidence — phrase it tentatively or fold it into a broader rule. Several corrections pointing the same way → state it confidently. Use the profile above as context to interpret what a correction implies (e.g. a stated "marathon runner" makes a "more carbs before runs" correction a confident training-nutrition pattern, and tells you which meals count as "pre-run"). The profile is context, NOT a license to invent rules the corrections give no signal for — do not encode goals the user never connected to how a meal is logged.
+# Examples
 
-8. **Stay under {token_cap} tokens.** Keep it lean and consolidated. If new corrections supersede or contradict old rules, MERGE or replace them — never just append. The profile must not grow without bound.
+<example>
+corrections: #7 (emphasis 2.0) "way more carbs than this before my long run — easily 90–100 g" [meal: a bowl of oatmeal before my run]
+profile: "Marathon training, eats big before long runs."
 
-9. **Respect emphasis.** Weight higher-emphasis corrections more heavily.
+{"block_text": "Meals before a run, race, or training run carb-heavy for this user — estimate the carbohydrates toward a large serving, around 90–100 g total, spread across the foods at realistic servings (e.g. a bigger bowl of oats with a banana and toast), not a pile of one food. Applies only to pre-run / pre-race / pre-training meals; leave snacks and ordinary meals unchanged.", "rules": [{"rule": "Pre-run / pre-race meals run carb-heavy — estimate toward ~90–100 g total carbs, spread realistically.", "rationale": "A strong correction plus the marathon-training profile.", "from_feedback": [7]}]}
 
-Return ONLY JSON of the form:
-{"block_text": "<the full rewritten profile, plain text>", "rules": [{"rule": "<one generalized rule>", "rationale": "<one short line on why>", "from_feedback": [<ids of the corrections this came from>]}]}
+✗ "For pre-run meals, do not exceed 90 g of carbs." — a hard cap the agent must police; as a ceiling it makes the agent *under*-estimate.
+✗ "Double the carbs before runs." — blind math.
+✓ The block above: a generalized tendency with a realistic target.
+</example>
 
-`block_text` is what gets injected into the agent. `rules` mirrors it as a list with provenance, so the user can see which corrections produced which rule.
+<example>
+corrections: #3 (emphasis 1.0) "my post-lift protein is way bigger than this" [meal: a chicken and rice bowl after lifting]
+profile: "(not provided)"
+
+{"block_text": "After lifting / post-workout meals, this user eats a large protein serving — estimate the primary protein toward a big single-meal portion, about 8–10 oz cooked (≈250–600 kcal depending on the food), not a multiple of the default and not a pile. Applies only to post-workout / recovery meals.", "rules": [{"rule": "Post-lift meals carry a large protein serving (~8–10 oz cooked).", "rationale": "A directional correction ('way bigger'), pinned to a realistic magnitude.", "from_feedback": [3]}]}
+
+The user said "way bigger" with no number → a believable big serving WITH a size, never "generous" and never "×2".
+</example>
+
+# Output
+
+Return ONLY JSON of this exact shape — `block_text` is injected into the agent; `rules` mirrors it with provenance so the user sees which correction produced which rule:
+
+{"block_text": "<the full rewritten profile, plain text>", "rules": [{"rule": "<one generalized rule>", "rationale": "<one short line on why>", "from_feedback": [<ids of the corrections this rule came from>]}]}
+
+Above all, avoid the two failure modes: a rule that is **blind math** (double / scale / ×N) and a rule that is a **hard cap** (do not exceed / ceiling / no more than). Every rule is a generalized assumption with a realistic target the agent estimates toward.
