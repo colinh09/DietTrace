@@ -60,6 +60,17 @@ export interface AgentEvent extends SupervisorDecision {
   // event so "See your experiment results" survives a reload (persisted with the
   // feed). See memory: diettrace-ui-must-persist-on-reload.
   experiment?: { rows: ExperimentRow[]; experimentUrl?: string };
+  // For a retune (Updated) event: the before→after calorie-estimate accuracy on
+  // BOTH sets, so the feed shows a clear "Accuracy recap" (Your Dataset + USDA)
+  // instead of one raw number. `shipped` distinguishes an applied update from a
+  // rejected one. Fractions 0–1.
+  recap?: {
+    shipped: boolean;
+    fitBefore: number;
+    fitAfter: number;
+    usdaBefore: number;
+    usdaAfter: number;
+  };
 }
 
 // A callback to push a new activity into the feed (the id + timing are stamped by
@@ -99,6 +110,53 @@ function groupOf(e: AgentEvent, now: number): Group {
   const midnight = new Date(now);
   midnight.setHours(0, 0, 0, 0);
   return e.ts >= midnight.getTime() ? "Earlier" : "Yesterday";
+}
+
+// A fraction (0–1) as a whole percent; "—" when missing.
+function fmtPct(v: number | null | undefined): string {
+  return v == null ? "—" : `${Math.round(v * 100)}%`;
+}
+
+// The feed headline. A retune reads as a full sentence keyed off whether the
+// update actually shipped, instead of the bare "Updated".
+function headlineOf(e: AgentEvent): string {
+  if (e.op === "retune" && e.recap) {
+    return e.recap.shipped
+      ? "Your dataset has been updated"
+      : "No update — accuracy didn't improve";
+  }
+  return LABELS[e.op];
+}
+
+// The before→after "Accuracy recap" under a retune event — Your Dataset (should
+// improve) and USDA / everyday (must hold its floor), with a one-line gloss on
+// what the percentage actually measures.
+function RetuneRecap({ recap }: { recap: NonNullable<AgentEvent["recap"]> }) {
+  const fitUp = recap.fitAfter > recap.fitBefore;
+  const usdaHeld = recap.usdaAfter >= recap.usdaBefore - 0.05;
+  return (
+    <div className="retune-recap">
+      <div className="rr-title">Accuracy recap</div>
+      <div className="rr-row">
+        <span className="rr-set">Your dataset</span>
+        <span className="rr-delta tnum">
+          {fmtPct(recap.fitBefore)} <span className="rr-arrow">→</span>{" "}
+          <b className={fitUp ? "up" : ""}>{fmtPct(recap.fitAfter)}</b>
+        </span>
+      </div>
+      <div className="rr-row">
+        <span className="rr-set">USDA / everyday</span>
+        <span className="rr-delta tnum">
+          {fmtPct(recap.usdaBefore)} <span className="rr-arrow">→</span>{" "}
+          <b>{fmtPct(recap.usdaAfter)}</b>
+          {usdaHeld && <span className="rr-held"> · held its floor</span>}
+        </span>
+      </div>
+      <div className="rr-note">
+        Accuracy = how close DietTrace&apos;s calorie estimates landed for those meals.
+      </div>
+    </div>
+  );
 }
 
 // The agent-observability feed: the supervisor's decisions as a vertical TRACE
@@ -160,7 +218,7 @@ export function AgentFeed({
                       <OpIcon op={e.op} />
                     </span>
                     <div className="revent-head">
-                      <span className="revent-label">{LABELS[e.op]}</span>
+                      <span className="revent-label">{headlineOf(e)}</span>
                       {(e.ts != null || e.when) && (
                         <span className="revent-time">
                           {e.ts != null ? relTime(e.ts, now) : e.when}
@@ -169,6 +227,7 @@ export function AgentFeed({
                     </div>
                     {e.mealText && <div className="revent-meal">{e.mealText}</div>}
                     {e.reason && <div className="revent-reason">{e.reason}</div>}
+                    {e.op === "retune" && e.recap && <RetuneRecap recap={e.recap} />}
                     {e.detail && <div className="revent-reason mono">{e.detail}</div>}
                     {e.phoenix && (
                       <div className="phoenix-line">

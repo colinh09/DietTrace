@@ -459,11 +459,19 @@ export function LearningObservability({
       } else if (e.type === "done") {
         setResult(e);
         if (e.ok) {
-          const fit =
-            e.current && e.proposed
-              ? `your-meal accuracy ${pct(e.current.fit)} → ${pct(e.proposed.fit)}`
-              : undefined;
           const rule = e.rules?.[0]?.rule;
+          // Both-set before→after, so the feed renders a full "Accuracy recap"
+          // (Your Dataset + USDA), not one raw fit number.
+          const recap =
+            e.current && e.proposed
+              ? {
+                  shipped: Boolean(e.shipped),
+                  fitBefore: e.current.fit,
+                  fitAfter: e.proposed.fit,
+                  usdaBefore: e.current.usda,
+                  usdaAfter: e.proposed.usda,
+                }
+              : undefined;
           onRetuneComplete?.(
             {
               id: `retune-${Date.now()}`,
@@ -472,12 +480,10 @@ export function LearningObservability({
               reason: e.shipped
                 ? (rule ?? "a new rule is now in effect")
                 : "no change — it wasn't more accurate",
-              detail: fit,
-              phoenix:
-                e.scored_via === "phoenix" && fit
-                  ? `read experiment · ${fit}`
-                  : undefined,
+              // The recap replaces the old raw "your-meal accuracy 61% → 86%" line.
+              phoenix: e.scored_via === "phoenix" ? "read experiment" : undefined,
               when: "now",
+              recap,
               // Persist the per-meal results ON the event so they survive a reload.
               experiment:
                 e.scored_via === "phoenix"

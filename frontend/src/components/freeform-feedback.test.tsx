@@ -90,8 +90,10 @@ describe("FreeformFeedback", () => {
     await waitFor(() => {
       expect(screen.getByText(/DietTrace learned/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/a rule saved/i)).toBeInTheDocument();
-    expect(screen.getByText(/applies to future meals/i)).toBeInTheDocument();
+    expect(screen.getByText(/test rationale/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/standing rule — DietTrace applies it to your future meals/i),
+    ).toBeInTheDocument();
   });
 
   it("shows an error message when the API call fails", async () => {

@@ -30,7 +30,7 @@ function learnedLabel(result: FreeformFeedbackResult): string {
     case "add_item":
       return `added ${result.target_food}${result.adjustment != null ? ` (${Math.round(result.adjustment)} g)` : ""}`;
     case "standing_rule":
-      return `a rule saved: ${result.rationale || result.target_food}`;
+      return result.rationale || result.target_food || "";
     default:
       return result.rationale || String(result.kind ?? "");
   }
@@ -117,7 +117,8 @@ export function FreeformFeedback({
               so it's clear how feedback becomes ground truth the agent re-tests on. */}
           {result.kind === "standing_rule" ? (
             <span className="freeform-pref-note">
-              saved as a rule — applies to future meals
+              Saved as a standing rule — DietTrace applies it to your future meals
+              right away.
             </span>
           ) : (
             <>

@@ -49,6 +49,58 @@ describe("AgentFeed", () => {
     expect(screen.getByText("two eggs")).toBeInTheDocument();
   });
 
+  it("shows an Accuracy recap (both sets) and a full-sentence headline on a shipped retune", () => {
+    render(
+      <AgentFeed
+        events={[
+          {
+            id: 9,
+            op: "retune",
+            reason: "Pre-run meals run carb-heavy",
+            recap: {
+              shipped: true,
+              fitBefore: 0.61,
+              fitAfter: 0.86,
+              usdaBefore: 1,
+              usdaAfter: 1,
+            },
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Your dataset has been updated")).toBeInTheDocument();
+    expect(screen.getByText("Accuracy recap")).toBeInTheDocument();
+    expect(screen.getByText("Your dataset")).toBeInTheDocument();
+    expect(screen.getByText("USDA / everyday")).toBeInTheDocument();
+    expect(screen.getByText("61%")).toBeInTheDocument();
+    expect(screen.getByText("86%")).toBeInTheDocument();
+    expect(screen.getByText(/calorie estimates landed/i)).toBeInTheDocument();
+  });
+
+  it("headlines a rejected retune as 'no update'", () => {
+    render(
+      <AgentFeed
+        events={[
+          {
+            id: 10,
+            op: "retune",
+            reason: "no change — it wasn't more accurate",
+            recap: {
+              shipped: false,
+              fitBefore: 0.7,
+              fitAfter: 0.7,
+              usdaBefore: 1,
+              usdaAfter: 1,
+            },
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByText(/no update — accuracy didn't improve/i),
+    ).toBeInTheDocument();
+  });
+
   it("renders nothing when there are no events", () => {
     const { container } = render(<AgentFeed events={[]} />);
     expect(container).toBeEmptyDOMElement();
