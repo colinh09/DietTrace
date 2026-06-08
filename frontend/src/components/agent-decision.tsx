@@ -128,42 +128,39 @@ function headlineOf(e: AgentEvent): string {
   return LABELS[e.op];
 }
 
-// The before→after "Accuracy recap" under a retune event — Your Dataset (should
-// improve) and USDA / everyday (must hold its floor), with a one-line gloss on
-// what the percentage actually measures.
+// One before→after cell: 62% → 89%, the "after" bolded (green when it went up).
+function Delta({ before, after }: { before: number; after: number }) {
+  return (
+    <span className="rr-mid tnum">
+      {fmtPct(before)} <span className="rr-arrow">→</span>{" "}
+      <b className={after > before ? "up" : ""}>{fmtPct(after)}</b>
+    </span>
+  );
+}
+
+// The "Accuracy" recap under a retune event as a tight 3-column grid: set ·
+// before→after · a short status tag (↑ improved / ✓ held the floor). The fuller
+// "what accuracy means" gloss lives under the experiment-results panel below.
 function RetuneRecap({ recap }: { recap: NonNullable<AgentEvent["recap"]> }) {
   const fitUp = recap.fitAfter > recap.fitBefore;
   const usdaHeld = recap.usdaAfter >= recap.usdaBefore - 0.05;
   return (
     <div className="retune-recap">
-      <div className="rr-title">Accuracy recap</div>
-      <div className="rr-item">
-        <div className="rr-row">
-          <span className="rr-set">Your dataset</span>
-          <span className="rr-delta tnum">
-            {fmtPct(recap.fitBefore)} <span className="rr-arrow">→</span>{" "}
-            <b className={fitUp ? "up" : ""}>{fmtPct(recap.fitAfter)}</b>
-          </span>
-        </div>
-        <div className="rr-sub">
-          {fitUp
-            ? "More accurately estimated calories for the foods you've logged."
-            : "No change to how it estimates the foods you've logged."}
-        </div>
+      <div className="rr-head">
+        <span className="rr-title">Accuracy</span>
+        <span className="rr-gloss">· 100% = a perfect estimate</span>
       </div>
-      <div className="rr-item">
-        <div className="rr-row">
-          <span className="rr-set">USDA</span>
-          <span className="rr-delta tnum">
-            {fmtPct(recap.usdaBefore)} <span className="rr-arrow">→</span>{" "}
-            <b>{fmtPct(recap.usdaAfter)}</b>
-          </span>
-        </div>
-        <div className="rr-sub">
-          {usdaHeld
-            ? "Stayed accurate on standard foods — didn't drop below the floor."
-            : "Dropped below the floor on standard foods."}
-        </div>
+      <div className="rr-grid">
+        <span className="rr-set">Your dataset</span>
+        <Delta before={recap.fitBefore} after={recap.fitAfter} />
+        <span className={"rr-tag" + (fitUp ? " up" : "")}>
+          {fitUp ? "↑ improved" : "— no change"}
+        </span>
+        <span className="rr-set">USDA</span>
+        <Delta before={recap.usdaBefore} after={recap.usdaAfter} />
+        <span className={"rr-tag" + (usdaHeld ? " held" : " bad")}>
+          {usdaHeld ? "✓ held the floor" : "✗ dropped below"}
+        </span>
       </div>
     </div>
   );

@@ -1465,17 +1465,21 @@ body {
 /* A bold section header inside a feed event (e.g. "Agent recap" above the rule) */
 .revent-section { font-size: 12px; font-weight: 600; color: var(--ink); margin: 7px 0 2px; }
 
-/* A retune's "Accuracy recap": Your Dataset + USDA before→after, on a tinted card */
+/* A retune's "Accuracy" recap: a tight 3-col grid — set · before→after · status tag */
 .retune-recap { margin: 9px 0 4px; padding: 10px 12px; background: var(--rail-bg); border-radius: 9px; }
-.rr-title { font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
-.rr-item { padding: 3px 0; }
-.rr-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.rr-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; }
+.rr-title { font-size: 12px; font-weight: 600; color: var(--ink); }
+.rr-gloss { font-size: 11px; color: var(--faint); }
+.rr-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 5px 18px; align-items: baseline; }
 .rr-set { font-size: 12.5px; color: var(--muted-ink); }
-.rr-delta { font-size: 12.5px; color: var(--muted-ink); }
-.rr-delta b { color: var(--ink); font-weight: 600; }
-.rr-delta b.up { color: var(--accent-ink); }
+.rr-mid { font-size: 12.5px; color: var(--muted-ink); white-space: nowrap; }
+.rr-mid b { color: var(--ink); font-weight: 600; }
+.rr-mid b.up { color: var(--accent-ink); }
 .rr-arrow { color: var(--faint); padding: 0 1px; }
-.rr-sub { font-size: 11px; font-style: italic; color: var(--faint); line-height: 1.4; margin-top: 1px; }
+.rr-tag { font-size: 11.5px; color: var(--faint); white-space: nowrap; }
+.rr-tag.up { color: var(--accent-ink); }
+.rr-tag.held { color: var(--muted-ink); }
+.rr-tag.bad { color: var(--danger-ink); }
 
 /* Phoenix MCP node: blue tag + code line */
 .phoenix-line { display: flex; align-items: center; gap: 8px; margin-top: 7px; flex-wrap: wrap; }

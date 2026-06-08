@@ -310,7 +310,7 @@ function ExperimentResults({
           </p>
           <p className="exp-results-accuracy">
             <b>Accuracy</b> = how close DietTrace&apos;s calorie estimate was for each
-            meal (100% = exact).
+            meal.
           </p>
           <div className="rt-panels">
             <ScorePanel

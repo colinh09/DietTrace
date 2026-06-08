@@ -70,15 +70,15 @@ describe("AgentFeed", () => {
     );
     expect(screen.getByText("Your dataset has been updated")).toBeInTheDocument();
     expect(screen.getByText("Agent recap")).toBeInTheDocument();
-    expect(screen.getByText("Accuracy recap")).toBeInTheDocument();
+    expect(screen.getByText("Accuracy")).toBeInTheDocument();
     expect(screen.getByText("Your dataset")).toBeInTheDocument();
     expect(screen.getByText("USDA")).toBeInTheDocument();
     expect(screen.getByText("61%")).toBeInTheDocument();
     expect(screen.getByText("86%")).toBeInTheDocument();
-    expect(
-      screen.getByText(/more accurately estimated calories/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/didn't drop below the floor/i)).toBeInTheDocument();
+    // The verbose captions are now short status tags.
+    expect(screen.getByText(/improved/)).toBeInTheDocument();
+    expect(screen.getByText(/held the floor/)).toBeInTheDocument();
+    expect(screen.getByText(/perfect estimate/)).toBeInTheDocument();
   });
 
   it("headlines a rejected retune as 'no update'", () => {
