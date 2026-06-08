@@ -112,6 +112,10 @@ export interface LogResponse {
 export interface SupervisorDecision {
   op: "bank_feedback" | "add_dataset_point" | "retune";
   reason: string;
+  // A short Phoenix-MCP direction + summary for the observability rail:
+  // an add_dataset_point wrote one held-out point; a retune read experiment results.
+  // Null/absent for bank_feedback (local-only, no MCP round-trip).
+  phoenix?: string | null;
 }
 
 // A persisted meal as stored by `dietrace.web.store.MealLogStore`. The breakdown

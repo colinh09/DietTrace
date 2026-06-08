@@ -181,6 +181,8 @@ def test_feedback_triggers_the_supervisor_decision(tmp_path) -> None:
     assert res["ok"] is True
     # 2 prior + this one = 3 corrections, 4 held-out points → enough signal → retune.
     assert res["supervisor"]["op"] == "retune"
+    # The retune op carries its Phoenix-MCP detail (reads experiment results back).
+    assert "read experiment" in res["supervisor"]["phoenix"]
 
 
 def test_confirm_returns_the_supervisor_decision(tmp_path) -> None:
@@ -198,6 +200,7 @@ def test_confirm_returns_the_supervisor_decision(tmp_path) -> None:
     ).json()
     # The confirm makes it 4 held-out points; with 3 corrections, that's enough → retune.
     assert res["supervisor"]["op"] == "retune"
+    assert "read experiment" in res["supervisor"]["phoenix"]
 
 
 def test_retune_scores_fit_via_phoenix_when_scorer_provided(tmp_path) -> None:

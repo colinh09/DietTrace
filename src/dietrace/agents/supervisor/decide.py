@@ -31,13 +31,34 @@ class DecisionSignals:
     meal_confidence: float = 1.0
 
 
+def phoenix_detail(op: str) -> str | None:
+    """A short Phoenix-MCP direction + summary for the observability rail.
+
+    Names what an op does over the Phoenix MCP server so the rail can show it:
+    adding a held-out point writes one example to the user's dataset; a retune
+    reads the experiment results back. ``bank_feedback`` is local-only (no MCP
+    round-trip), so it carries no detail.
+    """
+    if op == OP_ADD_DATASET_POINT:
+        return "wrote 1 point to your Phoenix dataset"
+    if op == OP_RETUNE:
+        return "read experiment · held-out fit"
+    return None
+
+
 @dataclass(frozen=True)
 class Decision:
     op: str
     reason: str
+    # The Phoenix-MCP detail for the rail; auto-derived from ``op`` when not given.
+    phoenix: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.phoenix is None:
+            object.__setattr__(self, "phoenix", phoenix_detail(self.op))
 
     def as_dict(self) -> dict[str, Any]:
-        return {"op": self.op, "reason": self.reason}
+        return {"op": self.op, "reason": self.reason, "phoenix": self.phoenix}
 
 
 def decide(signals: DecisionSignals, config: SupervisorConfig) -> Decision:

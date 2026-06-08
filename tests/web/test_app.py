@@ -709,6 +709,9 @@ def test_log_response_carries_supervisor_decision(tmp_path) -> None:
     assert "supervisor" in res
     assert res["supervisor"]["op"] == "add_dataset_point"
     assert res["supervisor"]["reason"]
+    # The Phoenix-MCP detail for the rail: adding a held-out point writes one
+    # example to the user's dataset.
+    assert res["supervisor"]["phoenix"] == "wrote 1 point to your Phoenix dataset"
 
 
 def test_feedback_records_and_pushes_a_correction_to_arize(tmp_path) -> None:

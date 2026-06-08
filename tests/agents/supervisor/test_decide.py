@@ -157,6 +157,31 @@ def test_llm_prompt_guides_with_heuristics_and_canonical_examples() -> None:
     assert "new_feedback=3" in prompt and "dataset_points=4" in prompt
 
 
+def test_decision_carries_phoenix_mcp_detail_per_op() -> None:
+    """Each decision carries a short Phoenix-MCP direction + summary for the rail
+   : a dataset-point write, a retune's experiment read, none for a
+    local bank. Additive — the existing op/reason are untouched."""
+    from dietrace.agents.supervisor.decide import phoenix_detail
+
+    assert phoenix_detail(OP_ADD_DATASET_POINT) == "wrote 1 point to your Phoenix dataset"
+    assert "read experiment" in phoenix_detail(OP_RETUNE)
+    assert phoenix_detail(OP_BANK_FEEDBACK) is None
+
+    # Auto-derived on the Decision and exposed through as_dict (additive key).
+    point = decide(DecisionSignals(new_feedback=1, dataset_points=1), _CFG)
+    assert point.op == OP_ADD_DATASET_POINT
+    assert point.phoenix == "wrote 1 point to your Phoenix dataset"
+    assert point.as_dict()["phoenix"] == "wrote 1 point to your Phoenix dataset"
+    assert point.as_dict()["op"] == OP_ADD_DATASET_POINT  # existing fields intact
+
+    retune = decide(DecisionSignals(new_feedback=2, dataset_points=3), _CFG)
+    assert retune.op == OP_RETUNE
+    assert "read experiment" in retune.as_dict()["phoenix"]
+
+    bank = decide(DecisionSignals(was_corrected=True), _CFG)
+    assert bank.as_dict()["phoenix"] is None
+
+
 def test_gather_signals_reads_store_counts() -> None:
     sig = gather_signals(
         _FakeFblog(4), _FakeConfirms(7), "alice", runs_today=2, meal_confidence=0.8
