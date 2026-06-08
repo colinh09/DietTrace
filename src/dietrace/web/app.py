@@ -1776,7 +1776,7 @@ def create_app(
                     if phoenix_fit_scorer is not None and fit_cases:
                         q.put({"type": "phase", "phase": "fit", "n": len(fit_cases),
                                "label": "Running an experiment in Phoenix — it'll pull "
-                                        "the results when it finishes…"})
+                                        "the results when it finishes"})
                         fit_phoenix = phoenix_fit_scorer(
                             user, current_block, proposed.block_text, logger_fn, fit_cases
                         )
@@ -1829,7 +1829,7 @@ def create_app(
                     if phoenix_usda_scorer is not None and usda_cases:
                         q.put({"type": "phase", "phase": "usda", "n": len(usda_cases),
                                "label": "Running an experiment in Phoenix — it'll pull "
-                                        "the results when it finishes…"})
+                                        "the results when it finishes"})
                         usda_phoenix = phoenix_usda_scorer(
                             user, current_block, proposed.block_text, logger_fn,
                             usda_cases,

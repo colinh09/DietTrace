@@ -124,7 +124,6 @@ function RetuneLive({
       <div className="rt-headline">{phase}</div>
       {rules.length > 0 && (
         <div className="rt-rule">
-          <Sparkles size={14} className="lm-rule-icon" aria-hidden="true" />
           <span>
             <b>New rule DietTrace wrote — </b>
             {rules[0].rule}

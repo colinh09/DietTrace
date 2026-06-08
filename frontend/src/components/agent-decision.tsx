@@ -202,7 +202,7 @@ export function AgentFeed({
           <div className="revent-head">
             <span className="revent-label">Thinking…</span>
           </div>
-          <div className="revent-reason">checking a new rule against your meals in Phoenix</div>
+          <div className="revent-reason">updating and evaluating your DietTrace agent</div>
         </div>
       )}
       {GROUP_ORDER.map((g) =>
