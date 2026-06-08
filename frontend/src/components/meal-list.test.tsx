@@ -132,6 +132,31 @@ describe("MealList", () => {
     expect(within(clean).getByText(/42%/)).toBeInTheDocument();
   });
 
+  it("gives the confidence chip a styled tooltip (focusable) when axes are present", () => {
+    const detail: MealDetail = {
+      trace: [],
+      perItem: [],
+      confidence: 0.66,
+      axes: [
+        { name: "resolution_completeness", score: 1, note: "✓ all foods resolved" },
+        { name: "source_quality", score: 1, note: "✓ USDA sources" },
+        { name: "portion_sanity", score: 0.5, note: "⚠ a portion looks off" },
+        { name: "calorie_plausibility", score: 1, note: "✓ calories add up" },
+      ],
+    };
+    render(<MealList meals={meals} detailsById={{ 2: detail }} />);
+    const clean = screen
+      .getByText("grilled chicken salad with olive oil")
+      .closest("li") as HTMLElement;
+    // The styled tooltip renders the four plain-language checks…
+    const tip = within(clean).getByRole("tooltip");
+    expect(within(tip).getByText("Sensible portions")).toBeInTheDocument();
+    // …and the chip is keyboard-focusable (the hover-only title is dropped).
+    const chip = clean.querySelector(".conf-chip") as HTMLElement;
+    expect(chip).toHaveAttribute("tabindex", "0");
+    expect(chip).not.toHaveAttribute("title");
+  });
+
   it("shows the confidence reasons in the 'why this confidence' card when expanded", () => {
     const detail: MealDetail = {
       trace: [

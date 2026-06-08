@@ -1,12 +1,13 @@
 "use client";
 
-// The app's top navbar: ✦ DietTrace on the left, then evenly-spaced tabs
-// (Today · Macros · Overview · Persona details · Reset), and the auth control on
-// the far right. The day/calendar navigation lives in the day-summary card below,
-// not here.
+// The app's top navbar: ✦ DietTrace on the left, the primary view tabs
+// (Today · Macros · Overview) right-aligned, and the account avatar on the far
+// right. Per  the navbar is CONSTANT chrome — the modal-opener
+// "Persona details" and the destructive "Reset" no longer sit among the tabs;
+// they fold into the avatar's account menu. The day/calendar navigation lives in
+// the day-summary card below, not here.
 import { Sparkle } from "lucide-react";
-import { SetupDetailsButton } from "@/components/setup-details-button";
-import { ResetSessionButton } from "@/components/reset-session-button";
+import { AccountMenu } from "@/components/account-menu";
 import { AuthButton } from "@/components/auth-button";
 
 interface HeaderProps {
@@ -50,11 +51,10 @@ export function Header({
         <button type="button" className="nav-item" onClick={() => onOpenOverview?.()}>
           Overview
         </button>
-        <SetupDetailsButton onViewDay={onViewDay} />
-        <ResetSessionButton onReset={onReset ?? onSeeded} />
       </nav>
       <div className="hdr-end">
         <AuthButton onAuthChange={onAuthChange} />
+        <AccountMenu onViewDay={onViewDay} onReset={onReset ?? onSeeded} />
       </div>
     </header>
   );

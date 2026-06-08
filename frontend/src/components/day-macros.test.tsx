@@ -11,12 +11,17 @@ const goals: GoalProgress[] = [
   { code: "204", name: "Total lipid (fat)", unit: "g", target: 65, consumed: 13, remaining: 52 },
 ];
 
+// The calorie ring zone — scoped so the big consumed number isn't confused with
+// the glance zone's "kcal remaining" figure (which can share the same value).
+const calZone = (c: HTMLElement) => c.querySelector(".dm-cal") as HTMLElement;
+const glance = (c: HTMLElement) => c.querySelector(".dm-glance") as HTMLElement;
+
 describe("DayMacros", () => {
   it("shows calories consumed against the target", () => {
-    render(<DayMacros goals={goals} />);
+    const { container } = render(<DayMacros goals={goals} />);
     expect(screen.getByText("calories")).toBeInTheDocument();
     // Big number is consumed; the goal is shown as "/ 2,000".
-    expect(screen.getByText("1,000")).toBeInTheDocument();
+    expect(within(calZone(container)).getByText("1,000")).toBeInTheDocument();
     expect(screen.getByText("/ 2,000")).toBeInTheDocument();
   });
 
@@ -47,21 +52,59 @@ describe("DayMacros", () => {
   });
 
   it("falls back to zeros when a macro is missing", () => {
-    render(<DayMacros goals={[]} />);
+    const { container } = render(<DayMacros goals={[]} />);
     // The calorie ring center reads 0; each macro bar reads "0 / 0 g".
-    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(within(calZone(container)).getByText("0")).toBeInTheDocument();
     expect(screen.getAllByText("0 / 0 g")).toHaveLength(3);
   });
 
   it("rounds fractional amounts for display", () => {
-    render(
+    const { container } = render(
       <DayMacros
         goals={[
           { code: "208", name: "Energy", unit: "kcal", target: 2000, consumed: 1234.6, remaining: 765.4 },
         ]}
       />,
     );
-    const band = screen.getByText("calories").closest("section") as HTMLElement;
-    expect(within(band).getByText("1,235")).toBeInTheDocument();
+    expect(within(calZone(container)).getByText("1,235")).toBeInTheDocument();
+  });
+
+  // ── Glance zone: kcal remaining + 7-day sparkline ──────────────────────────
+  it("shows kcal remaining for the day in the glance zone", () => {
+    const { container } = render(<DayMacros goals={goals} />);
+    const zone = glance(container);
+    expect(zone).not.toBeNull();
+    // 2000 target − 1000 consumed = 1000 remaining.
+    expect(within(zone).getByText("1,000")).toBeInTheDocument();
+    expect(within(zone).getByText(/kcal remaining/i)).toBeInTheDocument();
+  });
+
+  it("reads 'over' when the calorie target is exceeded", () => {
+    const { container } = render(
+      <DayMacros
+        goals={[
+          { code: "208", name: "Energy", unit: "kcal", target: 2000, consumed: 2300, remaining: -300 },
+        ]}
+      />,
+    );
+    const zone = glance(container);
+    expect(within(zone).getByText("300")).toBeInTheDocument();
+    expect(within(zone).getByText(/kcal over/i)).toBeInTheDocument();
+  });
+
+  it("renders a 7-day sparkline when trend history is supplied", () => {
+    const { container } = render(
+      <DayMacros goals={goals} trend={[1800, 1950, 2100, 1700, 2000, 1850, 1000]} />,
+    );
+    const zone = glance(container);
+    expect(within(zone).getByRole("img", { name: /7-day/i })).toBeInTheDocument();
+  });
+
+  it("stubs gracefully when there is no trend history yet", () => {
+    const { container } = render(<DayMacros goals={goals} />);
+    const zone = glance(container);
+    // No sparkline graphic, but a calm placeholder keeps the zone from looking broken.
+    expect(within(zone).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(zone).getByText(/not enough history yet/i)).toBeInTheDocument();
   });
 });

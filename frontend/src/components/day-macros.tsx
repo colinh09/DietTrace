@@ -3,6 +3,7 @@
 // /analysis (consumed + target) with /goals as the initial-target fallback
 //.
 import type { GoalProgress } from "@/lib/api";
+import { Sparkline } from "@/components/sparkline";
 
 // USDA number codes for the four tracked macros.
 // Each ring carries its own colour so the four are distinguishable at a glance —
@@ -85,11 +86,28 @@ function Ring({
   );
 }
 
-export function DayMacros({ goals }: { goals: GoalProgress[] }) {
+export function DayMacros({
+  goals,
+  trend,
+}: {
+  goals: GoalProgress[];
+  // The last several days of total calories (oldest → today) for the glance-zone
+  // sparkline. Absent when there's no history aggregate yet — the zone stubs
+  // gracefully instead of breaking.
+  trend?: number[];
+}) {
   const byCode = new Map(goals.map((g) => [g.code, g]));
   const cal = byCode.get(CALORIES);
   const calConsumed = cal?.consumed ?? 0;
   const calTarget = cal?.target ?? 0;
+  // Calories left in the day's budget — the headline of the at-a-glance zone.
+  // Past target reads as "over" (the magnitude, never a negative number).
+  const remaining = calTarget - calConsumed;
+  const over = remaining < 0;
+  const trendAvg =
+    trend && trend.length
+      ? Math.round(trend.reduce((s, v) => s + v, 0) / trend.length)
+      : 0;
 
   return (
     <section className="daymacros">
@@ -130,6 +148,29 @@ export function DayMacros({ goals }: { goals: GoalProgress[] }) {
             </div>
           );
         })}
+      </div>
+      <div className="dm-glance">
+        <div className="dm-remain">
+          <span className="dm-remain-num tnum">
+            {fmt.format(Math.round(Math.abs(remaining)))}
+          </span>
+          <span className="dm-remain-lab">
+            kcal {over ? "over" : "remaining"} today
+          </span>
+        </div>
+        <div className="dm-spark">
+          <div className="dm-spark-head">
+            <span className="dm-spark-lab">7-day trend</span>
+            {trend && trend.length > 0 && (
+              <span className="dm-spark-avg tnum">avg {fmt.format(trendAvg)}</span>
+            )}
+          </div>
+          {trend && trend.length > 0 ? (
+            <Sparkline data={trend} target={calTarget || undefined} />
+          ) : (
+            <p className="dm-spark-empty">Not enough history yet</p>
+          )}
+        </div>
       </div>
     </section>
   );

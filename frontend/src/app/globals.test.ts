@@ -45,3 +45,23 @@ describe("globals.css responsive layout", () => {
     expect(Math.min(...mobilePads)).toBeLessThanOrEqual(16);
   });
 });
+
+// The "sloppy" container-hierarchy fix:
+// sub-groups are WHITE TILES FLOATING ON A TINT, not hairline boxes on white. The
+// expanded meal drawer is the worst offender, so we pin the new contract here.
+describe("globals.css container hierarchy", () => {
+  it("floats the expanded-meal tiles on the tint instead of forcing a hairline border", () => {
+    const tile = css.match(/\.mt-card\s*\{([^}]*)\}/);
+    expect(tile).not.toBeNull();
+    const body = tile![1];
+    // A soft drop shadow lifts the tile; the forced 1px nested border is gone.
+    expect(body).toMatch(/box-shadow:/);
+    expect(body).not.toMatch(/border:\s*1px/);
+  });
+
+  it("keeps the drawer a tinted surface the tiles float on", () => {
+    const drawer = css.match(/\.mealtrace\s*\{([^}]*)\}/);
+    expect(drawer).not.toBeNull();
+    expect(drawer![1]).toMatch(/background:\s*var\(--accent-softer\)/);
+  });
+});

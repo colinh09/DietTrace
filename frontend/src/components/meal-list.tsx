@@ -12,6 +12,7 @@ import type { ConfidenceAxis, LoggedItem, Meal, TraceStep } from "@/lib/api";
 import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
 import { MealTrace } from "@/components/meal-trace";
+import { ConfidenceTooltip } from "@/components/confidence-tooltip";
 import type { AgentActivity } from "@/components/agent-decision";
 
 // The agent's-work detail for a meal, captured from its `/log` response: the
@@ -169,11 +170,21 @@ function MealRow({
               feedback
             </span>
           )}
-          <span className={"conf-chip " + chip} title={confTitle}>
-            <span className="conf-dot" aria-hidden="true" />
-            <span className="conf-label">{conf.level}</span>
-            <span className="conf-pct tnum"> · {conf.pct}%</span>
-          </span>
+          <ConfidenceTooltip pct={conf.pct} level={conf.level} axes={detail?.axes}>
+            {/* The styled tooltip replaces the giant native title when the four
+                axis checks are present; older logs keep the plain-text title.
+                Focusable so keyboard users reach the tooltip (`:focus-within`)
+                now that the hover-only title is dropped. */}
+            <span
+              className={"conf-chip " + chip}
+              title={detail?.axes?.length ? undefined : confTitle}
+              tabIndex={detail?.axes?.length ? 0 : undefined}
+            >
+              <span className="conf-dot" aria-hidden="true" />
+              <span className="conf-label">{conf.level}</span>
+              <span className="conf-pct tnum"> · {conf.pct}%</span>
+            </span>
+          </ConfidenceTooltip>
           <button
             type="button"
             className="meal-edit"
