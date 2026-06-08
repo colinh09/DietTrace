@@ -109,6 +109,34 @@ def test_negative_nutrient_value_is_dropped() -> None:
     assert food.nutrient("208") is not None  # energy intact
 
 
+def test_nan_nutrient_value_is_dropped() -> None:
+    """A NaN nutrient (json.loads accepts the ``NaN`` literal) is skipped — energy survives.
+
+    ``nan < 0`` is False, so the negative-value guard never catches it; only the
+    ``math.isfinite`` check drops it before a NaN amount reaches the per-100 g panel
+    and poisons every downstream macro total.
+    """
+    payload = dict(_FIVE_GUYS)
+    payload["protein_g"] = float("nan")
+    food = web_nutrition("bacon cheeseburger", "Five Guys", client=_client(json.dumps(payload)))
+
+    assert food is not None
+    assert food.nutrient("203") is None  # NaN protein dropped, not propagated
+    assert food.nutrient("208") is not None  # energy intact
+
+
+def test_non_finite_serving_grams_is_fail_soft_none() -> None:
+    """An infinite serving weight degrades to None — the ``isfinite`` guard, not ``> 0``.
+
+    ``inf > 0`` is True, so an infinite ``serving_grams`` would pass the positivity
+    check and make every per-100 g amount divide to 0; only ``math.isfinite`` rejects
+    it.
+    """
+    payload = dict(_FIVE_GUYS)
+    payload["serving_grams"] = float("inf")
+    assert web_nutrition("burger", "Five Guys", client=_client(json.dumps(payload))) is None
+
+
 def test_missing_description_falls_back_to_brand_food_label() -> None:
     """When the LLM omits the description field, the label is built from brand + food."""
     payload = {k: v for k, v in _FIVE_GUYS.items() if k != "description"}
