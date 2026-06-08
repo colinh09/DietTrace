@@ -217,9 +217,17 @@ export default function Home() {
       setSafety(null);
       logMealStream(text, day, (event) => {
         if (event.type === "step") {
-          setLive((current) =>
-            current ? { ...current, steps: [...current.steps, event] } : current,
-          );
+          setLive((current) => {
+            if (!current) return current;
+            // A step emits "running" then "done" — replace the running placeholder
+            // rather than appending a duplicate (e.g. "Read your meal" twice).
+            const last = current.steps[current.steps.length - 1];
+            const steps =
+              last && last.step === event.step && last.status === "running"
+                ? [...current.steps.slice(0, -1), event]
+                : [...current.steps, event];
+            return { ...current, steps };
+          });
           return;
         }
         // A safety-flagged input is not a meal: show the supportive notice and
@@ -252,18 +260,12 @@ export default function Home() {
         }));
         setSafety(event.safety ?? null);
         if (event.supervisor) {
-          const decided = event.supervisor;
-          // A "retune" decision triggers the gated eval (whose outcome the panel
-          // adds to the feed); other ops drop straight into the feed as a row.
-          if (decided.op === "retune") {
+          // Only an auto-retune acts on a logged meal. Dataset adds + feedback are
+          // USER-driven (the "Looks right → confirm" review and the correction box),
+          // so we never surface a supervisor-decided add_dataset_point / bank_feedback
+          // here — logging a meal must not silently add it to the dataset.
+          if (event.supervisor.op === "retune") {
             setRetuneSignal((n) => n + 1);
-          } else {
-            setAgentEvents((cur) =>
-              [
-                { ...decided, id, mealText: text, ts: Date.now(), when: "now" },
-                ...cur,
-              ].slice(0, 30),
-            );
           }
         }
         setLive(null);
