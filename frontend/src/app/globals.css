@@ -894,7 +894,7 @@ body {
 .reset-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .reset-dialog-actions .btn-ghost { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 100px; padding: 9px 18px; font-family: var(--ui-font); font-size: 13px; font-weight: 500; cursor: pointer; transition: background .15s, border-color .15s; }
 .reset-dialog-actions .btn-ghost:hover:not(:disabled) { background: var(--accent-softer); border-color: var(--faint); }
-.reset-dialog-actions .btn-danger { background: var(--danger); color: #fff; border: none; border-radius: 100px; padding: 9px 18px; font-family: var(--ui-font); font-size: 13px; font-weight: 600; cursor: pointer; transition: filter .15s; }
+.reset-dialog-actions .btn-danger { background: var(--danger-ink); color: #fff; border: none; border-radius: 100px; padding: 9px 18px; font-family: var(--ui-font); font-size: 13px; font-weight: 600; cursor: pointer; transition: filter .15s; }
 .reset-dialog-actions .btn-danger:hover:not(:disabled) { filter: brightness(.94); }
 .reset-dialog-actions button:disabled { opacity: .55; cursor: default; }
 
@@ -990,7 +990,7 @@ body {
 .lm-counts-toggle:hover { color: var(--accent-ink); }
 .lm-counts-toggle svg { flex: none; color: var(--muted-ink); }
 .lm-confirmed { list-style: none; margin: 12px 0 0; padding: 8px 0 4px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 2px; }
-.lm-confirmed-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 5px 2px; font-size: 13px; color: var(--ink); border-bottom: 1px solid var(--line-soft, var(--line)); }
+.lm-confirmed-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 5px 2px; font-size: 13px; color: var(--ink); border-bottom: 1px solid var(--line); }
 .lm-confirmed-row:last-of-type { border-bottom: none; }
 .lm-confirmed-text { flex: 1; min-width: 0; }
 .lm-confirmed-kcal { flex: none; font-size: 12px; color: var(--muted-ink); }
@@ -1330,12 +1330,12 @@ body {
 .agent-feed-reason { font-size: 12px; color: var(--muted-ink); line-height: 1.45; }
 
 /* Agent-activity rail header: the "state" button that opens the state modal. */
-.dash-state-btn { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono-font); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-ink); background: none; border: 1px solid var(--line-strong); border-radius: 8px; padding: 4px 9px; cursor: pointer; transition: color .14s, border-color .14s; }
+.dash-state-btn { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-ink); background: none; border: 1px solid var(--line-strong); border-radius: 8px; padding: 4px 9px; cursor: pointer; transition: color .14s, border-color .14s; }
 .dash-state-btn:hover { color: var(--ink); border-color: var(--accent); }
 .dash-state-btn svg { color: var(--faint); }
 
 /* Feed extras: timing label, re-tune detail line, the live running row, empty. */
-.agent-feed-when { flex: none; margin-left: auto; font-family: var(--mono-font); font-size: 10px; color: var(--faint); }
+.agent-feed-when { flex: none; margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--faint); }
 .agent-feed-detail { font-size: 11px; color: var(--accent-ink); }
 .agent-feed-running .agent-feed-icon svg { animation: agent-spin 1.1s linear infinite; color: var(--accent); }
 .agent-feed-empty { font-size: 13px; line-height: 1.5; color: var(--muted-ink); margin: 10px 2px 0; }
