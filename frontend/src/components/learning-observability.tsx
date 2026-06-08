@@ -523,7 +523,7 @@ export function LearningObservability({
                 </span>
               </span>
             ) : (
-              <span>Watching your diet log</span>
+              <span>DietTrace is watching your diet log</span>
             )}
           </div>
         </div>
