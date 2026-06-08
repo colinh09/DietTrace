@@ -183,8 +183,8 @@ function ScorePanel({
                   "rt-score " + (!scored ? "pending" : up ? "up" : down ? "down" : "")
                 }
               >
-                {/* Scores arrive out of order (USDA in parallel, fit from one
-                    Phoenix run) — so an unscored row is always a plain dash, never
+                {/* Scores arrive out of order (both sets run as Phoenix
+                    experiments) — so an unscored row is always a plain dash, never
                     a spinner that would imply "this one is next". */}
                 {r.after != null ? asPct(r.after) : "—"}
               </span>

@@ -33,7 +33,10 @@ from dietrace.agents.nutrition.interpret_feedback import apply_feedback, interpr
 from dietrace.agents.nutrition.safety import safety_check
 from dietrace.agents.supervisor.config import load_supervisor_config
 from dietrace.agents.supervisor.decide import decide_op, gather_signals
-from dietrace.agents.supervisor.phoenix_eval import score_fit_via_phoenix
+from dietrace.agents.supervisor.phoenix_eval import (
+    score_fit_via_phoenix,
+    score_usda_via_phoenix,
+)
 from dietrace.agents.supervisor.phoenix_mcp import add_user_dataset_point
 from dietrace.agents.supervisor.run import default_experiment_runner
 from dietrace.evals.online import evaluate_log, review_flag, sources_of
@@ -562,6 +565,7 @@ def create_app(
     experiment_runner: Callable[[dict[str, Any]], dict[str, Any]] = default_experiment_runner,
     dataset_writer: Callable[[str, dict[str, Any]], None] = add_user_dataset_point,
     phoenix_fit_scorer: Callable[..., dict[str, Any] | None] | None = None,
+    phoenix_usda_scorer: Callable[..., dict[str, Any] | None] | None = None,
 ) -> FastAPI:
     """Build the DietTrace FastAPI app with injectable logger/store (for tests)."""
     if store is not None and feedback_store is not None and trust_store is not None:
@@ -605,6 +609,11 @@ def create_app(
     # unless a fake scorer is injected). Returns None on any failure → local fallback.
     if phoenix_fit_scorer is None and "pytest" not in sys.modules:
         phoenix_fit_scorer = score_fit_via_phoenix
+    # The USDA floor set is scored in Arize too (a second Phoenix experiment pair),
+    # so BOTH panels are graded in Arize and land together; off in tests / on failure
+    # → local parallel scoring (which is what the offline stream test exercises).
+    if phoenix_usda_scorer is None and "pytest" not in sys.modules:
+        phoenix_usda_scorer = score_usda_via_phoenix
     # In-memory experiment-run registry + per-user daily run counter. The supervisor
     # triggers experiments off the hot path; runs_today feeds the decision's budget
     # guard (design §4). Both reset on restart — fine for a single Cloud Run service.
@@ -1801,26 +1810,51 @@ def create_app(
                     q.put(_SET_DONE)
 
             def run_usda() -> None:
-                # USDA floor: always local, and scored in PARALLEL (the food repo opens
-                # a connection per query, so the agent is thread-safe). Rows fill in as
-                # each completes — out of order, by index — the bulk of the speed-up.
+                # USDA floor: scored in Arize as its OWN Phoenix experiment (base vs
+                # tuned), read back over MCP — so the everyday-foods check is graded
+                # the same way as the fit set and both land together. Falls back to
+                # LOCAL parallel scoring (out of order, by index) when Phoenix/MCP is
+                # unavailable — which is what the offline stream test exercises.
                 try:
-                    q.put({"type": "phase", "phase": "usda",
-                           "n": len(usda_cases), "label": usda_label})
-                    with ThreadPoolExecutor(max_workers=6) as pool:
-                        futs = {
-                            pool.submit(score_case_traced, c, "usda"): i
-                            for i, c in enumerate(usda_cases)
-                        }
-                        for fut in as_completed(futs):
-                            i = futs[fut]
-                            before, after = fut.result()
-                            usda_before[i], usda_after[i] = before, after
-                            c = usda_cases[i]
+                    usda_phoenix = None
+                    if phoenix_usda_scorer is not None and usda_cases:
+                        q.put({"type": "phase", "phase": "usda", "n": len(usda_cases),
+                               "label": "Running everyday foods as a Phoenix "
+                                        "experiment — scored in Arize, read back over "
+                                        "MCP"})
+                        usda_phoenix = phoenix_usda_scorer(
+                            user, current_block, proposed.block_text, logger_fn,
+                            usda_cases,
+                        )
+                    if usda_phoenix is not None:
+                        rows = usda_phoenix.get("rows", [])
+                        ub = [r["before"] for r in rows if r.get("before") is not None]
+                        ua = [r["after"] for r in rows if r.get("after") is not None]
+                        if ub and ua:
+                            usda_before[:] = ub
+                            usda_after[:] = ua
+                        for i, r in enumerate(rows):
                             q.put({"type": "score", "set": "usda", "i": i + 1,
-                                   "n": len(usda_cases), "text": c["text"],
-                                   "expected": round(c["calories"]),
-                                   "before": before, "after": after})
+                                   "n": len(rows), "text": r.get("text", ""),
+                                   "expected": r.get("expected", 0),
+                                   "before": r.get("before"), "after": r.get("after")})
+                    else:
+                        q.put({"type": "phase", "phase": "usda",
+                               "n": len(usda_cases), "label": usda_label})
+                        with ThreadPoolExecutor(max_workers=6) as pool:
+                            futs = {
+                                pool.submit(score_case_traced, c, "usda"): i
+                                for i, c in enumerate(usda_cases)
+                            }
+                            for fut in as_completed(futs):
+                                i = futs[fut]
+                                before, after = fut.result()
+                                usda_before[i], usda_after[i] = before, after
+                                c = usda_cases[i]
+                                q.put({"type": "score", "set": "usda", "i": i + 1,
+                                       "n": len(usda_cases), "text": c["text"],
+                                       "expected": round(c["calories"]),
+                                       "before": before, "after": after})
                     q.put({"type": "set_done", "set": "usda",
                            "before": mean(usda_before), "after": mean(usda_after),
                            "delta": round(mean(usda_after) - mean(usda_before), 3),

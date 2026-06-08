@@ -124,49 +124,43 @@ def _results_via_mcp(experiment_id: str) -> list[dict[str, Any]]:  # pragma: no 
     return asyncio.run(_pull()) or []
 
 
-def score_fit_via_phoenix(
+def _score_set_via_phoenix(
     user: str,
+    set_name: str,
+    dataset_name: str,
+    dataset_desc: str,
+    cases: list[dict[str, Any]] | None,
     current_block: str,
     proposed_block: str,
     logger_fn: Callable[..., dict],
-    fit_cases: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:  # pragma: no cover - live
-    """Score the user's confirmed-meal set as base/tuned Phoenix experiments.
+    """Score one case set as base/tuned Phoenix experiments, read back over MCP.
 
-    *fit_cases* are the local confirmations (``{text, calories}``) — each retune
-    rebuilds the user's Phoenix dataset to exactly mirror them so the experiment has
-    the *current* ground truth to score against, even on a fresh/seeded user, with no
-    stale examples drifting onto the wrong meal. Returns ``{"current", "proposed",
-    "experiment_url", "rows"}`` — mean fit accuracies (base/tuned) pulled over MCP
-    plus per-meal rows ``{text, expected, before, after}`` for the rail — or ``None``
-    on any failure so the caller falls back to local scoring.
+    REBUILDS *dataset_name* to exactly mirror *cases* (``create_dataset`` on an
+    existing name replaces its examples with a fresh version, so a meal can never end
+    up scored against the wrong truth), runs the current vs proposed block over it as
+    two parallel experiments, and returns ``{"current", "proposed", "experiment_url",
+    "rows"}`` — mean accuracies (base/tuned) plus per-meal rows ``{text, expected,
+    before, after, base_kcal, tuned_kcal}`` for the rail — or ``None`` on any failure
+    so the caller falls back to local scoring.
     """
     try:
-        from dietrace.agents.supervisor.phoenix_mcp import (
-            mcp_available,
-            user_dataset_name,
-        )
+        from dietrace.agents.supervisor.phoenix_mcp import mcp_available
 
         if not mcp_available():
             return None
         client = _phoenix_client()
         if client is None:
             return None
-        # REBUILD the user's Phoenix dataset to EXACTLY mirror the current local
-        # confirmations. create_dataset on an existing name replaces its examples
-        # with a fresh version, so a meal can never end up scored against the wrong
-        # truth — the bug the stale "add only what's missing by text" sync caused as
-        # confirmations changed across sessions. No confirmations → no fit set.
-        name = user_dataset_name(user)
-        fit_by_text = {c["text"]: c for c in (fit_cases or []) if c.get("text")}
-        if not fit_by_text:
+        by_text = {c["text"]: c for c in (cases or []) if c.get("text")}
+        if not by_text:
             return None
-        cases = list(fit_by_text.values())
+        set_cases = list(by_text.values())
         dataset = client.datasets.create_dataset(
-            name=name,
-            inputs=[{"text": c["text"]} for c in cases],
-            outputs=[{"calories": c["calories"]} for c in cases],
-            dataset_description="DietTrace user confirmed meals — the gate's fit set",
+            name=dataset_name,
+            inputs=[{"text": c["text"]} for c in set_cases],
+            outputs=[{"calories": c["calories"]} for c in set_cases],
+            dataset_description=dataset_desc,
         )
         if not getattr(dataset, "example_count", 0):
             return None
@@ -179,11 +173,11 @@ def score_fit_via_phoenix(
         with ThreadPoolExecutor(max_workers=2) as pool:
             base_fut = pool.submit(
                 _run_experiment, client, dataset, current_block, logger_fn,
-                f"dietrace-{user}-fit-base",
+                f"dietrace-{user}-{set_name}-base",
             )
             tuned_fut = pool.submit(
                 _run_experiment, client, dataset, proposed_block, logger_fn,
-                f"dietrace-{user}-fit-tuned",
+                f"dietrace-{user}-{set_name}-tuned",
             )
             base_id, tuned_id = base_fut.result(), tuned_fut.result()
 
@@ -191,8 +185,8 @@ def score_fit_via_phoenix(
         tuned = row_data(_results_via_mcp(tuned_id)) if tuned_id else {}
         if not base or not tuned:
             return None
-        current_fit = round(sum(d["acc"] for d in base.values()) / len(base), 3)
-        proposed_fit = round(sum(d["acc"] for d in tuned.values()) / len(tuned), 3)
+        current_acc = round(sum(d["acc"] for d in base.values()) / len(base), 3)
+        proposed_acc = round(sum(d["acc"] for d in tuned.values()) / len(tuned), 3)
         rows = [
             {
                 "text": text,
@@ -211,10 +205,44 @@ def score_fit_via_phoenix(
         except Exception:
             url = ""
         return {
-            "current": current_fit,
-            "proposed": proposed_fit,
+            "current": current_acc,
+            "proposed": proposed_acc,
             "experiment_url": url,
             "rows": rows,
         }
     except Exception:
         return None
+
+
+def score_fit_via_phoenix(
+    user: str,
+    current_block: str,
+    proposed_block: str,
+    logger_fn: Callable[..., dict],
+    fit_cases: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:  # pragma: no cover - live
+    """Score the user's confirmed-meal (fit) set in Arize — each retune rebuilds the
+    user's Phoenix dataset to exactly mirror the current confirmations."""
+    from dietrace.agents.supervisor.phoenix_mcp import user_dataset_name
+
+    return _score_set_via_phoenix(
+        user, "fit", user_dataset_name(user),
+        "DietTrace user confirmed meals — the gate's fit set",
+        fit_cases, current_block, proposed_block, logger_fn,
+    )
+
+
+def score_usda_via_phoenix(
+    user: str,
+    current_block: str,
+    proposed_block: str,
+    logger_fn: Callable[..., dict],
+    usda_cases: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:  # pragma: no cover - live
+    """Score the USDA reference (floor) set in Arize too, so the everyday-foods
+    check is a Phoenix experiment like the fit set — not just a local re-score."""
+    return _score_set_via_phoenix(
+        user, "usda", f"dietrace-usda-{user}",
+        "DietTrace USDA reference foods — the gate's everyday-accuracy floor",
+        usda_cases, current_block, proposed_block, logger_fn,
+    )
