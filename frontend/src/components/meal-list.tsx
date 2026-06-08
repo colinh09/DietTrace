@@ -13,6 +13,7 @@ import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
 import { MealTrace } from "@/components/meal-trace";
 import { ConfidenceTooltip } from "@/components/confidence-tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { AgentActivity } from "@/components/agent-decision";
 
 // The agent's-work detail for a meal, captured from its `/log` response: the
@@ -152,23 +153,21 @@ function MealRow({
           {/* A dataset point keeps its confidence chip — the badge is an extra
               tag alongside it, not a replacement. */}
           {isDataset && (
-            <span
-              className="dataset-badge"
-              title="A meal you confirmed — held out as ground truth to test the agent. It never sees this while learning; it's only scored against it."
-            >
-              <span className="dataset-badge-dot" aria-hidden="true" />
-              dataset point
-            </span>
+            <Tooltip label="A meal you confirmed — held out as ground truth to test the agent. It never sees this while learning; it's only scored against it.">
+              <span className="dataset-badge">
+                <span className="dataset-badge-dot" aria-hidden="true" />
+                dataset point
+              </span>
+            </Tooltip>
           )}
           {/* A meal you've corrected — its feedback feeds the next re-tune. */}
           {meal.has_feedback && (
-            <span
-              className="feedback-badge"
-              title="You gave feedback on this meal. The corrector folds it into the agent's rule on the next re-tune."
-            >
-              <span className="feedback-badge-dot" aria-hidden="true" />
-              feedback
-            </span>
+            <Tooltip label="You gave feedback on this meal. The corrector folds it into the agent's rule on the next re-tune.">
+              <span className="feedback-badge">
+                <span className="feedback-badge-dot" aria-hidden="true" />
+                feedback
+              </span>
+            </Tooltip>
           )}
           <ConfidenceTooltip pct={conf.pct} level={conf.level} axes={detail?.axes}>
             {/* The styled tooltip replaces the giant native title when the four
@@ -185,18 +184,19 @@ function MealRow({
               <span className="conf-pct tnum"> · {conf.pct}%</span>
             </span>
           </ConfidenceTooltip>
-          <button
-            type="button"
-            className="meal-edit"
-            aria-label="remove meal"
-            title="Remove this meal"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit?.(meal);
-            }}
-          >
-            <Trash2 size={14} aria-hidden="true" />
-          </button>
+          <Tooltip label="Remove this meal">
+            <button
+              type="button"
+              className="meal-edit"
+              aria-label="remove meal"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit?.(meal);
+              }}
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </span>
       </div>
       {expanded && (

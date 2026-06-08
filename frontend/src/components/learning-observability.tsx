@@ -452,6 +452,7 @@ export function LearningObservability({
           const rule = e.rules?.[0]?.rule;
           onRetuneComplete?.({
             id: `retune-${Date.now()}`,
+            ts: Date.now(),
             op: "retune",
             reason: e.shipped
               ? rule
@@ -554,7 +555,7 @@ export function LearningObservability({
           )}
         </>
       )}
-      <AgentFeed events={feedEvents} />
+      <AgentFeed events={feedEvents} running={retuning} />
       {feedEvents.length === 0 && !retuning && (
         <p className="agent-feed-empty">
           Log a meal and the supervisor&apos;s decisions show up here.

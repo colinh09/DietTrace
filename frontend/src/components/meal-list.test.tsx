@@ -110,7 +110,7 @@ describe("MealList", () => {
     expandMeal(row);
     expect(within(row).getByText("140 g")).toBeInTheDocument();
     // The review step (confirm / tweak / correct) is the single correction surface.
-    expect(within(row).getByText(/does this look about right/i)).toBeInTheDocument();
+    expect(within(row).getByText(/does this look right/i)).toBeInTheDocument();
     // The trace steps are an always-visible "agent's work" card once expanded.
     expect(within(row).getByText(/Parsed 1 food/)).toBeInTheDocument();
   });
@@ -334,7 +334,8 @@ describe("MealList", () => {
     };
     render(<MealList meals={[meal]} />);
     const row = screen.getByText(/preworkout oats/).closest("li") as HTMLElement;
-    expect(within(row).getByText(/feedback/i)).toBeInTheDocument();
+    // Scope to the badge itself — the Tooltip hint also contains "feedback".
+    expect(row.querySelector(".feedback-badge")).toHaveTextContent(/feedback/i);
     expect(row.querySelector(".conf-chip")).not.toBeNull(); // chip kept alongside
   });
 });

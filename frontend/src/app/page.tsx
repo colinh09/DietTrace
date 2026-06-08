@@ -234,7 +234,10 @@ export default function Home() {
             setRetuneSignal((n) => n + 1);
           } else {
             setAgentEvents((cur) =>
-              [{ ...decided, id, mealText: text, when: "now" }, ...cur].slice(0, 30),
+              [
+                { ...decided, id, mealText: text, ts: Date.now(), when: "now" },
+                ...cur,
+              ].slice(0, 30),
             );
           }
         }
@@ -267,8 +270,9 @@ export default function Home() {
         setRetuneSignal((n) => n + 1);
         return;
       }
+      const ts = Date.now();
       setAgentEvents((cur) =>
-        [{ ...e, id: `act-${Date.now()}-${cur.length}`, when: "now" }, ...cur].slice(
+        [{ ...e, id: `act-${ts}-${cur.length}`, ts, when: "now" }, ...cur].slice(
           0,
           30,
         ),
@@ -281,6 +285,15 @@ export default function Home() {
   // a reload too, not just the live per-meal events).
   const handleRetuneComplete = useCallback((event: AgentEvent) => {
     setAgentEvents((cur) => [event, ...cur].slice(0, 30));
+  }, []);
+
+  // After a reset wipes the user server-side, re-trigger onboarding so a clean
+  // slate always starts from the welcome flow. Shared by both Reset entry points
+  // (the account menu and the quiet control on the date row).
+  const handleAfterReset = useCallback(() => {
+    clearOnboarded();
+    clearSetup();
+    setOnboarded(false);
   }, []);
 
   // Persist the activity feed per-user in localStorage so a reload keeps it (until a
@@ -363,13 +376,7 @@ export default function Home() {
             bumpLearning();
           }}
           onViewDay={(iso) => setDate(fromISODate(iso))}
-          onReset={() => {
-            // Reset wipes the user server-side AND re-triggers onboarding, so a
-            // clean slate always starts from the welcome flow (new-user parity).
-            clearOnboarded();
-            clearSetup();
-            setOnboarded(false);
-          }}
+          onReset={handleAfterReset}
           onAuthChange={() => {
             loadHistory();
             loadAnalysis();
@@ -384,6 +391,7 @@ export default function Home() {
                 date={date}
                 onShift={(days) => setDate((d) => shiftDate(d, days))}
                 onPickDate={setDate}
+                onReset={handleAfterReset}
               />
               <DayMacros goals={goals} />
             </section>

@@ -47,12 +47,12 @@ describe("MealTrace", () => {
 
   it("offers the review (confirm / correct) only when there's a meal", () => {
     const { rerender } = render(<MealTrace trace={trace} perItem={perItem} />);
-    expect(screen.queryByText(/does this look about right/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/does this look right/i)).not.toBeInTheDocument();
     rerender(<MealTrace trace={trace} perItem={perItem} mealText="x" />);
-    expect(screen.getByText(/does this look about right/i)).toBeInTheDocument();
+    expect(screen.getByText(/does this look right/i)).toBeInTheDocument();
     // The correction box is behind "No, something's off" (the correct path).
     expect(screen.queryByLabelText(/free-form feedback/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /no, something's off/i }));
+    fireEvent.click(screen.getByRole("button", { name: /something's off/i }));
     expect(screen.getByLabelText(/free-form feedback/i)).toBeInTheDocument();
   });
 

@@ -4,8 +4,14 @@
 // drops a month-grid popover. Lives in the day-summary card (not the navbar), so
 // the date sits right next to the calories it scopes (MacroFactor-style).
 import { useEffect, useRef, useState } from "react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
 import { formatHeaderDate, isSameDay } from "@/lib/date";
+import { ResetDialog } from "@/components/reset-dialog";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -80,11 +86,16 @@ export function DatePicker({
   date,
   onShift,
   onPickDate,
+  onReset,
 }: {
   date: Date;
   onShift: (days: number) => void;
   onPickDate: (date: Date) => void;
+  // Opens the Reset confirmation — the quiet second entry point on the date row
+  // (the account menu is the first). Absent → no Reset control here.
+  onReset?: () => void;
 }) {
+  const [resetOpen, setResetOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -138,6 +149,18 @@ export function DatePicker({
             setCalOpen(false);
           }}
         />
+      )}
+      {onReset && (
+        <button
+          type="button"
+          className="datenav-reset"
+          onClick={() => setResetOpen(true)}
+        >
+          <RotateCcw size={13} aria-hidden="true" /> Reset
+        </button>
+      )}
+      {resetOpen && onReset && (
+        <ResetDialog onClose={() => setResetOpen(false)} onReset={onReset} />
       )}
     </div>
   );

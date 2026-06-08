@@ -65,15 +65,25 @@ export function MealReview({
       <div className="review-confirmed">
         <Check size={14} aria-hidden="true" />
         <span>
-          Saved as a reference — DietTrace now checks itself against this meal.
+          Confirmed — saved as a held-out reference. DietTrace scores its future
+          re-tunes against this meal, but never sees it while learning.
         </span>
-        <button
-          type="button"
-          className="review-undo"
-          onClick={() => setMode("correcting")}
-        >
-          actually, I&apos;d change something
-        </button>
+        <span className="review-confirmed-more">
+          <button
+            type="button"
+            className="review-undo"
+            onClick={() => setMode("tweaking")}
+          >
+            nudge a portion?
+          </button>
+          <button
+            type="button"
+            className="review-undo"
+            onClick={() => setMode("correcting")}
+          >
+            actually, something&apos;s off
+          </button>
+        </span>
       </div>
     );
   }
@@ -81,7 +91,7 @@ export function MealReview({
   return (
     <div className="review">
       <div className="review-head">
-        <span className="review-q">Does this look about right?</span>
+        <span className="review-q">Does this look right?</span>
         <span className="review-sub">
           A quick check so DietTrace only learns from meals you&apos;ve vetted.
         </span>
@@ -95,21 +105,14 @@ export function MealReview({
             onClick={confirm}
             disabled={saving}
           >
-            {saving ? "saving…" : "Yes, looks right"}
-          </button>
-          <button
-            type="button"
-            className="review-tweak"
-            onClick={() => setMode("tweaking")}
-          >
-            Close — let me tweak a portion
+            {saving ? "saving…" : "Looks right"}
           </button>
           <button
             type="button"
             className="review-no"
             onClick={() => setMode("correcting")}
           >
-            No, something&apos;s off
+            Something&apos;s off
           </button>
         </div>
       )}
@@ -118,7 +121,7 @@ export function MealReview({
           mealText={mealText}
           perItem={perItem}
           onConfirmed={() => setMode("confirmed")}
-          onCancel={() => setMode("ask")}
+          onCancel={() => setMode("confirmed")}
         />
       )}
       {mode === "correcting" && (

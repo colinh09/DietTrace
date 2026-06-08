@@ -5,6 +5,7 @@
 // dataset point / retune) and why. Surfaces the decision the backend returns on
 // /log so the agent's own actions are visible, not hidden. Renders nothing when
 // no decision is present (e.g. a recalled meal).
+import { useEffect, useState } from "react";
 import { Database, MessageSquare, RefreshCw } from "lucide-react";
 import type { SupervisorDecision } from "@/lib/api";
 
@@ -39,6 +40,9 @@ export interface AgentEvent extends SupervisorDecision {
   id: number | string;
   mealText?: string;
   detail?: string;
+  // Epoch ms the action happened — drives ticking relative time + grouping.
+  // Absent on older persisted events, which fall back to the `when` label.
+  ts?: number;
   when?: string;
 }
 
@@ -53,13 +57,32 @@ export type AgentActivity = (e: {
   phoenix?: string | null;
 }) => void;
 
-// Which time-group an event belongs to (newest-first events keep their order
-// within a group). The page stamps `when` as "now" / "yesterday" on each event.
 const GROUP_ORDER = ["Now", "Earlier", "Yesterday"] as const;
-function groupOf(when?: string): (typeof GROUP_ORDER)[number] {
-  if (when === "now") return "Now";
-  if (when === "yesterday") return "Yesterday";
-  return "Earlier";
+type Group = (typeof GROUP_ORDER)[number];
+
+// A ticking, human relative time — "just now", "4m ago", "2h ago", "yesterday".
+function relTime(ts: number, now: number): string {
+  const s = Math.max(0, Math.round((now - ts) / 1000));
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return "yesterday";
+}
+
+// Group an event by recency: Now (<1h) / Earlier (today) / Yesterday (older).
+// Falls back to the static `when` label for older events with no timestamp.
+function groupOf(e: AgentEvent, now: number): Group {
+  if (e.ts == null) {
+    if (e.when === "yesterday") return "Yesterday";
+    if (e.when === "now") return "Now";
+    return "Earlier";
+  }
+  if (now - e.ts < 60 * 60 * 1000) return "Now";
+  const midnight = new Date(now);
+  midnight.setHours(0, 0, 0, 0);
+  return e.ts >= midnight.getTime() ? "Earlier" : "Yesterday";
 }
 
 // The agent-observability feed: the supervisor's decisions as a vertical TRACE
@@ -71,24 +94,31 @@ export function AgentFeed({
   running = false,
 }: {
   events: AgentEvent[];
-  // True while a re-tune is streaming — shows a live "re-tuning…" node on top.
+  // True while a re-tune is streaming — shows a live "thinking" node on top.
   running?: boolean;
 }) {
+  // A ticking clock so relative times ("4m ago") stay honest without a reload.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
   if (events.length === 0 && !running) return null;
-  const groups: Partial<Record<(typeof GROUP_ORDER)[number], AgentEvent[]>> = {};
-  for (const e of events) (groups[groupOf(e.when)] ||= []).push(e);
+  const groups: Partial<Record<Group, AgentEvent[]>> = {};
+  for (const e of events) (groups[groupOf(e, now)] ||= []).push(e);
 
   return (
     <div className="rail-events" aria-label="Agent activity">
       {running && (
-        <div className="revent">
+        <div className="revent revent-thinking revent-shimmer">
           <span className="revent-dot accent" aria-hidden="true" style={{ color: "var(--accent)" }}>
             <RefreshCw size={11} className="revent-ic" />
           </span>
           <div className="revent-head">
-            <span className="revent-label">Re-tuning…</span>
+            <span className="revent-label">Thinking…</span>
           </div>
-          <div className="revent-reason">running the gated eval in Phoenix</div>
+          <div className="revent-reason">testing a new rule against your meals in Phoenix</div>
         </div>
       )}
       {GROUP_ORDER.map((g) =>
@@ -108,7 +138,11 @@ export function AgentFeed({
                   </span>
                   <div className="revent-head">
                     <span className="revent-label">{LABELS[e.op]}</span>
-                    {e.when && <span className="revent-time">{e.when}</span>}
+                    {(e.ts != null || e.when) && (
+                      <span className="revent-time">
+                        {e.ts != null ? relTime(e.ts, now) : e.when}
+                      </span>
+                    )}
                   </div>
                   {e.mealText && <div className="revent-meal">{e.mealText}</div>}
                   <div className="revent-reason">{e.reason}</div>
