@@ -83,7 +83,7 @@ describe("DayMacros", () => {
     expect(within(calZone(container)).getByText("1,235")).toBeInTheDocument();
   });
 
-  // ── Glance zone: kcal remaining + 7-day sparkline ──────────────────────────
+  // ── Glance zone: kcal remaining + learning counts ──────────────────────────
   it("shows kcal remaining for the day in the glance zone", () => {
     const { container } = render(<DayMacros goals={goals} />);
     const zone = glance(container);
@@ -106,19 +106,26 @@ describe("DayMacros", () => {
     expect(within(zone).getByText(/kcal over/i)).toBeInTheDocument();
   });
 
-  it("renders a 7-day sparkline when trend history is supplied", () => {
+  it("shows the learning-loop counts in the glance zone", () => {
     const { container } = render(
-      <DayMacros goals={goals} trend={[1800, 1950, 2100, 1700, 2000, 1850, 1000]} />,
+      <DayMacros
+        goals={goals}
+        stats={{ corrections: 3, confirmations: 6, version: 2 }}
+      />,
     );
     const zone = glance(container);
-    expect(within(zone).getByRole("img", { name: /7-day/i })).toBeInTheDocument();
+    const stats = within(zone).getByLabelText(/learning progress/i);
+    expect(within(stats).getByText("3")).toBeInTheDocument();
+    expect(within(stats).getByText(/feedbacks banked/i)).toBeInTheDocument();
+    expect(within(stats).getByText("2")).toBeInTheDocument();
+    expect(within(stats).getByText(/re-tunes shipped/i)).toBeInTheDocument();
+    expect(within(stats).getByText("6")).toBeInTheDocument();
+    expect(within(stats).getByText(/in your dataset/i)).toBeInTheDocument();
   });
 
-  it("stubs gracefully when there is no trend history yet", () => {
+  it("falls back to zero counts before the stats have loaded", () => {
     const { container } = render(<DayMacros goals={goals} />);
-    const zone = glance(container);
-    // No sparkline graphic, but a calm placeholder keeps the zone from looking broken.
-    expect(within(zone).queryByRole("img")).not.toBeInTheDocument();
-    expect(within(zone).getByText(/not enough history yet/i)).toBeInTheDocument();
+    const stats = within(glance(container)).getByLabelText(/learning progress/i);
+    expect(within(stats).getAllByText("0")).toHaveLength(3);
   });
 });

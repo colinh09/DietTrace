@@ -80,7 +80,7 @@
   --bg: #FAFAF8;
   --ink: #1B1A16;
   --muted-ink: #79766C;
-  --faint: #A8A498;
+  --faint: #898371;
   --line: #ECEAE2;
   --line-strong: #E0DDD2;
   --surface: #FFFFFF;
@@ -249,16 +249,19 @@ body {
 
 /* Glance zone (3rd band column): kcal remaining + a 7-day sparkline. Earns the
    card's width that used to be dead whitespace. */
-.dm-glance { flex: none; width: clamp(150px, 18vw, 196px); align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding-left: clamp(8px, 2vw, 24px); border-left: 1px solid var(--line); }
-.dm-remain { display: flex; flex-direction: column; gap: 2px; }
-.dm-remain-num { font-size: 27px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; color: var(--accent-ink); }
-.dm-remain-lab { font-size: 12px; color: var(--muted); }
-.dm-spark { display: flex; flex-direction: column; gap: 7px; }
-.dm-spark-head { display: flex; align-items: center; justify-content: space-between; }
-.dm-spark-lab { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
-.dm-spark-avg { font-size: 11px; color: var(--faint); }
-.dm-spark-svg { width: 100%; height: 38px; display: block; overflow: visible; }
-.dm-spark-empty { font-size: 11.5px; color: var(--faint); font-style: italic; }
+.dm-glance { flex: none; width: clamp(160px, 19vw, 210px); align-self: stretch; display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  padding-left: clamp(8px, 2vw, 24px); border-left: 1px solid var(--line); text-align: center; }
+.dm-remain { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.dm-remain-num { font-family: var(--serif); font-size: 40px; font-weight: 600; line-height: 1;
+  letter-spacing: -0.02em; color: var(--accent-ink); }
+.dm-remain-lab { font-size: 12.5px; color: var(--muted-ink); }
+.dm-stats { display: inline-flex; flex-direction: column; gap: 8px; margin: 0 auto;
+  padding-top: 18px; border-top: 1px solid var(--line); }
+.dm-stat { display: flex; align-items: baseline; gap: 8px; }
+.dm-stat-num { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--accent-ink);
+  min-width: 15px; text-align: right; font-variant-numeric: tabular-nums; }
+.dm-stat-lab { font-size: 11.5px; color: var(--muted-ink); }
 
 /* a progress ring with center content */
 .ring-wrap { position: relative; display: inline-flex; }
@@ -1406,9 +1409,11 @@ body {
    Agent rail — live status + trace-timeline events + Phoenix MCP nodes
    ============================================================ */
 .rail-status { display: flex; flex-direction: column; gap: 7px; }
-.rail-live { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600;
-  font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); }
-.rail-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.rail-live { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 500;
+  color: var(--ink); }
+.rail-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+  flex: none; animation: rail-breathe 2.6s ease-in-out infinite; }
+@keyframes rail-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 .rail-state { font-size: 12.5px; color: var(--muted-ink); }
 .rail-state b { color: var(--ink); font-weight: 500; }
 .rail-state .dots { display: inline-flex; gap: 2px; margin-left: 4px; }

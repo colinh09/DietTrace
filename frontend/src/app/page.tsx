@@ -23,6 +23,7 @@ import {
   getAnalysis,
   getGoals,
   getHistory,
+  getPreferences,
   getProfile,
   logMealStream,
   userId,
@@ -57,6 +58,29 @@ export default function Home() {
   // corrections persist across day navigation instead of disappearing).
   const [reloadSignal, setReloadSignal] = useState(0);
   const bumpLearning = useCallback(() => setReloadSignal((n) => n + 1), []);
+  // Learning-loop counts for the day-summary glance zone — refreshed whenever the
+  // learning state changes (a correction, confirmation, seed, or shipped re-tune).
+  const [learnStats, setLearnStats] = useState<{
+    corrections: number;
+    confirmations: number;
+    version: number;
+  } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getPreferences()
+      .then((p) => {
+        if (alive)
+          setLearnStats({
+            corrections: p.corrections,
+            confirmations: p.confirmations,
+            version: p.block?.version ?? 0,
+          });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [reloadSignal]);
   // The safety guardrail result from the most recent log, or null when clear —
   // surfaces a calm supportive notice above the meals.
   const [safety, setSafety] = useState<Safety | null>(null);
@@ -393,7 +417,7 @@ export default function Home() {
                 onPickDate={setDate}
                 onReset={handleAfterReset}
               />
-              <DayMacros goals={goals} />
+              <DayMacros goals={goals} stats={learnStats} />
             </section>
 
             {/* The log card — input + the day's meals, a separate panel below. */}

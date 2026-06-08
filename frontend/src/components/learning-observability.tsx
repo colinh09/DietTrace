@@ -512,20 +512,18 @@ export function LearningObservability({
       <div className="dash-head">
         <div className="rail-status">
           <div className="rail-live">
-            <span className="rail-live-dot" aria-hidden="true" /> live
-          </div>
-          <div className="rail-state">
+            <span className="rail-live-dot" aria-hidden="true" />
             {retuning ? (
-              <>
-                <b>thinking</b>
+              <span>
+                Thinking
                 <span className="dots" aria-hidden="true">
                   <i />
                   <i />
                   <i />
                 </span>
-              </>
+              </span>
             ) : (
-              <b>watching your log</b>
+              <span>Watching your diet log</span>
             )}
           </div>
         </div>
