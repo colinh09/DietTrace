@@ -103,6 +103,32 @@ def test_fit_margin_is_configurable() -> None:
     assert ship_decision(current, proposed, fit_delta=0.03)["ship"] is True
 
 
+def test_zero_calorie_case_scores_exact_without_dividing_by_zero() -> None:
+    """A confirmed meal whose totals carry no energy (208) entry becomes a
+    zero-expected case (calories_of → 0.0). The gate must score it without a
+    ZeroDivisionError in abs(est - expected) / expected: an estimate that is
+    also 0 kcal is an exact hit (fit 1.0), so a black-coffee-style confirmation
+    counts as perfectly fit rather than crashing the whole retune scoring loop."""
+    zero_fit = [{"text": "black coffee", "calories": 0}]
+
+    def _zero_logger(text: str, examples=None) -> dict:
+        return {"totals": _totals(0)}
+
+    assert score_block("", zero_fit, _USDA, _zero_logger)["fit"] == 1.0
+
+
+def test_zero_calorie_case_misses_when_estimate_is_nonzero() -> None:
+    """The other arm of the zero-expected guard: when the meal's truth is 0 kcal
+    but the estimate hallucinates calories, that case scores 0.0 (a miss), again
+    without any division by zero."""
+    zero_fit = [{"text": "black coffee", "calories": 0}]
+
+    def _nonzero_logger(text: str, examples=None) -> dict:
+        return {"totals": _totals(50)}
+
+    assert score_block("", zero_fit, _USDA, _nonzero_logger)["fit"] == 0.0
+
+
 def test_confirmations_to_cases_uses_confirmed_calories_as_truth() -> None:
     confirmations = [
         {"meal_text": "oatmeal", "totals": _totals(214)},
