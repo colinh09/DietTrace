@@ -327,7 +327,14 @@ export default function Home() {
     clearOnboarded();
     clearSetup();
     // Clear the feed + zero the retune trigger so the remount can't replay a stale
-    // signal (re-seeding repopulates the feed; onboarding starts fresh).
+    // signal. Remove the PERSISTED feed directly (not just the in-memory state) —
+    // otherwise a reset that doesn't re-seed leaves the prior session's traces in
+    // localStorage, and they reappear on the next mount. Re-seeding repopulates it.
+    try {
+      window.localStorage.removeItem(`diettrace_activity_${userId()}`);
+    } catch {
+      /* storage unavailable — the in-memory clear below still applies */
+    }
     setAgentEvents([]);
     setRetuneSignal(0);
     setOnboarded(false);
