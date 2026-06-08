@@ -8,12 +8,13 @@ that the deterministic tools downstream — ``search_nutrition``,
 split the model only *parses and orchestrates*; it never invents a
 nutrient number a tool can look up.
 
-The model is asked for JSON. Real LLM output is unreliable, so parsing is
-fail-soft on every axis: missing response text, non-JSON output, an unexpected
-shape, or an individual malformed item all degrade to "drop it" rather than
-raising — an empty :class:`MealParse` in the worst case — so the agent loop
-keeps running. The Gemini client is injectable for tests; the default is built
-lazily so importing this module never requires GCP credentials.
+The model is asked for JSON. Real LLM output (and the call itself) is unreliable,
+so parsing is fail-soft on every axis: a failed client build (missing
+credentials), a failed API call (timeout, 429, 503), missing response text,
+non-JSON output, an unexpected shape, or an individual malformed item all degrade
+to "drop it" rather than raising — an empty :class:`MealParse` in the worst case —
+so the agent loop keeps running. The Gemini client is injectable for tests; the
+default is built lazily so importing this module never requires GCP credentials.
 """
 
 from __future__ import annotations
@@ -170,18 +171,30 @@ def parse_meal(
     Vertex client is built lazily. The live default path asks Gemini for
     structured output (``responseMimeType`` + ``responseSchema=MealParse``) so the
     model returns schema-valid JSON directly. Returns a :class:`MealParse` whose
-    ``items`` are the foods the model recovered. Any failure to get well-formed
-    JSON — no text, non-JSON, wrong shape — degrades to an empty parse rather than
-    raising.
+    ``items`` are the foods the model recovered. Any failure — the client build
+    raising, the API call raising, no text, non-JSON, wrong shape — degrades to an
+    empty parse rather than raising.
     """
     if client is None:
-        client = _default_client()
+        try:
+            client = _default_client()
+        except Exception:
+            # A credentials/Vertex-init failure must not crash the /log path —
+            # degrade to an empty parse, matching web_nutrition's
+            # guard around the same lazy client build.
+            return MealParse()
 
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=_prompt(text, examples),
-        config=_structured_config(),
-    )
+    try:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=_prompt(text, examples),
+            config=_structured_config(),
+        )
+    except Exception:
+        # A transient API error (timeout, 429, 503) must not crash the /log path —
+        # degrade to an empty parse like every other failure axis,
+        # matching web_nutrition's guard around the same generate_content call.
+        return MealParse()
 
     raw_text = getattr(response, "text", None)
     if not raw_text:

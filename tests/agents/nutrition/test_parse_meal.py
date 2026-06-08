@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from dietrace.agents.nutrition.parse_meal import MealParse, ParsedItem, parse_meal
 
@@ -139,6 +139,34 @@ def test_malformed_output_fails_soft() -> None:
 def test_missing_response_text_fails_soft() -> None:
     """A response with no text (None) is handled fail-soft."""
     assert parse_meal("anything", client=_client(None)).items == []
+
+
+def test_generate_content_exception_fails_soft() -> None:
+    """A transient Gemini API error (timeout, 429, 503) yields an empty parse, never raising."""
+    client = Mock()
+    client.models.generate_content.side_effect = RuntimeError("503 Service Unavailable")
+
+    result = parse_meal("two eggs", client=client)
+
+    assert isinstance(result, MealParse)
+    assert result.items == []
+
+
+def test_default_client_build_failure_fails_soft() -> None:
+    """A credentials/Vertex-init failure on the lazy client build yields an empty parse.
+
+    The default path builds a Vertex client; missing GCP credentials must not crash
+    the /log path, matching web_nutrition's guard around the same
+    lazy ``_default_client`` build.
+    """
+    with patch(
+        "dietrace.agents.nutrition.parse_meal._default_client",
+        side_effect=RuntimeError("could not find default credentials"),
+    ):
+        result = parse_meal("two eggs")  # client omitted → default build path
+
+    assert isinstance(result, MealParse)
+    assert result.items == []
 
 
 def test_skips_malformed_items_keeps_valid_ones() -> None:
