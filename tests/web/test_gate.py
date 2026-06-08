@@ -129,6 +129,38 @@ def test_zero_calorie_case_misses_when_estimate_is_nonzero() -> None:
     assert score_block("", zero_fit, _USDA, _nonzero_logger)["fit"] == 0.0
 
 
+def test_fit_gain_exactly_at_margin_ships_despite_float_error() -> None:
+    """A fit gain of *exactly* the margin must count as meaningful. Scores come back
+    rounded to 3 decimals, so realistic pairs land on the boundary: 0.016 → 0.036 is
+    a +0.020 gain, but 0.016 + 0.02 == 0.036000000000000004 in float, so a naive
+    ``>=`` wrongly rejects it. The gate must ship it."""
+    current = {"usda": 1.0, "fit": 0.016}
+    proposed = {"usda": 1.0, "fit": 0.036}  # exactly +0.020, the default margin
+    decision = ship_decision(current, proposed)
+    assert decision["fit_gain"] is True
+    assert decision["ship"] is True
+
+
+def test_usda_floor_exactly_at_eps_holds_despite_float_error() -> None:
+    """A USDA drop of *exactly* eps holds the floor (within ε), not breaches it.
+    0.07 → 0.02 is a −0.050 drop, but 0.07 − 0.05 == 0.020000000000000004 in float,
+    so a naive ``>=`` wrongly flags a floor breach."""
+    current = {"usda": 0.07, "fit": 0.50}
+    proposed = {"usda": 0.02, "fit": 0.80}  # exactly −0.050 USDA, big fit win
+    decision = ship_decision(current, proposed, eps=0.05)
+    assert decision["usda_ok"] is True
+    assert decision["ship"] is True
+
+
+def test_genuine_sub_margin_gain_still_rejected_after_tolerance() -> None:
+    """The float tolerance must be far below the 3-decimal score granularity, so a
+    real sub-margin gain (+0.019 < 0.020) is still rejected — the fix absorbs
+    representation error only, it does not loosen the rule."""
+    current = {"usda": 1.0, "fit": 0.700}
+    proposed = {"usda": 1.0, "fit": 0.719}  # +0.019, just under the 0.020 margin
+    assert ship_decision(current, proposed)["fit_gain"] is False
+
+
 def test_confirmations_to_cases_uses_confirmed_calories_as_truth() -> None:
     confirmations = [
         {"meal_text": "oatmeal", "totals": _totals(214)},

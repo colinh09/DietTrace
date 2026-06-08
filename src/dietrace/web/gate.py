@@ -26,6 +26,13 @@ DEFAULT_EPS = 0.05
 # a smaller bump is treated as noise so trivial/contradictory feedback can't ship.
 DEFAULT_FIT_DELTA = 0.02
 
+# Float-comparison slack for the ship-rule boundaries. Scores are rounded to 3
+# decimals, so a gain/drop of *exactly* the margin (e.g. 0.016 + 0.02) can read as
+# just-below due to IEEE-754 error and wrongly reject. This tolerance absorbs that
+# representation error while staying far below the 1e-3 score granularity, so a
+# genuine sub-margin change is never promoted.
+_BOUNDARY_TOL = 1e-9
+
 
 def _case_score(case: dict[str, Any], estimate: Callable[[str], dict]) -> float:
     """Calorie accuracy of one *estimate* against a case (1.0 exact, 0.0 far off)."""
@@ -91,8 +98,8 @@ def ship_decision(
     bump is treated as noise). Returns the verdict plus a plain reason for
     observability.
     """
-    usda_ok = proposed["usda"] >= current["usda"] - eps
-    fit_gain = proposed["fit"] >= current["fit"] + fit_delta
+    usda_ok = proposed["usda"] >= current["usda"] - eps - _BOUNDARY_TOL
+    fit_gain = proposed["fit"] >= current["fit"] + fit_delta - _BOUNDARY_TOL
     ship = usda_ok and fit_gain
     if ship:
         reason = (

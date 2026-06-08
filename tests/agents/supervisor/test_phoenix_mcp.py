@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from dietrace.agents.supervisor.phoenix_mcp import (
     PhoenixMCPClient,
     mcp_available,
@@ -16,10 +18,22 @@ class _FakeContent:
         self.text = text
 
 
+class _NoTextContent:
+    """A content block with no ``text`` attribute (e.g. an image/blob part)."""
+
+
 class _FakeResult:
     def __init__(self, payload: object, is_error: bool = False) -> None:
         self.isError = is_error
         self.content = [_FakeContent(json.dumps(payload))]
+
+
+class _RawResult:
+    """A result whose content blocks are supplied verbatim (no JSON wrapping)."""
+
+    def __init__(self, content: list, is_error: bool = False) -> None:
+        self.isError = is_error
+        self.content = content
 
 
 class _FakeSession:
@@ -32,6 +46,18 @@ class _FakeSession:
     async def call_tool(self, name: str, arguments: dict) -> _FakeResult:
         self.calls.append((name, arguments))
         return _FakeResult(self._payload)
+
+
+class _CannedResultSession:
+    """Returns a pre-built result object verbatim from every tool call."""
+
+    def __init__(self, result: object) -> None:
+        self._result = result
+        self.calls: list[tuple[str, dict]] = []
+
+    async def call_tool(self, name: str, arguments: dict) -> object:
+        self.calls.append((name, arguments))
+        return self._result
 
 
 # ---- reads ---------------------------------------------------------------
@@ -114,6 +140,54 @@ async def test_add_dataset_examples_calls_write_tool() -> None:
 
 def test_user_dataset_name_is_deterministic() -> None:
     assert user_dataset_name("alice") == "dietrace-user-alice"
+
+
+async def test_tool_error_result_raises_with_message() -> None:
+    """An ``isError`` MCP result surfaces as a RuntimeError carrying the error text,
+    rather than being silently swallowed into an empty read."""
+    result = _RawResult([_FakeContent("dataset not found")], is_error=True)
+    client = PhoenixMCPClient(_session=_CannedResultSession(result))
+
+    with pytest.raises(RuntimeError, match="dataset not found"):
+        await client.list_datasets()
+
+
+async def test_error_result_without_text_content_still_raises() -> None:
+    """An error result whose blocks carry no ``text`` still raises (empty message),
+    never returns as if the call succeeded."""
+    result = _RawResult([_NoTextContent()], is_error=True)
+    client = PhoenixMCPClient(_session=_CannedResultSession(result))
+
+    with pytest.raises(RuntimeError, match="MCP tool returned an error"):
+        await client.get_spans("trace-1")
+
+
+async def test_no_text_content_parses_to_empty_read() -> None:
+    """A success result with no text block parses to None, so reads degrade to []."""
+    result = _RawResult([_NoTextContent()])
+    client = PhoenixMCPClient(_session=_CannedResultSession(result))
+
+    assert await client.list_datasets() == []
+
+
+async def test_unexpected_payload_shapes_degrade_to_empty() -> None:
+    """When the payload is neither a list nor the expected wrapper dict, each read
+    returns an empty result instead of raising — the supervisor degrades fail-soft."""
+    client = PhoenixMCPClient(_session=_FakeSession({"unexpected": True}))
+
+    assert await client.list_datasets() == []
+    assert await client.get_recent_experiments("ds1") == []
+    assert await client.get_experiment_results("exp1") == []
+    assert await client.get_spans("trace-1") == []
+    assert await client.find_dataset("missing") is None
+
+
+async def test_add_dataset_examples_falls_back_to_count_on_nondict() -> None:
+    """A non-dict write response falls back to a synthetic ``{"added": N}`` summary."""
+    client = PhoenixMCPClient(_session=_FakeSession("ok"))
+    examples = [{"input": {}, "output": {}, "metadata": {}}, {"input": {}, "output": {}}]
+
+    assert await client.add_dataset_examples("dietrace-user-bob", examples) == {"added": 2}
 
 
 def test_mcp_available_requires_both_creds(monkeypatch) -> None:
