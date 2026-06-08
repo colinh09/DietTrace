@@ -9,6 +9,10 @@ exercise known values so the arithmetic is locked, not just the plumbing. No DB
 or network is touched.
 """
 
+import math
+
+import pytest
+
 from dietrace.evals.evaluators import (
     PHOENIX_EVALUATORS,
     EvalResult,
@@ -466,3 +470,43 @@ def test_new_evaluators_registered_in_phoenix_list() -> None:
     """The three new evaluators are wired into PHOENIX_EVALUATORS by name (10.2)."""
     names = {fn.__name__ for fn in PHOENIX_EVALUATORS}
     assert {"fiber_accuracy", "sodium_accuracy", "total_sugars_accuracy"} <= names
+
+
+# --- non-finite output stays in the [0,1] contract -------------------
+#
+# Every numeric evaluator funnels through ``_pct_error`` and normalizes its score
+# with ``1 - min(err, 1)``.  requires scores "normalized to [0,1] for
+# Phoenix charts" so "regressions flag". But ``min(nan, 1.0)`` is ``nan`` in
+# Python, so a non-finite agent total (a NaN/inf amount reaching an evaluator from
+# a replayed/stored output or an MCP-written dataset point) would yield a ``nan``
+# score — which corrupts Phoenix aggregation and, worse, does NOT flag as a
+# regression (``nan <= tol`` is False, but a nan score poisons any mean). A broken
+# output must instead score as the worst possible miss (error 1.0 → score 0.0).
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_calorie_accuracy_non_finite_total_is_worst_miss_not_nan(bad: float) -> None:
+    output = _totals(calories=bad, protein_g=20.0, fat_g=40.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = calorie_accuracy(output, expected)
+
+    assert math.isfinite(result.score)
+    assert result.score == 0.0  # unusable output → worst miss, keeps [0,1]
+    assert result.metadata["calorie_pct_error"] == 1.0
+    assert result.label == "fail"
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_macro_pct_error_non_finite_macro_keeps_score_finite(bad: float) -> None:
+    # One poisoned macro must not NaN out the whole mean-driven score.
+    output = _totals(calories=400.0, protein_g=bad, fat_g=40.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = macro_pct_error(output, expected)
+
+    assert math.isfinite(result.score)
+    # One poisoned macro (err 1.0) among three exact (0.0) → mean 0.25 → score 0.75.
+    assert result.score == 0.75
+    assert result.metadata["per_macro"]["protein_g"] == 1.0  # bad macro → full error
+    assert math.isfinite(result.metadata["mean_pct_error"])

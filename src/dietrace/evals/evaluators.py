@@ -16,6 +16,7 @@ against the default ±15% band.
 from __future__ import annotations
 
 import functools
+import math
 from collections.abc import Callable
 from typing import Any
 
@@ -75,10 +76,19 @@ def _expected_macros(expected: Any) -> dict[str, float]:
 
 
 def _pct_error(actual: float, expected: float) -> float:
-    """|%error| as a fraction; a zero ground truth is 0 if hit exactly, else 1."""
+    """|%error| as a fraction; a zero ground truth is 0 if hit exactly, else 1.
+
+    A non-finite operand (a NaN/inf amount reaching an evaluator from a replayed
+    or MCP-written output) yields the worst error (1.0), not a non-finite value:
+    every evaluator normalizes with ``1 - min(err, 1)`` and ``min(nan, 1.0)`` is
+    ``nan``, so an unguarded non-finite error would poison the [0,1] score 
+    requires for Phoenix charts and regression flagging. An unusable output is a
+    full miss, not a silent ``nan``.
+    """
     if expected == 0.0:
         return 0.0 if actual == 0.0 else 1.0
-    return abs(actual - expected) / abs(expected)
+    err = abs(actual - expected) / abs(expected)
+    return err if math.isfinite(err) else 1.0
 
 
 def macro_pct_error(
