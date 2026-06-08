@@ -1473,7 +1473,7 @@ body {
 .rr-delta b { color: var(--ink); font-weight: 600; }
 .rr-delta b.up { color: var(--accent-ink); }
 .rr-arrow { color: var(--faint); padding: 0 1px; }
-.rr-sub { font-size: 11px; color: var(--faint); line-height: 1.4; margin-top: 1px; }
+.rr-sub { font-size: 11px; font-style: italic; color: var(--faint); line-height: 1.4; margin-top: 1px; }
 .rr-note { margin-top: 7px; font-size: 11px; color: var(--faint); line-height: 1.45; }
 
 /* Phoenix MCP node: blue tag + code line */
