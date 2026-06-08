@@ -33,12 +33,13 @@ export function ResetDialog({
   return (
     <Modal onClose={onClose} labelledBy="reset-title">
       <div className="reset-dialog">
+        <div className="reset-dialog-eyebrow mono">Reset</div>
         <h2 id="reset-title" className="reset-dialog-title display">
           Reset everything?
         </h2>
         <p className="reset-dialog-body">
-          This clears your meals, goals, and everything DietTrace has learned
-          about you, then restarts onboarding. You can&apos;t undo this.
+          This permanently clears your meals, goals, and everything DietTrace has
+          learned about you, then restarts onboarding. This can&apos;t be undone.
         </p>
         <div className="reset-dialog-actions">
           <button

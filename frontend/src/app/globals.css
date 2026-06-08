@@ -900,9 +900,10 @@ body {
 .acct-menu-sep { height: 1px; background: var(--line); margin: 5px 4px; }
 
 /* ── Reset confirmation dialog (a real modal, no in-place navbar morph) ── */
-.reset-dialog { max-width: 392px; }
-.reset-dialog-title { font-size: 20px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
-.reset-dialog-body { font-size: 13.5px; color: var(--ink); line-height: 1.55; margin-bottom: 20px; }
+.reset-dialog { max-width: 400px; padding: 4px 2px; }
+.reset-dialog-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--danger-ink); margin-bottom: 9px; }
+.reset-dialog-title { font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin-bottom: 9px; }
+.reset-dialog-body { font-size: 13.5px; color: var(--muted-ink); line-height: 1.6; margin-bottom: 22px; }
 .reset-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .reset-dialog-actions .btn-ghost { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 100px; padding: 9px 18px; font-family: var(--ui-font); font-size: 13px; font-weight: 500; cursor: pointer; transition: background .15s, border-color .15s; }
 .reset-dialog-actions .btn-ghost:hover:not(:disabled) { background: var(--accent-softer); border-color: var(--faint); }
