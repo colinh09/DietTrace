@@ -149,10 +149,6 @@ export function FreeformFeedback({
               </span>
             </>
           )}
-
-          <button type="button" className="freeform-again" onClick={reset}>
-            tell it something else
-          </button>
         </div>
       )}
       {status === "done" && result && !result.ok && (

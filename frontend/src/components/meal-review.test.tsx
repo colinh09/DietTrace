@@ -25,11 +25,15 @@ describe("MealReview", () => {
     expect(screen.queryByLabelText(/free-form feedback/i)).not.toBeInTheDocument();
   });
 
-  it("confirms the meal as an answer key on 'looks right'", async () => {
+  it("'looks right' → 'would you change anything?' → confirm adds it as an answer key", async () => {
     vi.mocked(api.confirmMeal).mockResolvedValue({ ok: true, id: 1, confirmations: 6 });
     render(<MealReview mealText="oatmeal" perItem={perItem} totals={totals} />);
 
     fireEvent.click(screen.getByRole("button", { name: /looks right/i }));
+    // Intermediate step before anything is saved.
+    expect(await screen.findByText(/would you change anything/i)).toBeInTheDocument();
+    expect(api.confirmMeal).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /confirm it/i }));
     await waitFor(() =>
       expect(api.confirmMeal).toHaveBeenCalledWith("oatmeal", perItem, totals),
     );
@@ -42,12 +46,12 @@ describe("MealReview", () => {
     expect(screen.getByLabelText(/free-form feedback/i)).toBeInTheDocument();
   });
 
-  it("offers a portion nudge after confirming, opening the quantity editor", async () => {
+  it("lets you adjust a portion at the 'change anything?' step before confirming", async () => {
     vi.mocked(api.confirmMeal).mockResolvedValue({ ok: true, id: 1, confirmations: 6 });
     render(<MealReview mealText="oatmeal" perItem={perItem} totals={totals} />);
 
     fireEvent.click(screen.getByRole("button", { name: /looks right/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /nudge a portion/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /adjust a portion/i }));
     // The gram editor opens with the item's editable grams.
     expect(screen.getByLabelText(/grams of oats/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /save as confirmed/i }));
@@ -55,13 +59,14 @@ describe("MealReview", () => {
     expect(await screen.findByText(/answer key/i)).toBeInTheDocument();
   });
 
-  it("offers a path back to correcting after confirming (XOR)", async () => {
+  it("locks once confirmed — no undo or change affordance remains", async () => {
     vi.mocked(api.confirmMeal).mockResolvedValue({ ok: true, id: 1, confirmations: 6 });
     render(<MealReview mealText="oatmeal" perItem={perItem} totals={totals} />);
 
     fireEvent.click(screen.getByRole("button", { name: /looks right/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirm it/i }));
     await screen.findByText(/answer key/i);
-    fireEvent.click(screen.getByRole("button", { name: /actually, something's off/i }));
-    expect(screen.getByLabelText(/free-form feedback/i)).toBeInTheDocument();
+    // Terminal state: no buttons to nudge, undo, or re-open the correction box.
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

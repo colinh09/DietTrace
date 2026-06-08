@@ -12,7 +12,7 @@ import { FreeformFeedback } from "@/components/freeform-feedback";
 import type { AgentActivity } from "@/components/agent-decision";
 import { QuantityEditor } from "@/components/quantity-editor";
 
-type Mode = "ask" | "tweaking" | "correcting" | "confirmed";
+type Mode = "ask" | "reviewing" | "tweaking" | "correcting" | "confirmed";
 
 export function MealReview({
   mealId,
@@ -60,6 +60,8 @@ export function MealReview({
       .finally(() => setSaving(false));
   };
 
+  // Terminal, locked state — once confirmed it's an answer key; no more changes
+  // or undos (a later change would un-confirm it and break the XOR with feedback).
   if (mode === "confirmed") {
     return (
       <div className="review-confirmed">
@@ -68,45 +70,33 @@ export function MealReview({
           Confirmed — saved as an answer key. DietTrace will check its future
           updates against this meal, but never peeks at it while learning.
         </span>
-        <span className="review-confirmed-more">
-          <button
-            type="button"
-            className="review-undo"
-            onClick={() => setMode("tweaking")}
-          >
-            nudge a portion?
-          </button>
-          <button
-            type="button"
-            className="review-undo"
-            onClick={() => setMode("correcting")}
-          >
-            actually, something&apos;s off
-          </button>
-        </span>
       </div>
     );
   }
 
   return (
     <div className="review">
-      <div className="review-head">
-        <span className="review-q">Does this look right?</span>
-        <span className="review-sub">
-          A quick check so DietTrace only learns from meals you&apos;ve confirmed
-          are right.
-        </span>
-      </div>
+      {(mode === "ask" || mode === "reviewing") && (
+        <div className="review-head">
+          <span className="review-q">
+            {mode === "ask" ? "Does this look right?" : "Would you change anything?"}
+          </span>
+          <span className="review-sub">
+            {mode === "ask"
+              ? "A quick check so DietTrace only learns from meals you've confirmed are right."
+              : "Adjust a portion if something's off — otherwise confirm it as your answer key."}
+          </span>
+        </div>
+      )}
 
       {mode === "ask" && (
         <div className="review-actions">
           <button
             type="button"
             className="review-yes"
-            onClick={confirm}
-            disabled={saving}
+            onClick={() => setMode("reviewing")}
           >
-            {saving ? "saving…" : "Looks right"}
+            Looks right
           </button>
           <button
             type="button"
@@ -117,12 +107,31 @@ export function MealReview({
           </button>
         </div>
       )}
+      {mode === "reviewing" && (
+        <div className="review-actions">
+          <button
+            type="button"
+            className="review-yes"
+            onClick={confirm}
+            disabled={saving}
+          >
+            {saving ? "saving…" : "No — confirm it"}
+          </button>
+          <button
+            type="button"
+            className="review-no"
+            onClick={() => setMode("tweaking")}
+          >
+            Adjust a portion
+          </button>
+        </div>
+      )}
       {mode === "tweaking" && (
         <QuantityEditor
           mealText={mealText}
           perItem={perItem}
           onConfirmed={() => setMode("confirmed")}
-          onCancel={() => setMode("confirmed")}
+          onCancel={() => setMode("reviewing")}
         />
       )}
       {mode === "correcting" && (
