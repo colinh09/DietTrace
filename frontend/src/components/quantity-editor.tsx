@@ -10,18 +10,26 @@ import { macrosOf, rescaleItem, sumItemsToTotals } from "@/lib/meal";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
 
+export type PortionChange = { food: string; grams: number };
+
 export function QuantityEditor({
   mealText,
+  mealId,
   perItem,
   onConfirmed,
   onCancel,
 }: {
   mealText: string;
+  // The logged meal's id, so the backend can rewrite the entry to the new portions.
+  mealId?: number;
   perItem: LoggedItem[];
-  // Passes the /confirm response up so the parent can fire the same feed event +
-  // history refresh as a direct confirm (otherwise an adjusted meal never reaches
-  // the agent feed and never becomes a dataset point).
-  onConfirmed: (res: Awaited<ReturnType<typeof confirmMeal>>) => void;
+  // Passes the /confirm response up (so the parent fires the same feed event +
+  // history refresh as a direct confirm) plus the portions that actually changed
+  // (so the parent can say "Updated X to Y g").
+  onConfirmed: (
+    res: Awaited<ReturnType<typeof confirmMeal>>,
+    changes: PortionChange[],
+  ) => void;
   onCancel: () => void;
 }) {
   // Hold the raw input STRING, not a number — a controlled number input keeps a
@@ -46,8 +54,12 @@ export function QuantityEditor({
   const save = () => {
     if (saving) return;
     setSaving(true);
-    confirmMeal(mealText, edited, totals)
-      .then(onConfirmed)
+    const changes: PortionChange[] = perItem
+      .map((it, i) => ({ food: it.description, grams: grams[i], was: Math.round(it.grams) }))
+      .filter((c) => c.grams !== c.was)
+      .map((c) => ({ food: c.food, grams: c.grams }));
+    confirmMeal(mealText, edited, totals, mealId)
+      .then((res) => onConfirmed(res, changes))
       .catch(() => setSaving(false));
   };
 

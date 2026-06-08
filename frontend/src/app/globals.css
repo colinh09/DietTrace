@@ -1155,8 +1155,11 @@ body {
 .review-yes:disabled { opacity: 0.6; cursor: default; }
 .review-no { font-size: 13px; font-weight: 500; color: var(--accent-ink); background: none; border: 1px solid var(--accent-soft); border-radius: 8px; padding: 8px 16px; cursor: pointer; transition: background .14s, color .14s; }
 .review-no:hover { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-.review-confirmed { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 11px 14px; font-size: 13px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 10px; }
+.review-confirmed { display: flex; align-items: flex-start; gap: 9px; padding: 11px 14px; font-size: 13px; color: var(--accent-ink); background: var(--accent-soft); border-radius: 10px; }
 .review-confirmed > span { flex: 1; min-width: 160px; }
+.review-confirmed svg { flex: none; margin-top: 2px; }
+.review-confirmed-body { display: flex; flex-direction: column; gap: 5px; }
+.review-confirmed-body p { margin: 0; line-height: 1.4; }
 .review-undo { font-size: 12px; color: var(--accent-ink); background: none; border: none; cursor: pointer; padding: 2px 4px; text-decoration: underline; text-underline-offset: 2px; }
 .review-undo:hover { color: var(--ink); }
 .conf-calc-intro { font-size: 12px; line-height: 1.45; color: var(--muted-ink); margin: -4px 0 11px; max-width: 56ch; }

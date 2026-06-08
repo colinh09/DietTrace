@@ -10,7 +10,7 @@ import { Check } from "lucide-react";
 import { confirmMeal, type LoggedItem, type Nutrient } from "@/lib/api";
 import { FreeformFeedback } from "@/components/freeform-feedback";
 import type { AgentActivity } from "@/components/agent-decision";
-import { QuantityEditor } from "@/components/quantity-editor";
+import { QuantityEditor, type PortionChange } from "@/components/quantity-editor";
 
 type Mode = "ask" | "reviewing" | "tweaking" | "correcting" | "confirmed";
 
@@ -31,13 +31,19 @@ export function MealReview({
 }) {
   const [mode, setMode] = useState<Mode>("ask");
   const [saving, setSaving] = useState(false);
+  // Portions changed via "Adjust a portion" — shown in the confirmed message.
+  const [changes, setChanges] = useState<PortionChange[]>([]);
 
   // Shared post-confirm work, run for BOTH a direct confirm and an adjusted-portion
   // confirm (the QuantityEditor) so neither path skips it: lock the UI, refresh the
   // state counts + history (so the meal becomes a dataset point), and drop the
   // dataset-point entry (+ any triggered retune) into the activity feed.
-  const afterConfirm = (res: Awaited<ReturnType<typeof confirmMeal>>) => {
+  const afterConfirm = (
+    res: Awaited<ReturnType<typeof confirmMeal>>,
+    edits: PortionChange[] = [],
+  ) => {
     setMode("confirmed");
+    setChanges(edits);
     onCorrected?.();
     onAgentEvent?.({
       op: "add_dataset_point",
@@ -73,10 +79,19 @@ export function MealReview({
     return (
       <div className="review-confirmed">
         <Check size={14} aria-hidden="true" />
-        <span>
-          Confirmed — saved to your dataset. DietTrace will check its future
-          updates against this meal, but never peeks at it while learning.
-        </span>
+        <div className="review-confirmed-body">
+          <p>Confirmed — saved to your dataset.</p>
+          {changes.length > 0 && (
+            <p>
+              Updated{" "}
+              {changes.map((c) => `${c.food} to ${c.grams} g`).join(", ")}.
+            </p>
+          )}
+          <p>
+            DietTrace will check its future updates against this meal, but never
+            peeks at it while learning.
+          </p>
+        </div>
       </div>
     );
   }
@@ -136,6 +151,7 @@ export function MealReview({
       {mode === "tweaking" && (
         <QuantityEditor
           mealText={mealText}
+          mealId={mealId}
           perItem={perItem}
           onConfirmed={afterConfirm}
           onCancel={() => setMode("reviewing")}

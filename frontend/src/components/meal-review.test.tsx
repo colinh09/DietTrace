@@ -85,6 +85,29 @@ describe("MealReview", () => {
     expect(await screen.findByText(/your dataset/i)).toBeInTheDocument();
   });
 
+  it("a changed portion rewrites the meal (meal_id) and is named in the confirmed text", async () => {
+    vi.mocked(api.confirmMeal).mockResolvedValue({ ok: true, id: 1, confirmations: 6 });
+    render(<MealReview mealId={5} mealText="oatmeal" perItem={perItem} totals={totals} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /looks right/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /adjust a portion/i }));
+    fireEvent.change(screen.getByLabelText(/grams of oats/i), {
+      target: { value: "100" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save as confirmed/i }));
+    // meal_id is sent so the backend rewrites the logged entry to the new portion…
+    await waitFor(() =>
+      expect(api.confirmMeal).toHaveBeenCalledWith(
+        "oatmeal",
+        expect.anything(),
+        expect.anything(),
+        5,
+      ),
+    );
+    // …and the confirmed message names the change.
+    expect(await screen.findByText(/updated oats to 100 g/i)).toBeInTheDocument();
+  });
+
   it("locks once confirmed — no undo or change affordance remains", async () => {
     vi.mocked(api.confirmMeal).mockResolvedValue({ ok: true, id: 1, confirmations: 6 });
     render(<MealReview mealText="oatmeal" perItem={perItem} totals={totals} />);

@@ -781,6 +781,9 @@ export async function confirmMeal(
   meal_text: string,
   items: LoggedItem[],
   totals: Nutrient[],
+  // Provided only when a portion was adjusted — the backend rewrites the logged
+  // meal to these items so the entry matches what was confirmed.
+  meal_id?: number,
 ): Promise<{
   ok: boolean;
   id: number;
@@ -789,7 +792,7 @@ export async function confirmMeal(
 }> {
   return request("/confirm", {
     method: "POST",
-    body: JSON.stringify({ meal_text, items, totals }),
+    body: JSON.stringify({ meal_text, items, totals, meal_id }),
   });
 }
 
