@@ -626,8 +626,17 @@ body {
 .phoenix-exp-link:hover { text-decoration: underline; }
 
 /* The finished-experiment per-meal results table (pulled from Arize over MCP). */
-.exp-results { margin-top: 12px; }
-.exp-results-sub { font-size: 12px; color: var(--muted-ink); margin: 0 0 10px; }
+.exp-results { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.exp-results-toggle { display: flex; align-items: center; gap: 7px; width: 100%; padding: 9px 12px;
+  background: none; border: none; cursor: pointer; font-family: var(--mono); font-size: 10px;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted-ink); text-align: left; }
+.exp-results-toggle svg { color: var(--faint); flex: none; }
+.exp-results-count { margin-left: auto; font-family: var(--ui-font); font-size: 11px; letter-spacing: 0;
+  text-transform: none; color: var(--faint); }
+.exp-results .exp-rows { padding: 0 13px 11px; }
+.exp-results .phoenix-exp-link { display: inline-block; margin: 0 13px 12px; }
+/* the experiment detail nested under the most recent "Updated" feed event */
+.revent-detail { padding-left: 24px; margin: 2px 0 8px; }
 .exp-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .exp-row { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .exp-row:last-child { border-bottom: none; padding-bottom: 0; }

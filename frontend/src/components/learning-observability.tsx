@@ -135,7 +135,7 @@ function RetuneLive({
         <ScorePanel
           title="USDA / everyday"
           tone="var(--macro-carb)"
-          goal="reference foods · must not drop"
+          goal="reference foods · must stay accurate"
           rows={usda}
         />
       </div>
@@ -156,7 +156,6 @@ function ScorePanel({
   goal: string;
   rows: LiveRow[];
 }) {
-  const activeIdx = rows.findIndex((r) => r.before == null);
   const asPct = (v: number) => `${Math.round(v * 100)}%`;
   return (
     <div className="rt-panel">
@@ -184,13 +183,10 @@ function ScorePanel({
                   "rt-score " + (!scored ? "pending" : up ? "up" : down ? "down" : "")
                 }
               >
-                {r.after != null ? (
-                  asPct(r.after)
-                ) : i === activeIdx ? (
-                  <span className="lm-spinner" aria-hidden="true" />
-                ) : (
-                  "—"
-                )}
+                {/* Scores arrive out of order (USDA in parallel, fit from one
+                    Phoenix run) — so an unscored row is always a plain dash, never
+                    a spinner that would imply "this one is next". */}
+                {r.after != null ? asPct(r.after) : "—"}
               </span>
             </Fragment>
           );
@@ -242,7 +238,7 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
           label="On everyday foods"
           current={cur.usda}
           proposed={prop.usda}
-          hint={`how close it gets on ${result.usda_cases} standard reference foods — this can't drop`}
+          hint={`how close it gets on ${result.usda_cases} standard reference foods — this has to stay accurate`}
         />
       </div>
 
@@ -299,41 +295,54 @@ function ExperimentResults({
   rows: LiveRow[];
   result: LearningRetuneResult;
 }) {
+  const [open, setOpen] = useState(true);
   const fit = rows.filter((r) => r.set === "fit" && r.expected != null);
   if (!fit.length) return null;
   return (
-    <section className="dash-card exp-results">
-      <div className="dash-card-head mono">experiment results · arize via mcp</div>
-      <p className="exp-results-sub">
-        {fit.length} meal{fit.length === 1 ? "" : "s"} scored as a Phoenix experiment —
-        each row read back over MCP.
-      </p>
-      <ul className="exp-rows">
-        {fit.map((r, i) => {
-          const up = r.after != null && r.before != null && r.after > r.before;
-          return (
-            <li className="exp-row" key={i}>
-              <span className="exp-meal">{r.text}</span>
-              <span className="exp-kcal mono tnum">
-                {r.baseKcal ?? "–"} → {r.tunedKcal ?? "–"} kcal
-                <span className="exp-truth"> · truth {r.expected}</span>
-              </span>
-              <span className={"exp-acc mono tnum" + (up ? " up" : "")}>
-                {pct(r.before ?? 0)} → {pct(r.after ?? 0)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      {result.experiment_url && (
-        <a
-          className="phoenix-exp-link"
-          href={result.experiment_url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          open the experiment in Arize ↗
-        </a>
+    <section className="exp-results">
+      <button
+        type="button"
+        className="exp-results-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        <span className="mono">experiment results · arize via mcp</span>
+        <span className="exp-results-count">
+          {fit.length} meal{fit.length === 1 ? "" : "s"}
+        </span>
+      </button>
+      {open && (
+        <>
+          <ul className="exp-rows">
+            {fit.map((r, i) => {
+              const up =
+                r.after != null && r.before != null && r.after > r.before;
+              return (
+                <li className="exp-row" key={i}>
+                  <span className="exp-meal">{r.text}</span>
+                  <span className="exp-kcal mono tnum">
+                    {r.baseKcal ?? "–"} → {r.tunedKcal ?? "–"} kcal
+                    <span className="exp-truth"> · truth {r.expected}</span>
+                  </span>
+                  <span className={"exp-acc mono tnum" + (up ? " up" : "")}>
+                    {pct(r.before ?? 0)} → {pct(r.after ?? 0)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {result.experiment_url && (
+            <a
+              className="phoenix-exp-link"
+              href={result.experiment_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              open the experiment in Arize ↗
+            </a>
+          )}
+        </>
       )}
     </section>
   );
@@ -553,16 +562,21 @@ export function LearningObservability({
           )}
         </>
       )}
-      <AgentFeed events={feedEvents} running={retuning} />
+      {/* The experiment's per-meal results ride UNDER the most recent "Updated"
+          event in the feed (collapsible), not as a footer at the bottom. */}
+      <AgentFeed
+        events={feedEvents}
+        running={retuning}
+        retuneDetail={
+          result && !retuning && result.scored_via === "phoenix" ? (
+            <ExperimentResults rows={liveRows} result={result} />
+          ) : null
+        }
+      />
       {feedEvents.length === 0 && !retuning && (
         <p className="agent-feed-empty">
           Log a meal and DietTrace&apos;s decisions show up here.
         </p>
-      )}
-      {/* After a Phoenix-scored re-tune: the finished experiment's per-meal results,
-          pulled back from Arize over MCP. */}
-      {result && !retuning && result.scored_via === "phoenix" && (
-        <ExperimentResults rows={liveRows} result={result} />
       )}
 
       {/* ── State modal: the deep dive behind the icon ────────────────────── */}

@@ -5,7 +5,7 @@
 // dataset point / retune) and why. Surfaces the decision the backend returns on
 // /log so the agent's own actions are visible, not hidden. Renders nothing when
 // no decision is present (e.g. a recalled meal).
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Database, MessageSquare, RefreshCw } from "lucide-react";
 import type { SupervisorDecision } from "@/lib/api";
 
@@ -92,10 +92,14 @@ function groupOf(e: AgentEvent, now: number): Group {
 export function AgentFeed({
   events,
   running = false,
+  retuneDetail,
 }: {
   events: AgentEvent[];
   // True while a re-tune is streaming — shows a live "thinking" node on top.
   running?: boolean;
+  // The finished experiment's per-meal results, rendered collapsibly UNDER the most
+  // recent "Updated" event — so it reads as that update's detail, not a page footer.
+  retuneDetail?: React.ReactNode;
 }) {
   // A ticking clock so relative times ("4m ago") stay honest without a reload.
   const [now, setNow] = useState(() => Date.now());
@@ -107,6 +111,8 @@ export function AgentFeed({
   if (events.length === 0 && !running) return null;
   const groups: Partial<Record<Group, AgentEvent[]>> = {};
   for (const e of events) (groups[groupOf(e, now)] ||= []).push(e);
+  // Attach the experiment-results detail to the most recent "Updated" event.
+  const firstRetuneId = events.find((e) => e.op === "retune")?.id;
 
   return (
     <div className="rail-events" aria-label="Agent activity">
@@ -128,34 +134,39 @@ export function AgentFeed({
             {groups[g]!.map((e) => {
               const isPhoenix = Boolean(e.phoenix);
               return (
-                <div className="revent" key={e.id} data-op={e.op}>
-                  <span
-                    className={"revent-dot " + (isPhoenix ? "phoenix" : "accent")}
-                    aria-hidden="true"
-                    style={{ color: isPhoenix ? "var(--macro-carb)" : "var(--accent)" }}
-                  >
-                    <OpIcon op={e.op} />
-                  </span>
-                  <div className="revent-head">
-                    <span className="revent-label">{LABELS[e.op]}</span>
-                    {(e.ts != null || e.when) && (
-                      <span className="revent-time">
-                        {e.ts != null ? relTime(e.ts, now) : e.when}
-                      </span>
+                <Fragment key={e.id}>
+                  <div className="revent" data-op={e.op}>
+                    <span
+                      className={"revent-dot " + (isPhoenix ? "phoenix" : "accent")}
+                      aria-hidden="true"
+                      style={{ color: isPhoenix ? "var(--macro-carb)" : "var(--accent)" }}
+                    >
+                      <OpIcon op={e.op} />
+                    </span>
+                    <div className="revent-head">
+                      <span className="revent-label">{LABELS[e.op]}</span>
+                      {(e.ts != null || e.when) && (
+                        <span className="revent-time">
+                          {e.ts != null ? relTime(e.ts, now) : e.when}
+                        </span>
+                      )}
+                    </div>
+                    {e.mealText && <div className="revent-meal">{e.mealText}</div>}
+                    <div className="revent-reason">{e.reason}</div>
+                    {e.detail && <div className="revent-reason mono">{e.detail}</div>}
+                    {e.phoenix && (
+                      <div className="phoenix-line">
+                        <span className="phoenix-tag">
+                          <span className="pdot" /> Arize Phoenix
+                        </span>
+                        <span className="phoenix-code">{e.phoenix}</span>
+                      </div>
                     )}
                   </div>
-                  {e.mealText && <div className="revent-meal">{e.mealText}</div>}
-                  <div className="revent-reason">{e.reason}</div>
-                  {e.detail && <div className="revent-reason mono">{e.detail}</div>}
-                  {e.phoenix && (
-                    <div className="phoenix-line">
-                      <span className="phoenix-tag">
-                        <span className="pdot" /> Arize Phoenix
-                      </span>
-                      <span className="phoenix-code">{e.phoenix}</span>
-                    </div>
+                  {retuneDetail && e.id === firstRetuneId && (
+                    <div className="revent-detail">{retuneDetail}</div>
                   )}
-                </div>
+                </Fragment>
               );
             })}
           </div>
