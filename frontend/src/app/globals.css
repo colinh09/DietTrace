@@ -198,7 +198,7 @@ body {
 /* header — ✦ brand + date navigation */
 .hdr { display: flex; align-items: center; gap: clamp(18px, 3vw, 44px); padding: 4px 0 16px; border-bottom: 1px solid var(--line); }
 .brand { flex: none; display: flex; align-items: center; gap: 9px; }
-.hdr-end { margin-left: auto; display: flex; align-items: center; }
+.hdr-end { display: flex; align-items: center; padding-left: clamp(8px, 1.4vw, 18px); }
 .brand-name { font-family: var(--serif); font-size: 20px; font-weight: 600; letter-spacing: -0.005em; }
 .datenav { display: flex; align-items: center; gap: 3px; position: relative; }
 .date-arrow, .date-label, .date-cal { background: none; border: none; cursor: pointer; color: var(--muted-ink); font-family: inherit; border-radius: 7px; transition: background .14s ease, color .14s ease; }
@@ -807,10 +807,11 @@ body {
 @media (max-width: 520px) { .tg-grid { grid-template-columns: 1fr; } .tg-seg.grow { flex-wrap: wrap; } }
 
 /* ── Top navbar (horizontal nav, no sidebar) ───────────────────────────── */
-.hdr-nav { display: flex; align-items: center; gap: clamp(4px, 1.4vw, 18px); }
-.nav-item { background: none; border: none; cursor: pointer; font-family: var(--ui-font); font-size: 14px; font-weight: 500; color: var(--muted-ink); padding: 6px 4px; border-radius: 8px; transition: color .14s; white-space: nowrap; }
+.hdr-nav { display: flex; align-items: center; gap: clamp(4px, 1.4vw, 18px); margin-left: auto; }
+.nav-item { position: relative; background: none; border: none; cursor: pointer; font-family: var(--ui-font); font-size: 14px; font-weight: 500; color: var(--muted-ink); padding: 6px 4px; border-radius: 8px; transition: color .14s; white-space: nowrap; }
 .nav-item:hover:not(:disabled) { color: var(--ink); }
 .nav-item.active { color: var(--accent-ink); font-weight: 600; }
+.nav-item.active::after { content: ""; position: absolute; left: 4px; right: 4px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
 .nav-sep { display: inline-block; width: 1px; height: 16px; background: var(--line-strong); margin: 0 6px; }
 .reset-session-btn { color: var(--faint); }
 .reset-session-btn:hover { color: var(--amber-ink); background: var(--amber-soft); }
