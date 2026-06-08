@@ -6,8 +6,9 @@
 // with the rule vs without, then the ship verdict), the corrections you've taught
 // (meal + what you said, persisted), and the held-out dataset it's tested against.
 // This is the observability-everywhere rule applied to the loop itself.
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   Gauge,
@@ -87,13 +88,11 @@ function ScoreBar({
 
 // The live retest as it streams: the current phase, the rule the corrector wrote,
 // and each meal scored with the rule vs without as it lands.
-// One score cell — the running row spins, not-yet-scored rows show a dash.
-function Cell({ value, active }: { value: number | null; active: boolean }) {
-  if (value != null) return <span className="lm-cell-val tnum">{pct(value)}</span>;
-  if (active) return <span className="lm-cell-spin" aria-label="scoring" />;
-  return <span className="lm-cell-dash" aria-hidden="true">—</span>;
-}
 
+// The live re-tune as the design's two parallel scoring panels: "Fit to you"
+// (your confirmed meals — should improve) and "USDA / everyday" (reference foods —
+// must not drop), each streaming base → tuned calorie accuracy per meal as the
+// Phoenix experiment scores them.
 function RetuneLive({
   phase,
   rules,
@@ -103,57 +102,100 @@ function RetuneLive({
   rules: PreferenceRule[];
   rows: LiveRow[];
 }) {
-  // The row currently being scored = the first one without a result yet.
-  const activeIdx = rows.findIndex((r) => r.before == null);
+  const fit = rows.filter((r) => r.set === "fit");
+  const usda = rows.filter((r) => r.set === "usda");
+  const allDone = rows.length > 0 && rows.every((r) => r.before != null);
   return (
-    <div className="lm-live">
-      <div className="lm-live-phase">
-        <span className="lm-spinner" aria-hidden="true" />
-        {phase}
+    <div className="rt-live">
+      <div className="rt-badge">
+        {allDone ? (
+          <Check size={13} aria-hidden="true" />
+        ) : (
+          <span className="lm-spinner" aria-hidden="true" />
+        )}
+        Re-tuning · {allDone ? "complete" : "live"}
       </div>
+      <div className="rt-headline">{phase}</div>
       {rules.length > 0 && (
-        <div className="lm-live-rule">
-          <Sparkles size={13} className="lm-rule-icon" aria-hidden="true" />
-          <span>{rules[0].rule}</span>
+        <div className="rt-rule">
+          <Sparkles size={14} className="lm-rule-icon" aria-hidden="true" />
+          <span>
+            <b>New rule the corrector wrote — </b>
+            {rules[0].rule}
+          </span>
         </div>
       )}
-      {rows.length > 0 && (
-        <div className="lm-live-table">
-          <div className="lm-live-caption">
-            Base agent <span className="lm-score-arrow">→</span> agent tuned to you
-            · calorie accuracy per meal (100% = exact)
-          </div>
-          <div className="lm-live-thead">
-            <span aria-hidden="true" />
-            <span aria-hidden="true" />
-            <span className="lm-live-th">Base</span>
-            <span className="lm-live-th">Tuned</span>
-          </div>
-          <ul className="lm-live-rows">
-            {rows.map((r, i) => {
-              const up = r.after != null && r.before != null && r.after > r.before;
-              const down = r.after != null && r.before != null && r.after < r.before;
-              return (
-                <li
-                  className={"lm-live-row" + (i === activeIdx ? " active" : "")}
-                  key={i}
-                >
-                  <span className={"lm-live-set mono lm-set-" + r.set}>
-                    {r.set === "fit" ? "you" : "usda"}
-                  </span>
-                  <span className="lm-live-text">{r.text}</span>
-                  <span className="lm-live-cell">
-                    <Cell value={r.before} active={i === activeIdx} />
-                  </span>
-                  <span className={"lm-live-cell" + (up ? " up" : down ? " down" : "")}>
-                    <Cell value={r.after} active={i === activeIdx} />
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      <div className="rt-panels">
+        <ScorePanel
+          title="Fit to you"
+          tone="var(--accent)"
+          goal="your confirmed meals · should improve"
+          rows={fit}
+        />
+        <ScorePanel
+          title="USDA / everyday"
+          tone="var(--macro-carb)"
+          goal="reference foods · must not drop"
+          rows={usda}
+        />
+      </div>
+    </div>
+  );
+}
+
+// One scoring panel: Meal · Base · Tuned, streaming a row at a time (a pending row
+// shows a spinner on the meal currently being scored, a dash on the rest).
+function ScorePanel({
+  title,
+  tone,
+  goal,
+  rows,
+}: {
+  title: string;
+  tone: string;
+  goal: string;
+  rows: LiveRow[];
+}) {
+  const activeIdx = rows.findIndex((r) => r.before == null);
+  const asPct = (v: number) => `${Math.round(v * 100)}%`;
+  return (
+    <div className="rt-panel">
+      <div className="rt-panel-title">
+        <span className="rt-panel-dot" style={{ background: tone }} aria-hidden="true" />
+        {title}
+      </div>
+      <div className="rt-panel-goal">{goal}</div>
+      <div className="rt-cols">
+        <span className="rt-colhead">Meal</span>
+        <span className="rt-colhead">Base</span>
+        <span className="rt-colhead">Tuned</span>
+        {rows.map((r, i) => {
+          const scored = r.before != null && r.after != null;
+          const up = scored && (r.after as number) > (r.before as number);
+          const down = scored && (r.after as number) < (r.before as number);
+          return (
+            <Fragment key={i}>
+              <span className="rt-name">{r.text}</span>
+              <span className="rt-score base">
+                {r.before != null ? asPct(r.before) : "—"}
+              </span>
+              <span
+                className={
+                  "rt-score " + (!scored ? "pending" : up ? "up" : down ? "down" : "")
+                }
+              >
+                {r.after != null ? (
+                  asPct(r.after)
+                ) : i === activeIdx ? (
+                  <span className="lm-spinner" aria-hidden="true" />
+                ) : (
+                  "—"
+                )}
+              </span>
+            </Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -498,8 +540,7 @@ export function LearningObservability({
       {/* While a re-tune streams, show the live per-meal scoring right in the
           rail — every dataset point re-scored base vs tuned as the eval runs. */}
       {retuning && (
-        <section className="dash-card agent-retune-live">
-          <div className="dash-card-head mono">re-tuning · live</div>
+        <>
           <RetuneLive phase={livePhase} rules={liveRules} rows={liveRows} />
           {experimentUrl && (
             <a
@@ -511,7 +552,7 @@ export function LearningObservability({
               Your meals scored as a Phoenix experiment — view in Arize ↗
             </a>
           )}
-        </section>
+        </>
       )}
       <AgentFeed events={feedEvents} />
       {feedEvents.length === 0 && !retuning && (

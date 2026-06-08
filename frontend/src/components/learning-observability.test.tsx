@@ -104,8 +104,9 @@ describe("LearningObservability", () => {
       expect(screen.getByText("a medium banana")).toBeInTheDocument(),
     );
     expect(screen.getByText("oatmeal before my long run")).toBeInTheDocument();
-    expect(screen.getByText("Base")).toBeInTheDocument();
-    expect(screen.getByText("Tuned")).toBeInTheDocument();
+    // Two side-by-side panels (Fit to you · USDA), each with Base/Tuned columns.
+    expect(screen.getAllByText("Base")).toHaveLength(2);
+    expect(screen.getAllByText("Tuned")).toHaveLength(2);
     finish();
   });
 
