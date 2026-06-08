@@ -108,8 +108,7 @@ def _strip_fences(text: str) -> str:
 def _llm_prompt(signals: DecisionSignals, config: SupervisorConfig, trend: str) -> str:
     """The supervisor's decision prompt.
 
-    Written at the "right altitude" (Anthropic, *Effective context engineering*):
-    strong heuristics + a few canonical examples rather than brittle if/else logic,
+    Strong heuristics + a few canonical examples rather than brittle if/else logic,
     so the model reasons about borderline cases. The thresholds are *soft guides*
     here (the prompt) and a *hard guard* in :func:`decide` (the fail-soft fallback);
     the deterministic ship gate — not this decision — still decides whether a retune

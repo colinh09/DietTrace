@@ -136,9 +136,9 @@ def test_powerful_mode_without_client_is_deterministic() -> None:
 
 
 def test_llm_prompt_guides_with_heuristics_and_canonical_examples() -> None:
-    """The decision prompt is written at the right altitude: soft heuristics + a few
-    canonical examples (not brittle if/else), with feedback as the primary trigger and
-    the live signals injected for the model to reason over."""
+    """The decision prompt guides via soft heuristics + a few canonical examples (not
+    brittle if/else), with feedback as the primary trigger and the live signals
+    injected for the model to reason over."""
     from dietrace.agents.supervisor.decide import _llm_prompt
 
     cfg = SupervisorConfig(mode="powerful", min_new_feedback=3, min_new_dataset_points=4)
