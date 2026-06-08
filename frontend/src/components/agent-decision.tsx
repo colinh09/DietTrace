@@ -137,20 +137,33 @@ function RetuneRecap({ recap }: { recap: NonNullable<AgentEvent["recap"]> }) {
   return (
     <div className="retune-recap">
       <div className="rr-title">Accuracy recap</div>
-      <div className="rr-row">
-        <span className="rr-set">Your dataset</span>
-        <span className="rr-delta tnum">
-          {fmtPct(recap.fitBefore)} <span className="rr-arrow">→</span>{" "}
-          <b className={fitUp ? "up" : ""}>{fmtPct(recap.fitAfter)}</b>
-        </span>
+      <div className="rr-item">
+        <div className="rr-row">
+          <span className="rr-set">Your dataset</span>
+          <span className="rr-delta tnum">
+            {fmtPct(recap.fitBefore)} <span className="rr-arrow">→</span>{" "}
+            <b className={fitUp ? "up" : ""}>{fmtPct(recap.fitAfter)}</b>
+          </span>
+        </div>
+        <div className="rr-sub">
+          {fitUp
+            ? "More accurately estimated calories for the foods you've logged."
+            : "No change to how it estimates the foods you've logged."}
+        </div>
       </div>
-      <div className="rr-row">
-        <span className="rr-set">USDA / everyday</span>
-        <span className="rr-delta tnum">
-          {fmtPct(recap.usdaBefore)} <span className="rr-arrow">→</span>{" "}
-          <b>{fmtPct(recap.usdaAfter)}</b>
-          {usdaHeld && <span className="rr-held"> · held its floor</span>}
-        </span>
+      <div className="rr-item">
+        <div className="rr-row">
+          <span className="rr-set">USDA</span>
+          <span className="rr-delta tnum">
+            {fmtPct(recap.usdaBefore)} <span className="rr-arrow">→</span>{" "}
+            <b>{fmtPct(recap.usdaAfter)}</b>
+          </span>
+        </div>
+        <div className="rr-sub">
+          {usdaHeld
+            ? "Stayed accurate on standard foods — didn't drop below the floor."
+            : "Dropped below the floor on standard foods."}
+        </div>
       </div>
       <div className="rr-note">
         Accuracy = how close DietTrace&apos;s calorie estimates landed for those meals.
@@ -226,6 +239,9 @@ export function AgentFeed({
                       )}
                     </div>
                     {e.mealText && <div className="revent-meal">{e.mealText}</div>}
+                    {e.op === "retune" && e.recap && e.reason && (
+                      <div className="revent-section">Agent recap</div>
+                    )}
                     {e.reason && <div className="revent-reason">{e.reason}</div>}
                     {e.op === "retune" && e.recap && <RetuneRecap recap={e.recap} />}
                     {e.detail && <div className="revent-reason mono">{e.detail}</div>}

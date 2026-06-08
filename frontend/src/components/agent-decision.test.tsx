@@ -69,11 +69,16 @@ describe("AgentFeed", () => {
       />,
     );
     expect(screen.getByText("Your dataset has been updated")).toBeInTheDocument();
+    expect(screen.getByText("Agent recap")).toBeInTheDocument();
     expect(screen.getByText("Accuracy recap")).toBeInTheDocument();
     expect(screen.getByText("Your dataset")).toBeInTheDocument();
-    expect(screen.getByText("USDA / everyday")).toBeInTheDocument();
+    expect(screen.getByText("USDA")).toBeInTheDocument();
     expect(screen.getByText("61%")).toBeInTheDocument();
     expect(screen.getByText("86%")).toBeInTheDocument();
+    expect(
+      screen.getByText(/more accurately estimated calories/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/didn't drop below the floor/i)).toBeInTheDocument();
     expect(screen.getByText(/calorie estimates landed/i)).toBeInTheDocument();
   });
 

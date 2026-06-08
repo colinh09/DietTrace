@@ -321,6 +321,10 @@ export default function Home() {
   const handleAfterReset = useCallback(() => {
     clearOnboarded();
     clearSetup();
+    // Clear the feed + zero the retune trigger so the remount can't replay a stale
+    // signal (re-seeding repopulates the feed; onboarding starts fresh).
+    setAgentEvents([]);
+    setRetuneSignal(0);
     setOnboarded(false);
   }, []);
 

@@ -316,7 +316,7 @@ function ExperimentResults({
               rows={fit}
             />
             <ScorePanel
-              title="USDA / everyday"
+              title="USDA"
               tone="var(--macro-carb)"
               goal="reference foods"
               rows={usda}
@@ -481,7 +481,9 @@ export function LearningObservability({
                 ? (rule ?? "a new rule is now in effect")
                 : "no change — it wasn't more accurate",
               // The recap replaces the old raw "your-meal accuracy 61% → 86%" line.
-              phoenix: e.scored_via === "phoenix" ? "read experiment" : undefined,
+              // No Phoenix code line here — the "See your experiment results" panel
+              // right below already shows the read (and "read experiment" was cryptic).
+              phoenix: undefined,
               when: "now",
               recap,
               // Persist the per-meal results ON the event so they survive a reload.
@@ -511,8 +513,14 @@ export function LearningObservability({
 
   // When the supervisor decides "retune" on a logged meal, run the gated eval
   // automatically — the agent triggers it, the panel just shows it happening.
+  // Fire ONLY on a genuinely new signal (the counter went up), never on mount:
+  // resetting unmounts + remounts this panel, and a stale counter from an earlier
+  // retune this session would otherwise auto-run a retune the moment we remount.
+  const lastAutoRetune = useRef(autoRetune);
   useEffect(() => {
-    if (autoRetune > 0 && !retuning) runRetune();
+    const isNew = autoRetune > lastAutoRetune.current;
+    lastAutoRetune.current = autoRetune;
+    if (isNew && !retuning) runRetune();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRetune]);
 
