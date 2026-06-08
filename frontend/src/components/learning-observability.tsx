@@ -465,9 +465,7 @@ export function LearningObservability({
             ts: Date.now(),
             op: "retune",
             reason: e.shipped
-              ? rule
-                ? `applied: ${rule}`
-                : "applied a new rule"
+              ? (rule ?? "a new rule is now in effect")
               : "no change — it wasn't more accurate",
             detail: fit,
             phoenix:
