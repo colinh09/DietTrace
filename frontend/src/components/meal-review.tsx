@@ -32,30 +32,35 @@ export function MealReview({
   const [mode, setMode] = useState<Mode>("ask");
   const [saving, setSaving] = useState(false);
 
+  // Shared post-confirm work, run for BOTH a direct confirm and an adjusted-portion
+  // confirm (the QuantityEditor) so neither path skips it: lock the UI, refresh the
+  // state counts + history (so the meal becomes a dataset point), and drop the
+  // dataset-point entry (+ any triggered retune) into the activity feed.
+  const afterConfirm = (res: Awaited<ReturnType<typeof confirmMeal>>) => {
+    setMode("confirmed");
+    onCorrected?.();
+    onAgentEvent?.({
+      op: "add_dataset_point",
+      reason: "you confirmed it — added to your dataset",
+      mealText,
+      phoenix: "wrote 1 point to your Phoenix dataset",
+    });
+    // Growing the held-out set can tip the supervisor into a retune.
+    if (res?.supervisor?.op === "retune") {
+      onAgentEvent?.({
+        op: "retune",
+        reason: res.supervisor.reason,
+        mealText,
+        phoenix: res.supervisor.phoenix,
+      });
+    }
+  };
+
   const confirm = () => {
     if (saving) return;
     setSaving(true);
     confirmMeal(mealText, perItem, totals)
-      .then((res) => {
-        setMode("confirmed");
-        // Live: refresh the state counts AND drop an entry into the activity feed.
-        onCorrected?.();
-        onAgentEvent?.({
-          op: "add_dataset_point",
-          reason: "you confirmed it — added to your dataset",
-          mealText,
-          phoenix: "wrote 1 point to your Phoenix dataset",
-        });
-        // Growing the held-out set can tip the supervisor into a retune.
-        if (res?.supervisor?.op === "retune") {
-          onAgentEvent?.({
-            op: "retune",
-            reason: res.supervisor.reason,
-            mealText,
-            phoenix: res.supervisor.phoenix,
-          });
-        }
-      })
+      .then(afterConfirm)
       .catch(() => {})
       .finally(() => setSaving(false));
   };
@@ -130,7 +135,7 @@ export function MealReview({
         <QuantityEditor
           mealText={mealText}
           perItem={perItem}
-          onConfirmed={() => setMode("confirmed")}
+          onConfirmed={afterConfirm}
           onCancel={() => setMode("reviewing")}
         />
       )}

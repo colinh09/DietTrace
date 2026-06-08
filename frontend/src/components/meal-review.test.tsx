@@ -40,6 +40,32 @@ describe("MealReview", () => {
     expect(await screen.findByText(/your dataset/i)).toBeInTheDocument();
   });
 
+  it("an adjusted-portion confirm still reaches the feed (onAgentEvent + onCorrected)", async () => {
+    vi.mocked(api.confirmMeal).mockResolvedValue({ ok: true, id: 1, confirmations: 6 });
+    const onAgentEvent = vi.fn();
+    const onCorrected = vi.fn();
+    render(
+      <MealReview
+        mealText="oatmeal"
+        perItem={perItem}
+        totals={totals}
+        onAgentEvent={onAgentEvent}
+        onCorrected={onCorrected}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /looks right/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /adjust a portion/i }));
+    fireEvent.click(screen.getByRole("button", { name: /save as confirmed/i }));
+    // The adjust-portion path used to skip both of these — the meal never reached
+    // the agent feed and never became a dataset point.
+    await waitFor(() =>
+      expect(onAgentEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ op: "add_dataset_point" }),
+      ),
+    );
+    expect(onCorrected).toHaveBeenCalled();
+  });
+
   it("reveals the correction box on 'something's off'", () => {
     render(<MealReview mealText="oatmeal" perItem={perItem} totals={totals} />);
     fireEvent.click(screen.getByRole("button", { name: /something's off/i }));

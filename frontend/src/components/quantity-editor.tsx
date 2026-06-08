@@ -18,18 +18,30 @@ export function QuantityEditor({
 }: {
   mealText: string;
   perItem: LoggedItem[];
-  onConfirmed: () => void;
+  // Passes the /confirm response up so the parent can fire the same feed event +
+  // history refresh as a direct confirm (otherwise an adjusted meal never reaches
+  // the agent feed and never becomes a dataset point).
+  onConfirmed: (res: Awaited<ReturnType<typeof confirmMeal>>) => void;
   onCancel: () => void;
 }) {
-  const [grams, setGrams] = useState<number[]>(perItem.map((it) => it.grams));
+  // Hold the raw input STRING, not a number — a controlled number input keeps a
+  // stale leading zero ("011") when the parsed value is unchanged, which React
+  // won't re-render away. Controlling the string lets us strip it deterministically.
+  const [gramsStr, setGramsStr] = useState<string[]>(
+    perItem.map((it) => String(Math.round(it.grams))),
+  );
   const [saving, setSaving] = useState(false);
+  const grams = gramsStr.map((s) => Number(s) || 0);
 
-  const edited = perItem.map((it, i) => rescaleItem(it, grams[i] || 0));
+  const edited = perItem.map((it, i) => rescaleItem(it, grams[i]));
   const totals = sumItemsToTotals(edited);
   const macros = macrosOf(totals);
 
-  const setGram = (i: number, v: number) =>
-    setGrams((cur) => cur.map((g, j) => (j === i ? Math.max(0, v) : g)));
+  const setGram = (i: number, raw: string) => {
+    // digits only; strip leading zeros ("011" → "11") but keep "" and a lone "0".
+    const v = raw.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
+    setGramsStr((cur) => cur.map((g, j) => (j === i ? v : g)));
+  };
 
   const save = () => {
     if (saving) return;
@@ -50,10 +62,10 @@ export function QuantityEditor({
               <span className="qe-input-wrap">
                 <input
                   className="qe-input mono tnum"
-                  type="number"
-                  min={0}
-                  value={Math.round(grams[i])}
-                  onChange={(e) => setGram(i, Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  value={gramsStr[i]}
+                  onChange={(e) => setGram(i, e.target.value)}
                   aria-label={`grams of ${it.description}`}
                 />
                 <span className="qe-unit">g</span>
