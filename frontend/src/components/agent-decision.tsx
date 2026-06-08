@@ -34,6 +34,18 @@ export function AgentDecision({ decision }: { decision?: SupervisorDecision }) {
   );
 }
 
+// One per-meal row of a finished experiment, carried on a retune event so the
+// results survive a reload (the feed is persisted; ephemeral state is not).
+export interface ExperimentRow {
+  set: "fit" | "usda";
+  text: string;
+  before: number | null;
+  after: number | null;
+  expected?: number;
+  baseKcal?: number | null;
+  tunedKcal?: number | null;
+}
+
 // One decision the supervisor made. Per-meal ops carry the meal; a re-tune event
 // carries a `detail` (e.g. "fit 49→79%") instead. `when` is a short timing label.
 export interface AgentEvent extends SupervisorDecision {
@@ -44,6 +56,10 @@ export interface AgentEvent extends SupervisorDecision {
   // Absent on older persisted events, which fall back to the `when` label.
   ts?: number;
   when?: string;
+  // The finished experiment's per-meal rows + Arize URL, attached to a retune
+  // event so "See your experiment results" survives a reload (persisted with the
+  // feed). See memory: diettrace-ui-must-persist-on-reload.
+  experiment?: { rows: ExperimentRow[]; experimentUrl?: string };
 }
 
 // A callback to push a new activity into the feed (the id + timing are stamped by

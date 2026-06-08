@@ -6,7 +6,7 @@
 // with the rule vs without, then the ship verdict), the corrections you've taught
 // (meal + what you said, persisted), and the held-out dataset it's tested against.
 // This is the observability-everywhere rule applied to the loop itself.
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -16,7 +16,11 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { AgentFeed, type AgentEvent } from "@/components/agent-decision";
+import {
+  AgentFeed,
+  type AgentEvent,
+  type ExperimentRow,
+} from "@/components/agent-decision";
 import { Modal } from "@/components/modal";
 import {
   deleteLearningFeedback,
@@ -291,10 +295,10 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
 // "Updated" event.
 function ExperimentResults({
   rows,
-  result,
+  experimentUrl,
 }: {
-  rows: LiveRow[];
-  result: LearningRetuneResult;
+  rows: ExperimentRow[];
+  experimentUrl?: string;
 }) {
   const [open, setOpen] = useState(true);
   const fit = rows.filter((r) => r.set === "fit");
@@ -330,10 +334,10 @@ function ExperimentResults({
               rows={usda}
             />
           </div>
-          {result.experiment_url && (
+          {experimentUrl && (
             <a
               className="phoenix-exp-link"
-              href={result.experiment_url}
+              href={experimentUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -369,6 +373,9 @@ export function LearningObservability({
   const [livePhase, setLivePhase] = useState("");
   const [liveRules, setLiveRules] = useState<PreferenceRule[]>([]);
   const [liveRows, setLiveRows] = useState<LiveRow[]>([]);
+  // A live mirror of liveRows so the "done" handler can read the FINAL rows (the
+  // state closure would be stale) to attach them to the persisted retune event.
+  const liveRowsRef = useRef<LiveRow[]>([]);
   // Link to the Phoenix experiment when the fit set is scored in Arize over MCP.
   const [experimentUrl, setExperimentUrl] = useState("");
   const [showData, setShowData] = useState(false);
@@ -421,34 +428,42 @@ export function LearningObservability({
     setLivePhase("Starting the eval…");
     setLiveRules([]);
     setLiveRows([]);
+    liveRowsRef.current = [];
     setExperimentUrl("");
     const onEvent = (e: LearningRetuneEvent) => {
       if (e.type === "phase") setLivePhase(e.label);
       else if (e.type === "rule") setLiveRules(e.rules);
       else if (e.type === "phoenix") setExperimentUrl(e.experiment_url);
       else if (e.type === "manifest") {
-        setLiveRows(
-          e.rows.map((r) => ({ set: r.set, text: r.text, before: null, after: null })),
-        );
+        const rows = e.rows.map((r) => ({
+          set: r.set,
+          text: r.text,
+          before: null,
+          after: null,
+        }));
+        liveRowsRef.current = rows;
+        setLiveRows(rows);
       } else if (e.type === "score") {
-        // Fill the i-th row of this set (1-based) with its scores.
-        setLiveRows((rows) => {
-          let seen = 0;
-          return rows.map((row) => {
-            if (row.set !== e.set) return row;
-            seen += 1;
-            return seen === e.i
-              ? {
-                  ...row,
-                  before: e.before,
-                  after: e.after,
-                  expected: e.expected,
-                  baseKcal: e.base_kcal ?? null,
-                  tunedKcal: e.tuned_kcal ?? null,
-                }
-              : row;
-          });
+        // Fill the i-th row of this set (1-based). Compute from the REF (synchronous
+        // source of truth) so a burst of scores + the "done" event all see the latest
+        // rows even before React flushes setLiveRows — the persisted event needs them.
+        let seen = 0;
+        const next = liveRowsRef.current.map((row) => {
+          if (row.set !== e.set) return row;
+          seen += 1;
+          return seen === e.i
+            ? {
+                ...row,
+                before: e.before,
+                after: e.after,
+                expected: e.expected,
+                baseKcal: e.base_kcal ?? null,
+                tunedKcal: e.tuned_kcal ?? null,
+              }
+            : row;
         });
+        liveRowsRef.current = next;
+        setLiveRows(next);
       } else if (e.type === "done") {
         setResult(e);
         if (e.ok) {
@@ -472,6 +487,14 @@ export function LearningObservability({
                 ? `read experiment · ${fit}`
                 : undefined,
             when: "now",
+            // Persist the per-meal results ON the event so they survive a reload.
+            experiment:
+              e.scored_via === "phoenix"
+                ? {
+                    rows: liveRowsRef.current,
+                    experimentUrl: e.experiment_url,
+                  }
+                : undefined,
           });
         }
       }
@@ -512,6 +535,12 @@ export function LearningObservability({
   // The feed: re-tune events the panel raised + the per-meal decisions from the page.
   const feedEvents = agentEvents;
   const latest = feedEvents[0];
+  // The most recent retune that carries persisted experiment results — drives the
+  // collapsible "See your experiment results" under the Updated event, restored
+  // straight from the persisted feed so it survives a reload.
+  const retuneExperiment = feedEvents.find(
+    (e) => e.op === "retune" && e.experiment && e.experiment.rows.length > 0,
+  )?.experiment;
 
   return (
     <>
@@ -566,8 +595,11 @@ export function LearningObservability({
         events={feedEvents}
         running={retuning}
         retuneDetail={
-          result && !retuning && result.scored_via === "phoenix" ? (
-            <ExperimentResults rows={liveRows} result={result} />
+          !retuning && retuneExperiment ? (
+            <ExperimentResults
+              rows={retuneExperiment.rows}
+              experimentUrl={retuneExperiment.experimentUrl}
+            />
           ) : null
         }
       />
