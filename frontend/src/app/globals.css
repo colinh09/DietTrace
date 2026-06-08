@@ -626,14 +626,18 @@ body {
 .phoenix-exp-link:hover { text-decoration: underline; }
 
 /* The finished-experiment per-meal results table (pulled from Arize over MCP). */
-.exp-results { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+/* The experiment results read like an expanded meal: a cream container (inset
+   hairline) holding white tiles, not a hard-bordered white card with floaty panels. */
+.exp-results { background: var(--rail-bg); box-shadow: inset 0 0 0 1px var(--line); border-radius: 12px; overflow: hidden; }
 .exp-results-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 13px;
   background: none; border: none; cursor: pointer; font-size: 12.5px; font-weight: 600;
   color: var(--ink); text-align: left; }
 .exp-results-toggle svg { color: var(--muted-ink); flex: none; }
-.exp-results-body { padding: 0 13px 12px; background: var(--rail-bg); border-top: 1px solid var(--line); }
+.exp-results-body { padding: 0 13px 12px; border-top: 1px solid var(--line); }
 .exp-results-sub { font-family: var(--ui-font); font-size: 11.5px; font-weight: 400; color: var(--muted-ink); margin: 11px 0; }
 .exp-results .rt-panels { gap: 10px; }
+/* white tiles on the cream container — no shadow, like the meal drawer's tiles */
+.exp-results .rt-panel { box-shadow: none; }
 .exp-results .phoenix-exp-link { display: inline-block; margin: 11px 0 0; }
 /* the experiment detail nested under the most recent "Updated" feed event */
 .revent-detail { padding-left: 24px; margin: 2px 0 8px; }
