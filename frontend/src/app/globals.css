@@ -849,6 +849,19 @@ body {
 .tg-cal-ref b { color: var(--muted-ink); font-weight: 500; }
 .tg-macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 .tg-macro-val { display: flex; align-items: baseline; margin: 7px 0 10px; }
+
+/* Quick-edit view: edit Cal/P/C/F directly with a live mismatch check */
+.tg-quick { margin-top: 20px; }
+.tg-quick-cal { margin-bottom: 18px; }
+.tg-quick-cal-lab { display: block; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.tg-quick-macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.tg-mismatch { margin-top: 16px; font-size: 12.5px; line-height: 1.5; padding: 10px 13px; border-radius: 10px; }
+.tg-mismatch.ok { color: var(--accent-ink); background: var(--accent-soft); }
+.tg-mismatch.bad { color: var(--danger-ink); background: var(--danger-soft); }
+.tg-mismatch b { font-weight: 600; }
+.tg-relink { background: none; border: none; padding: 0; font-family: var(--ui-font); font-size: 12.5px; font-weight: 500; color: var(--accent-ink); cursor: pointer; }
+.tg-relink:hover { text-decoration: underline; }
+.tg-relink.back { display: block; margin-bottom: 8px; }
 .tg-num-edit { display: inline-flex; align-items: baseline; gap: 3px; }
 .tg-num-edit input { border: none; border-bottom: 1px dashed var(--line-strong); background: transparent; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--accent-ink); text-align: left; padding: 0 1px 1px; transition: border-color .16s; }
 .tg-num-edit input:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }

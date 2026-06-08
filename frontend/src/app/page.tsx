@@ -467,6 +467,7 @@ export default function Home() {
       {overviewOpen && <OverviewModal onClose={() => setOverviewOpen(false)} />}
       {macroOpen && (
         <MacroModal
+          goals={goals}
           onClose={() => setMacroOpen(false)}
           onSaved={() => {
             // Saved targets become the user's per-user goals; refresh the band.
