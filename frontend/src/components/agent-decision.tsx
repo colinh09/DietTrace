@@ -168,7 +168,7 @@ export function AgentFeed({
                       )}
                     </div>
                     {e.mealText && <div className="revent-meal">{e.mealText}</div>}
-                    <div className="revent-reason">{e.reason}</div>
+                    {e.reason && <div className="revent-reason">{e.reason}</div>}
                     {e.detail && <div className="revent-reason mono">{e.detail}</div>}
                     {e.phoenix && (
                       <div className="phoenix-line">

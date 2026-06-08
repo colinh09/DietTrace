@@ -74,7 +74,10 @@ def test_demo_seed_returns_decisions_and_tags_seeded_source(tmp_path) -> None:
     assert decisions, "seed should return prior agent decisions for the feed"
     ops = {d["op"] for d in decisions}
     assert ops == {"add_dataset_point", "bank_feedback"}
-    assert all(d["meal_text"] and d["reason"] for d in decisions)
+    # Every decision carries its meal; dataset-point rows have no reason line (the
+    # "Added to your dataset" label already says it), feedback rows keep theirs.
+    assert all(d["meal_text"] for d in decisions)
+    assert all(d["reason"] for d in decisions if d["op"] == "bank_feedback")
 
     prefs = client.get("/preferences", headers=_H).json()
     assert prefs["confirmations_seeded"] == prefs["confirmations"] > 0

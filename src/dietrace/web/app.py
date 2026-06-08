@@ -1378,7 +1378,8 @@ def create_app(
                 )
                 seeded_decisions.append({
                     "op": "add_dataset_point",
-                    "reason": "you confirmed it — added to your dataset",
+                    # No reason line — the "Added to your dataset" label already says it.
+                    "reason": "",
                     "meal_text": m["text"],
                 })
         for f in persona.feedback:
@@ -1387,8 +1388,7 @@ def create_app(
             )
             seeded_decisions.append({
                 "op": "bank_feedback",
-                "reason": "this will be used to adapt your nutrition agent to your "
-                          "style of logging",
+                "reason": "To be used to refine your DietTrace agent!",
                 "meal_text": f.get("meal_text") or f["feedback_text"],
             })
 

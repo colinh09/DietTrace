@@ -41,7 +41,9 @@ export function MealReview({
     onCorrected?.();
     onAgentEvent?.({
       op: "add_dataset_point",
-      reason: "you confirmed it — added to your dataset",
+      // No reason line — the "Added to your dataset" label already says it; a
+      // second identical line just reads as duplication.
+      reason: "",
       mealText,
       phoenix: "wrote 1 point to your Phoenix dataset",
     });
@@ -148,8 +150,7 @@ export function MealReview({
             onCorrected?.();
             onAgentEvent?.({
               op: "bank_feedback",
-              reason:
-                "this will be used to adapt your nutrition agent to your style of logging",
+              reason: "To be used to refine your DietTrace agent!",
               mealText,
             });
             // Feedback is the primary retune trigger — if this correction tipped
