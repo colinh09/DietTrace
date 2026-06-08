@@ -140,3 +140,43 @@ def test_zero_target_goal_met_reads_within() -> None:
     goals = [NutrientGoal(code=_SUGARS, name="Added sugars", target=0.0, unit="g")]
 
     assert check_against_goals(totals, goals).status(_SUGARS).status == "within"
+
+
+# ``check_against_goals`` is exposed as an ADK FunctionTool (agent.py), so the
+# model calls it directly with its own ``totals``/``goals`` dicts. ``json.loads``
+# and pydantic both admit the literals ``NaN``/``Infinity``, so a garbled
+# tool-call argument can carry a non-finite amount or target. The percent maths
+# then reach ``round(nan)`` / ``round(inf)`` — a ValueError / OverflowError
+# straight out of the tool — and an infinite target reads as a nonsense
+# "X of inf" band. These pin the same non-finite fail-soft contract already held
+# in parse_meal / web_nutrition / estimate_portion / interpret_feedback.
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_total_degrades_to_under_without_crashing(bad: float) -> None:
+    """A non-finite consumed amount reads as nothing-consumed, never raises."""
+    totals = [Nutrient(code=_SODIUM, name="Sodium, Na", amount=bad, unit="mg")]
+    goals = [NutrientGoal(code=_SODIUM, name="Sodium, Na", target=2300.0, unit="mg")]
+
+    status = check_against_goals(totals, goals).status(_SODIUM)
+    assert status.status == "under"
+    assert status.consumed == 0.0
+    assert status.pct_of_goal == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_goal_target_is_skipped(bad: float) -> None:
+    """A goal with a non-finite target cannot be scored — it is left unreported.
+
+    Other, well-formed goals are still scored, mirroring how a total with no goal
+    is simply ignored rather than crashing the step.
+    """
+    totals = _totals()
+    goals = [
+        NutrientGoal(code=_SODIUM, name="Sodium, Na", target=bad, unit="mg"),
+        NutrientGoal(code=_PROTEIN, name="Protein", target=140.0, unit="g"),
+    ]
+
+    check = check_against_goals(totals, goals)
+    assert check.status(_SODIUM) is None
+    assert check.status(_PROTEIN).status == "under"

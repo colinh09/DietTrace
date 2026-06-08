@@ -15,6 +15,7 @@ no goal is simply not reported, keeping the step fail-soft.
 
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel
@@ -74,9 +75,19 @@ class GoalCheck(BaseModel):
 
 
 def _amount(totals: dict[str, Nutrient], code: str) -> float:
-    """The consumed amount for *code*, or 0.0 when the meal has no such total."""
+    """The consumed amount for *code*, or 0.0 when the meal has no such total.
+
+    A non-finite amount (``NaN``/``±inf``) — which pydantic admits and a garbled
+    LLM tool-call can supply, since ``check_against_goals`` is an ADK
+    ``FunctionTool`` — is treated as nothing reliably consumed (0.0) rather than
+    flowing into the percent maths, where ``round(nan)``/``round(inf)`` would
+    raise straight out of the tool ( fail-soft, mirroring the isfinite
+    guards in parse_meal / web_nutrition / estimate_portion).
+    """
     nutrient = totals.get(code)
-    return nutrient.amount if nutrient is not None else 0.0
+    if nutrient is None or not math.isfinite(nutrient.amount):
+        return 0.0
+    return nutrient.amount
 
 
 def _message(name: str, label: GoalLabel, pct_off: int, consumed: float, goal: NutrientGoal) -> str:
@@ -105,6 +116,11 @@ def check_against_goals(totals: list[Nutrient], goals: list[NutrientGoal]) -> Go
 
     statuses: list[GoalStatus] = []
     for goal in goals:
+        # A non-finite target defines no band to score against — skip it rather
+        # than crash the percent maths, the same way a total with no goal is
+        # left unreported.
+        if not math.isfinite(goal.target):
+            continue
         consumed = _amount(by_code, goal.code)
         pct_of_goal = (consumed / goal.target * 100.0) if goal.target else 0.0
 
