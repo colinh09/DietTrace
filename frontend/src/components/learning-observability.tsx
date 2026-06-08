@@ -127,9 +127,9 @@ function RetuneLive({
       )}
       <div className="rt-panels">
         <ScorePanel
-          title="Fit to you"
+          title="Your Dataset"
           tone="var(--accent)"
-          goal="your confirmed meals · should improve"
+          goal="meals you confirmed · should improve"
           rows={fit}
         />
         <ScorePanel
@@ -286,8 +286,9 @@ function RetuneResult({ result }: { result: LearningRetuneResult }) {
   );
 }
 
-// The finished experiment, pulled from Arize over MCP and shown per-meal: each
-// confirmed meal with its truth, the base→tuned kcal estimate, and the accuracy gain.
+// The finished experiment, pulled from Arize over MCP: BOTH sets — Your Dataset and
+// USDA — shown as the same two-column Base → Tuned chart, collapsible under the
+// "Updated" event.
 function ExperimentResults({
   rows,
   result,
@@ -296,8 +297,9 @@ function ExperimentResults({
   result: LearningRetuneResult;
 }) {
   const [open, setOpen] = useState(true);
-  const fit = rows.filter((r) => r.set === "fit" && r.expected != null);
-  if (!fit.length) return null;
+  const fit = rows.filter((r) => r.set === "fit");
+  const usda = rows.filter((r) => r.set === "usda");
+  if (!fit.length && !usda.length) return null;
   return (
     <section className="exp-results">
       <button
@@ -307,31 +309,27 @@ function ExperimentResults({
         onClick={() => setOpen((o) => !o)}
       >
         {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        <span className="mono">experiment results · arize via mcp</span>
-        <span className="exp-results-count">
-          {fit.length} meal{fit.length === 1 ? "" : "s"}
-        </span>
+        See your experiment results
       </button>
       {open && (
-        <>
-          <ul className="exp-rows">
-            {fit.map((r, i) => {
-              const up =
-                r.after != null && r.before != null && r.after > r.before;
-              return (
-                <li className="exp-row" key={i}>
-                  <span className="exp-meal">{r.text}</span>
-                  <span className="exp-kcal mono tnum">
-                    {r.baseKcal ?? "–"} → {r.tunedKcal ?? "–"} kcal
-                    <span className="exp-truth"> · truth {r.expected}</span>
-                  </span>
-                  <span className={"exp-acc mono tnum" + (up ? " up" : "")}>
-                    {pct(r.before ?? 0)} → {pct(r.after ?? 0)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+        <div className="exp-results-body">
+          <p className="exp-results-sub">
+            {fit.length + usda.length} meals scored in Arize, read back over MCP.
+          </p>
+          <div className="rt-panels">
+            <ScorePanel
+              title="Your Dataset"
+              tone="var(--accent)"
+              goal="meals you confirmed"
+              rows={fit}
+            />
+            <ScorePanel
+              title="USDA / everyday"
+              tone="var(--macro-carb)"
+              goal="reference foods"
+              rows={usda}
+            />
+          </div>
           {result.experiment_url && (
             <a
               className="phoenix-exp-link"
@@ -342,7 +340,7 @@ function ExperimentResults({
               open the experiment in Arize ↗
             </a>
           )}
-        </>
+        </div>
       )}
     </section>
   );
@@ -693,7 +691,7 @@ export function LearningObservability({
             </p>
             <ul>
               <li>
-                <b>Fit to you</b> — the meals you confirmed, kept <i>out</i> of
+                <b>Your Dataset</b> — the meals you confirmed, kept <i>out</i> of
                 learning so the test stays honest (your answer key).
               </li>
               <li>

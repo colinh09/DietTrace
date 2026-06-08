@@ -1740,9 +1740,9 @@ def create_app(
             usda_after = [0.0] * len(usda_cases)
             shared: dict[str, Any] = {"scored_via": "local", "experiment_url": ""}
             usda_label = (
-                "Re-checking the full standard set — accuracy can't regress"
+                "Re-checking the full standard set — everyday foods should stay accurate"
                 if full
-                else "Re-checking a sample of standard foods — accuracy can't regress"
+                else "Re-checking a sample of standard foods — everyday foods should stay accurate"
             )
 
             # Both panels fill CONCURRENTLY: each set scores in its own thread and

@@ -627,14 +627,14 @@ body {
 
 /* The finished-experiment per-meal results table (pulled from Arize over MCP). */
 .exp-results { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
-.exp-results-toggle { display: flex; align-items: center; gap: 7px; width: 100%; padding: 9px 12px;
-  background: none; border: none; cursor: pointer; font-family: var(--mono); font-size: 10px;
-  letter-spacing: .08em; text-transform: uppercase; color: var(--muted-ink); text-align: left; }
-.exp-results-toggle svg { color: var(--faint); flex: none; }
-.exp-results-count { margin-left: auto; font-family: var(--ui-font); font-size: 11px; letter-spacing: 0;
-  text-transform: none; color: var(--faint); }
-.exp-results .exp-rows { padding: 0 13px 11px; }
-.exp-results .phoenix-exp-link { display: inline-block; margin: 0 13px 12px; }
+.exp-results-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 13px;
+  background: none; border: none; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  color: var(--ink); text-align: left; }
+.exp-results-toggle svg { color: var(--muted-ink); flex: none; }
+.exp-results-body { padding: 0 13px 12px; background: var(--rail-bg); border-top: 1px solid var(--line); }
+.exp-results-sub { font-size: 11.5px; color: var(--muted-ink); margin: 11px 0; }
+.exp-results .rt-panels { gap: 10px; }
+.exp-results .phoenix-exp-link { display: inline-block; margin: 11px 0 0; }
 /* the experiment detail nested under the most recent "Updated" feed event */
 .revent-detail { padding-left: 24px; margin: 2px 0 8px; }
 .exp-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -916,8 +916,7 @@ body {
 .freeform-feedback { margin-top: 14px; }
 /* Hint stays out of the way until you actually engage a feedback box — no repeated
    instruction line on every meal card. Revealed on hover or focus-within. */
-.freeform-hint { font-size: 13px; color: var(--muted-ink); line-height: 1.5; max-height: 0; opacity: 0; overflow: hidden; margin-bottom: 0; transition: max-height .18s ease, opacity .18s ease, margin-bottom .18s ease; }
-.freeform-feedback:hover .freeform-hint, .freeform-feedback:focus-within .freeform-hint { max-height: 40px; opacity: 1; margin-bottom: 8px; }
+.freeform-hint { font-size: 13px; color: var(--muted-ink); line-height: 1.5; margin-bottom: 8px; }
 .freeform-input-row { display: flex; gap: 8px; align-items: stretch; }
 .freeform-input { flex: 1; min-width: 0; border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 13px; background: var(--card); font-family: var(--ui-font); font-size: 14px; color: var(--ink); transition: border-color .16s, box-shadow .16s; }
 .freeform-input::placeholder { color: var(--faint); }
