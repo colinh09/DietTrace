@@ -100,7 +100,11 @@ export function FreeformFeedback({
               onClick={() => void submit()}
               disabled={status === "loading" || !text.trim()}
             >
-              {status === "loading" ? "thinking…" : "tell it"}
+              {status === "loading" ? (
+                <span className="btn-spin" aria-label="thinking" />
+              ) : (
+                "tell it"
+              )}
             </button>
           </div>
         </>

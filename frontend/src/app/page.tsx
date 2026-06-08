@@ -311,8 +311,11 @@ export default function Home() {
   const handleRetuneComplete = useCallback(
     (event: AgentEvent, shipped?: boolean, retuneNo?: number | null) => {
       setAgentEvents((cur) => foldRetuneIntoFeed(cur, event, shipped, retuneNo));
+      // Refresh the glance stats so "updates" reflects the new version right away
+      // (corrections already refresh on /log; a shipped retune bumps the version).
+      bumpLearning();
     },
-    [],
+    [bumpLearning],
   );
 
   // After a reset wipes the user server-side, re-trigger onboarding so a clean

@@ -309,8 +309,8 @@ function ExperimentResults({
             {fit.length + usda.length} meals scored in Phoenix.
           </p>
           <p className="exp-results-accuracy">
-            <b>Accuracy</b> = how close DietTrace&apos;s calorie estimate was for each
-            meal.
+            <b>Accuracy</b>{" "}= how close DietTrace&apos;s calorie estimate was for
+            each meal.
           </p>
           <div className="rt-panels">
             <ScorePanel

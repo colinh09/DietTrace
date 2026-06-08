@@ -159,7 +159,9 @@ def stream_meal(
         trace.append(event)
         return event
 
-    yield step(step="parse_meal", status="running", summary="reading your meal…")
+    # No running summary — the "Read your meal" label already says it; the live UI
+    # adds its own "…" progress marker.
+    yield step(step="parse_meal", status="running", summary="")
     parsed = parse_meal(text, client=client, examples=examples)
     foods = [item.food for item in parsed.items]
     plural = "" if len(foods) == 1 else "s"

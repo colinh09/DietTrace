@@ -78,7 +78,6 @@ describe("AgentFeed", () => {
     // The verbose captions are now short status tags.
     expect(screen.getByText(/improved/)).toBeInTheDocument();
     expect(screen.getByText(/held the floor/)).toBeInTheDocument();
-    expect(screen.getByText(/perfect estimate/)).toBeInTheDocument();
   });
 
   it("headlines a rejected retune as 'no update'", () => {

@@ -249,19 +249,19 @@ body {
 
 /* Glance zone (3rd band column): kcal remaining + a 7-day sparkline. Earns the
    card's width that used to be dead whitespace. */
-.dm-glance { flex: none; width: clamp(160px, 19vw, 210px); align-self: stretch; display: flex;
+.dm-glance { flex: none; width: clamp(210px, 25vw, 290px); align-self: stretch; display: flex;
   flex-direction: column; align-items: center; justify-content: center; gap: 20px;
-  padding-left: clamp(8px, 2vw, 24px); border-left: 1px solid var(--line); text-align: center; }
+  padding-left: clamp(12px, 2.4vw, 30px); border-left: 1px solid var(--line); text-align: center; }
 .dm-remain { display: flex; flex-direction: column; gap: 4px; align-items: center; }
-.dm-remain-num { font-size: 40px; font-weight: 600; line-height: 1;
+.dm-remain-num { font-size: 42px; font-weight: 600; line-height: 1;
   letter-spacing: -0.02em; color: var(--macro-cal); }
-.dm-remain-lab { font-size: 12.5px; color: var(--muted-ink); }
-.dm-stats { display: inline-flex; flex-direction: column; gap: 8px; margin: 0 auto;
+.dm-remain-lab { font-size: 13px; color: var(--muted-ink); }
+.dm-stats { display: inline-flex; flex-direction: column; gap: 9px; margin: 0 auto;
   padding-top: 18px; border-top: 1px solid var(--line); }
-.dm-stat { display: flex; align-items: baseline; gap: 8px; }
-.dm-stat-num { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--accent-ink);
-  min-width: 15px; text-align: right; font-variant-numeric: tabular-nums; }
-.dm-stat-lab { font-size: 11.5px; color: var(--muted-ink); }
+.dm-stat { display: flex; align-items: baseline; gap: 9px; }
+.dm-stat-num { font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--accent-ink);
+  min-width: 17px; text-align: right; font-variant-numeric: tabular-nums; }
+.dm-stat-lab { font-size: 13px; color: var(--muted-ink); }
 
 /* a progress ring with center content */
 .ring-wrap { position: relative; display: inline-flex; }
@@ -1014,6 +1014,8 @@ body {
 .lm-retune-btn:disabled { opacity: 0.5; cursor: default; }
 .lm-retune-running { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: var(--muted-ink); background: var(--accent-softer); border-radius: 10px; }
 .lm-spinner { flex: none; width: 13px; height: 13px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: retune-spin .7s linear infinite; }
+/* A spinner sized for a filled button (white on the accent fill) */
+.btn-spin { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.45); border-top-color: #fff; border-radius: 50%; animation: retune-spin .7s linear infinite; vertical-align: -2px; }
 .lm-retune-note { margin-top: 14px; padding: 12px 14px; font-size: 13px; color: var(--amber-ink); background: var(--amber-soft); border-radius: 10px; }
 
 /* Live retune (streamed) — the retest made visible. */
@@ -1467,9 +1469,7 @@ body {
 
 /* A retune's "Accuracy" recap: a tight 3-col grid — set · before→after · status tag */
 .retune-recap { margin: 9px 0 4px; padding: 10px 12px; background: var(--rail-bg); border-radius: 9px; }
-.rr-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 7px; }
-.rr-title { font-size: 12px; font-weight: 600; color: var(--ink); }
-.rr-gloss { font-size: 11px; color: var(--faint); }
+.rr-title { font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 7px; }
 .rr-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 5px 18px; align-items: baseline; }
 .rr-set { font-size: 12.5px; color: var(--muted-ink); }
 .rr-mid { font-size: 12.5px; color: var(--muted-ink); white-space: nowrap; }

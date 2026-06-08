@@ -146,10 +146,7 @@ function RetuneRecap({ recap }: { recap: NonNullable<AgentEvent["recap"]> }) {
   const usdaHeld = recap.usdaAfter >= recap.usdaBefore - 0.05;
   return (
     <div className="retune-recap">
-      <div className="rr-head">
-        <span className="rr-title">Accuracy</span>
-        <span className="rr-gloss">· 100% = a perfect estimate</span>
-      </div>
+      <div className="rr-title">Accuracy</div>
       <div className="rr-grid">
         <span className="rr-set">Your dataset</span>
         <Delta before={recap.fitBefore} after={recap.fitAfter} />
