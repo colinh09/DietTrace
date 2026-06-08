@@ -677,3 +677,56 @@ def test_best_unit_match_regular_beats_first_listed() -> None:
 
     assert est.grams == pytest.approx(32.0)  # 2 × 16 g (regular), not 2 × 8 g (mini)
     assert est.source == "serving_size"
+
+
+class TestNonFiniteOrNonPositiveQuantity:
+    """A non-finite or non-positive quantity is not a real portion (fail-soft).
+
+    Unlike the deterministic /log orchestrator (which routes through
+    ``parse_meal``, whose own guard already drops a NaN/inf/≤0 quantity), the ADK
+    agent exposes ``estimate_portion`` as a ``FunctionTool`` the model calls
+    *directly* with its own ``quantity`` (agent.py). A hallucinated negative,
+    zero, or NaN/inf quantity would otherwise sail past every serving/mass branch
+    and yield a negative/NaN/inf gram weight (``quantity × grams_per_unit``) that
+    poisons ``log_entry`` totals — the same failure class already guarded in
+    ``parse_meal`` (quantity), ``web_nutrition`` (isfinite), and ``feedback``
+    (corrected_grams). The tool must instead degrade to ``grams=None`` at zero
+    confidence, exactly as it does for an unresolvable unit, rather than emit a
+    nonsense number.
+    """
+
+    def test_negative_quantity_mass_unit_returns_unknown(self) -> None:
+        """A negative quantity with a trusted mass unit must not yield -grams."""
+        est = estimate_portion(_egg(), -2.0, "g")
+
+        assert est.grams is None
+        assert est.source == "unknown"
+        assert est.confidence == 0.0
+
+    def test_zero_quantity_returns_unknown(self) -> None:
+        """A zero-count portion is degenerate — no grams, not 0 g of a serving."""
+        est = estimate_portion(_egg(), 0.0, "egg")
+
+        assert est.grams is None
+        assert est.source == "unknown"
+
+    def test_nan_quantity_returns_unknown(self) -> None:
+        """A NaN quantity must not propagate a NaN gram weight into the totals."""
+        est = estimate_portion(_egg(), float("nan"), "g")
+
+        assert est.grams is None
+        assert est.source == "unknown"
+
+    def test_inf_quantity_whole_item_returns_unknown(self) -> None:
+        """An infinite count must not yield an infinite whole-item gram weight."""
+        est = estimate_portion(_egg(), float("inf"), "egg")
+
+        assert est.grams is None
+        assert est.source == "unknown"
+
+    def test_negative_quantity_whole_item_returns_unknown(self) -> None:
+        """A negative whole-item count must not yield a negative gram weight."""
+        est = estimate_portion(_avocado(), -3.0, "fruit")
+
+        assert est.grams is None
+        assert est.source == "unknown"

@@ -20,6 +20,8 @@ raising, keeping the agent loop fail-soft.
 
 from __future__ import annotations
 
+import math
+
 from pydantic import BaseModel
 
 from dietrace.nutrition.models import Food, ServingSize
@@ -268,9 +270,23 @@ def estimate_portion(food: Food, quantity: float, unit: str | None = None) -> Po
 
     Tries mass → serving size → whole-item → fallback table, returning the first
     that resolves. ``unit`` is matched case- and plural-insensitively. The
-    result always carries a ``source`` and ``confidence``; an unresolved unit
-    yields ``grams=None`` rather than raising.
+    result always carries a ``source`` and ``confidence``; an unresolved unit —
+    or a non-finite/non-positive ``quantity`` (no real portion) — yields
+    ``grams=None`` rather than raising.
     """
+    # A real portion is a positive, finite count. The ADK agent calls this tool
+    # directly with an LLM-supplied quantity (agent.py), so — like parse_meal's
+    # guard on its own output — a non-finite or non-positive quantity is rejected
+    # up front rather than scaled into a negative/NaN/inf gram weight that would
+    # poison log_entry's totals.
+    if not math.isfinite(quantity) or quantity <= 0:
+        return PortionEstimate(
+            grams=None,
+            source="unknown",
+            confidence=0.0,
+            basis=f"invalid quantity: {quantity:g} — not a positive, finite portion",
+        )
+
     normalized = (unit or "").strip().lower()
     key = _singular(normalized)
 
