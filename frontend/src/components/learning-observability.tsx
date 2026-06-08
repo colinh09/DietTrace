@@ -308,6 +308,10 @@ function ExperimentResults({
           <p className="exp-results-sub">
             {fit.length + usda.length} meals scored in Phoenix.
           </p>
+          <p className="exp-results-accuracy">
+            <b>Accuracy</b> = how close DietTrace&apos;s calorie estimate was for each
+            meal (100% = exact).
+          </p>
           <div className="rt-panels">
             <ScorePanel
               title="Your Dataset"

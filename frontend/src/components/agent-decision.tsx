@@ -165,9 +165,6 @@ function RetuneRecap({ recap }: { recap: NonNullable<AgentEvent["recap"]> }) {
             : "Dropped below the floor on standard foods."}
         </div>
       </div>
-      <div className="rr-note">
-        Accuracy = how close DietTrace&apos;s calorie estimates landed for those meals.
-      </div>
     </div>
   );
 }
@@ -245,7 +242,7 @@ export function AgentFeed({
                     {e.reason && <div className="revent-reason">{e.reason}</div>}
                     {e.op === "retune" && e.recap && <RetuneRecap recap={e.recap} />}
                     {e.detail && <div className="revent-reason mono">{e.detail}</div>}
-                    {e.phoenix && (
+                    {e.phoenix && e.op !== "retune" && (
                       <div className="phoenix-line">
                         <span className="phoenix-tag">
                           <span className="pdot" /> Arize Phoenix

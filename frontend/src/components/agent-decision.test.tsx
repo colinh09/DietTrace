@@ -79,7 +79,6 @@ describe("AgentFeed", () => {
       screen.getByText(/more accurately estimated calories/i),
     ).toBeInTheDocument();
     expect(screen.getByText(/didn't drop below the floor/i)).toBeInTheDocument();
-    expect(screen.getByText(/calorie estimates landed/i)).toBeInTheDocument();
   });
 
   it("headlines a rejected retune as 'no update'", () => {
