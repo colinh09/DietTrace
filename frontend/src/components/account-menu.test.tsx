@@ -68,16 +68,23 @@ describe("AccountMenu", () => {
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
   });
 
-  it("offers Sign in when configured but signed out (anonymous session)", async () => {
-    const signInWithGoogle = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(useAuth).mockReturnValue({
-      ...anonAuth,
-      configured: true,
-      signInWithGoogle,
-    });
+  it("offers Sign out (not Sign in) in an anonymous session and returns to the gate", () => {
+    // On the food-logging screen you're always "logged in" (here: anonymous), so
+    // the menu offers Sign out — which forgets the anon choice and reloads the gate.
+    const reload = vi.fn();
+    vi.stubGlobal("location", { href: "http://localhost/", reload });
+    window.localStorage.setItem("diettrace_anon_choice", "1");
+    vi.mocked(useAuth).mockReturnValue({ ...anonAuth, configured: true });
     render(<AccountMenu />);
     fireEvent.click(screen.getByRole("button", { name: /account/i }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /sign in/i }));
-    await waitFor(() => expect(signInWithGoogle).toHaveBeenCalledTimes(1));
+
+    expect(
+      screen.queryByRole("menuitem", { name: /sign in/i }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: /sign out/i }));
+
+    expect(window.localStorage.getItem("diettrace_anon_choice")).toBeNull();
+    expect(reload).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

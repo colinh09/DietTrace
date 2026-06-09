@@ -19,3 +19,13 @@ export function chooseAnon(): void {
     /* private mode / storage disabled — the gate just re-asks next load */
   }
 }
+
+// Signing out of the anonymous session: forget the choice so the next load (or an
+// immediate reload) drops back to the sign-in gate.
+export function clearAnon(): void {
+  try {
+    window.localStorage.removeItem(ANON_KEY);
+  } catch {
+    /* storage disabled — nothing to clear */
+  }
+}

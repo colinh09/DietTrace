@@ -7,9 +7,10 @@
 // this level — siblings of the dropdown — so closing the menu never unmounts an
 // open modal.
 import { useEffect, useRef, useState } from "react";
-import { LogIn, LogOut, RotateCcw, User } from "lucide-react";
+import { LogOut, RotateCcw, User } from "lucide-react";
 import { getSetup, type Setup } from "@/lib/setup";
 import { useAuth } from "@/lib/auth";
+import { clearAnon } from "@/lib/auth-gate";
 import { RecapModal } from "@/components/recap-modal";
 import { ResetDialog } from "@/components/reset-dialog";
 import { Modal } from "@/components/modal";
@@ -38,7 +39,7 @@ export function AccountMenu({
   // Fired after a sign-in/out so the page can reload data for the new bucket.
   onAuthChange?: () => void;
 }) {
-  const { user, configured, signInWithGoogle, signOut } = useAuth();
+  const { user, configured, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [personaOpen, setPersonaOpen] = useState(false);
   const [setup, setSetupState] = useState<Setup | null>(null);
@@ -93,6 +94,20 @@ export function AccountMenu({
     }
   };
 
+  // Once you're on the food-logging screen you're always "logged in" (Google or
+  // anonymous), so the menu always offers Sign out. A real user signs out of
+  // Firebase; an anonymous user forgets the "continue anonymous" choice and
+  // reloads back to the sign-in gate.
+  const handleSignOut = () => {
+    if (user) {
+      runAuth(signOut);
+      return;
+    }
+    setMenuOpen(false);
+    clearAnon();
+    window.location.reload();
+  };
+
   return (
     <>
       <div className="acct" ref={acctRef}>
@@ -139,29 +154,16 @@ export function AccountMenu({
             {configured && (
               <>
                 <div className="acct-menu-sep" />
-                {user ? (
-                  <button
-                    type="button"
-                    className="acct-menu-item"
-                    role="menuitem"
-                    onClick={() => runAuth(signOut)}
-                    disabled={authBusy}
-                  >
-                    <LogOut size={16} className="acct-menu-ic" aria-hidden="true" />
-                    Sign out
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="acct-menu-item"
-                    role="menuitem"
-                    onClick={() => runAuth(signInWithGoogle)}
-                    disabled={authBusy}
-                  >
-                    <LogIn size={16} className="acct-menu-ic" aria-hidden="true" />
-                    Sign in
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="acct-menu-item"
+                  role="menuitem"
+                  onClick={handleSignOut}
+                  disabled={authBusy}
+                >
+                  <LogOut size={16} className="acct-menu-ic" aria-hidden="true" />
+                  Sign out
+                </button>
               </>
             )}
             <div className="acct-menu-sep" />
