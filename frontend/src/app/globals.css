@@ -891,7 +891,13 @@ body {
 .tg-quick-cal { margin-bottom: 18px; }
 .tg-quick-cal-lab { display: block; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
 .tg-quick-macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-.tg-mismatch { margin-top: 16px; font-size: 12.5px; line-height: 1.5; padding: 10px 13px; border-radius: 10px; }
+.tg-split-wrap { margin-top: 20px; }
+.tg-split { display: flex; height: 12px; border-radius: 100px; overflow: hidden; background: var(--line); }
+.tg-split-seg { height: 100%; transition: width .25s ease; }
+.tg-split-legend { display: flex; gap: 16px; margin-top: 9px; font-size: 11px; color: var(--muted-ink); }
+.tg-split-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.tg-split-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.tg-mismatch { margin-top: 12px; font-size: 12.5px; line-height: 1.5; padding: 10px 13px; border-radius: 10px; }
 .tg-mismatch.ok { color: var(--accent-ink); background: var(--accent-soft); }
 .tg-mismatch.bad { color: var(--danger-ink); background: var(--danger-soft); }
 .tg-mismatch b { font-weight: 600; }

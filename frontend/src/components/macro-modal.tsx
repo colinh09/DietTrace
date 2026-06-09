@@ -151,6 +151,52 @@ export function MacroModal({
             <MacroCol name="Fat" value={q.f} onChange={(v) => setQv("f", v)} />
           </div>
 
+          {macroKcal > 0 && (
+            <div className="tg-split-wrap">
+              <div
+                className="tg-split"
+                role="img"
+                aria-label="share of calories from each macro"
+              >
+                <span
+                  className="tg-split-seg"
+                  style={{
+                    width: `${((q.p * 4) / macroKcal) * 100}%`,
+                    background: "var(--macro-protein)",
+                  }}
+                />
+                <span
+                  className="tg-split-seg"
+                  style={{
+                    width: `${((q.c * 4) / macroKcal) * 100}%`,
+                    background: "var(--macro-carb)",
+                  }}
+                />
+                <span
+                  className="tg-split-seg"
+                  style={{
+                    width: `${((q.f * 9) / macroKcal) * 100}%`,
+                    background: "var(--macro-fat)",
+                  }}
+                />
+              </div>
+              <div className="tg-split-legend mono">
+                <span>
+                  <i style={{ background: "var(--macro-protein)" }} />
+                  Protein {Math.round(((q.p * 4) / macroKcal) * 100)}%
+                </span>
+                <span>
+                  <i style={{ background: "var(--macro-carb)" }} />
+                  Carbs {Math.round(((q.c * 4) / macroKcal) * 100)}%
+                </span>
+                <span>
+                  <i style={{ background: "var(--macro-fat)" }} />
+                  Fat {Math.round(((q.f * 9) / macroKcal) * 100)}%
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className={"tg-mismatch" + (mismatch ? " bad" : " ok")}>
             {mismatch ? (
               <>

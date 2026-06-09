@@ -32,9 +32,7 @@ describe("AccuracyPage", () => {
     render(<AccuracyPage />);
 
     await waitFor(() =>
-      expect(
-        screen.getByText(/How DietTrace stays accurate/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/graded on accuracy/i)).toBeInTheDocument(),
     );
     expect(screen.getByText("60%")).toBeInTheDocument(); // calorie accuracy headline
     expect(screen.getByText(/how DietTrace checks its own work/i)).toBeInTheDocument();

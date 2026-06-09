@@ -5,8 +5,9 @@
 // AccuracyView; this just adds the page chrome + the fetch. Read from GET /accuracy.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Sparkle } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { AccuracyView } from "@/components/accuracy-view";
+import { BrandMark } from "@/components/brand-mark";
 import { getAccuracy, type AccuracyReport } from "@/lib/api";
 
 export default function AccuracyPage() {
@@ -26,12 +27,20 @@ export default function AccuracyPage() {
             <ChevronLeft size={16} /> today
           </Link>
           <div className="brand">
-            <Sparkle size={15} fill="var(--accent)" color="var(--accent)" />
+            <BrandMark size={18} />
             <span className="brand-name">accuracy</span>
             <Link href="/trust" className="hdr-link mono">
               trust
             </Link>
           </div>
+        </header>
+        <header className="ov-head">
+          <span className="ov-eyebrow mono">Accuracy</span>
+          <h1 className="ov-title">An AI nutritionist graded on accuracy</h1>
+          <p className="ov-sub">
+            DietTrace grades its own work on every meal against USDA data and learns
+            how <i>you</i> eat — tested so personalizing never makes it less accurate.
+          </p>
         </header>
         {report && <AccuracyView report={report} />}
       </main>
