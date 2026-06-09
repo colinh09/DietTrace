@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { OverviewModal } from "@/components/observability-modal";
-import { HOW_STEPS } from "@/components/how-it-works";
 import {
   getAccuracy,
   getTrust,
@@ -57,10 +56,9 @@ describe("OverviewModal", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("has a 'How it works' tab with the written guide and launches the tour", async () => {
+  it("has a 'How it works' tab with the written guide", async () => {
     vi.mocked(getAccuracy).mockResolvedValue(accuracy);
-    const onStartTour = vi.fn();
-    render(<OverviewModal onClose={vi.fn()} onStartTour={onStartTour} />);
+    render(<OverviewModal onClose={vi.fn()} />);
 
     // Defaults to the Accuracy report.
     await waitFor(() =>
@@ -70,10 +68,10 @@ describe("OverviewModal", () => {
     );
 
     fireEvent.click(screen.getByRole("tab", { name: /how it works/i }));
-    expect(screen.getByText(HOW_STEPS[0].title)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /take the tour/i }));
-    expect(onStartTour).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("heading", { name: /how diettrace works/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/your day at a glance/i)).toBeInTheDocument();
   });
 
   it("closes on Escape", () => {

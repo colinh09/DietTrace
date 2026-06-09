@@ -817,23 +817,6 @@ body {
 .hiw-body { min-width: 0; }
 .hiw-title { font-size: 15px; font-weight: 600; color: var(--ink); margin: 2px 0 4px; }
 .hiw-text { font-size: 13.5px; line-height: 1.6; color: var(--muted-ink); margin: 0; max-width: 60ch; }
-.hiw-foot { margin-top: 24px; display: flex; justify-content: flex-start; }
-
-/* ── Guided tour overlay ───────────────────────────────────────────────── */
-.tour-count { font-size: 11px; letter-spacing: 0.08em; color: var(--faint); }
-.tour-title { font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--ink); margin: 7px 0 10px; line-height: 1.15; }
-.tour-text { font-size: 14px; line-height: 1.65; color: var(--muted-ink); margin: 0; }
-.tour-foot { display: flex; align-items: center; gap: 10px; margin-top: 24px; }
-.tour-spacer { flex: 1; }
-
-/* ── Proactive tour nudge ──────────────────────────────────────────────── */
-.tourp { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 11px 12px 11px 15px; margin-bottom: 14px; background: var(--accent-softer); border: 1px solid var(--line); border-radius: 12px; }
-.tourp-text { font-size: 13px; color: var(--accent-ink); line-height: 1.4; }
-.tourp-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.tourp-go { background: var(--accent); color: var(--on-accent); border: none; border-radius: 9px; padding: 7px 14px; font-family: var(--ui-font); font-size: 13px; font-weight: 600; cursor: pointer; transition: filter .15s; }
-.tourp-go:hover { filter: brightness(.93); }
-.tourp-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; background: none; color: var(--faint); border-radius: 8px; cursor: pointer; transition: background .14s, color .14s; }
-.tourp-x:hover { background: var(--accent-soft); color: var(--ink); }
 
 /* ── Macro editor modal (Set your targets) ─────────────────────────────── */
 .tg-scrim { position: fixed; inset: 0; background: rgba(27,26,22,0.26); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 90; }

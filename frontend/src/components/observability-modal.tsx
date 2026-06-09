@@ -31,14 +31,7 @@ function Skeleton() {
   );
 }
 
-export function OverviewModal({
-  onClose,
-  onStartTour,
-}: {
-  onClose: () => void;
-  // Launch the interactive tour (the page closes this modal and opens the tour).
-  onStartTour?: () => void;
-}) {
+export function OverviewModal({ onClose }: { onClose: () => void }) {
   const [acc, setAcc] = useState<AccuracyReport | null>(accCache);
   const [tab, setTab] = useState<"accuracy" | "guide">("accuracy");
 
@@ -99,7 +92,7 @@ export function OverviewModal({
           </>
         ) : (
           <section className="ov-section obs-body">
-            <HowItWorksGuide onStartTour={onStartTour} />
+            <HowItWorksGuide />
           </section>
         )}
       </div>

@@ -17,7 +17,6 @@ import type { AgentEvent } from "@/components/agent-decision";
 import { Dashboard } from "@/components/dashboard";
 import { OverviewModal } from "@/components/observability-modal";
 import { MacroModal } from "@/components/macro-modal";
-import { Tour, TourPrompt } from "@/components/how-it-works";
 import { Onboarding } from "@/components/onboarding";
 import {
   deleteMeal,
@@ -90,8 +89,6 @@ export default function Home() {
   const [overviewOpen, setOverviewOpen] = useState(false);
   // Whether the macro editor ("Set your targets") modal is open.
   const [macroOpen, setMacroOpen] = useState(false);
-  // Whether the optional guided "how it works" tour overlay is open.
-  const [tourOpen, setTourOpen] = useState(false);
   // Whether the "recalculate from your details" flow (the reused onboarding chat)
   // is open, overlaying the app.
   const [recalcOpen, setRecalcOpen] = useState(false);
@@ -435,8 +432,6 @@ export default function Home() {
         />
         <div className="layout">
           <div className="col-log">
-            {/* Optional, dismissible nudge offering the guided walkthrough. */}
-            <TourPrompt onStartTour={() => setTourOpen(true)} />
             {/* The day card — date navigator + calorie/macro rings, one panel. */}
             <section className="day-card">
               <DatePicker
@@ -473,16 +468,8 @@ export default function Home() {
         </div>
       </main>
       {overviewOpen && (
-        <OverviewModal
-          onClose={() => setOverviewOpen(false)}
-          onStartTour={() => {
-            // Close the modal so the tour overlays the live app it describes.
-            setOverviewOpen(false);
-            setTourOpen(true);
-          }}
-        />
+        <OverviewModal onClose={() => setOverviewOpen(false)} />
       )}
-      {tourOpen && <Tour onClose={() => setTourOpen(false)} />}
       {macroOpen && (
         <MacroModal
           goals={goals}
