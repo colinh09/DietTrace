@@ -27,7 +27,7 @@ export function BrandMark({
   size = 24,
   echo = true,
   stroke = "var(--accent)",
-  strokeWidth = 4,
+  strokeWidth = 5,
   className,
   title,
 }: BrandMarkProps): JSX.Element {

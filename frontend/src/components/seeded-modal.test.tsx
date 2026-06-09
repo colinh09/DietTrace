@@ -49,7 +49,7 @@ describe("SeededModal", () => {
     // The hook meal carries the "under-counted" flag badge.
     expect(document.querySelector(".sm-flag")).toHaveTextContent(/under-counted/i);
     // The seeded learning state is described.
-    expect(screen.getByText(/meals you confirmed/i)).toBeInTheDocument();
+    expect(screen.getByText(/kept aside in your dataset/i)).toBeInTheDocument();
     expect(
       screen.getByText(/before workouts I eat way more carbs/i),
     ).toBeInTheDocument();

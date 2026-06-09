@@ -55,6 +55,22 @@ export function SeededModal({
           ))}
         </div>
 
+        {/* what's loaded, at a glance */}
+        <div className="sm-stats">
+          <div className="sm-stat">
+            <span className="sm-stat-num">{p.meal_texts.length}</span>
+            <span className="sm-stat-lab mono">on today</span>
+          </div>
+          <div className="sm-stat">
+            <span className="sm-stat-num">{result.confirmations}</span>
+            <span className="sm-stat-lab mono">confirmed</span>
+          </div>
+          <div className="sm-stat">
+            <span className="sm-stat-num">{result.corrections}</span>
+            <span className="sm-stat-lab mono">to learn from</span>
+          </div>
+        </div>
+
         {/* today's playground meals */}
         <section className="sm-section">
           <div className="sm-sub mono">On today — your playground</div>
@@ -72,19 +88,14 @@ export function SeededModal({
             })}
           </ul>
           <p className="sm-note">{p.hook_note}</p>
-          <p className="sm-note sm-note-soft">
-            They’re on today — edit a portion, suggest a food, or correct the
-            under-count, then update.
-          </p>
         </section>
 
         {/* the held-out dataset — visible on the previous day */}
         <section className="sm-section">
           <div className="sm-sub mono">Confirmed meals · {datasetDayLabel}</div>
           <p className="sm-line">
-            <b>{result.confirmations}</b> meals you confirmed — logged on the
-            previous day and kept aside in your dataset, which DietTrace is checked
-            against (it never sees them while learning).
+            Logged on the previous day and kept aside in your dataset — DietTrace is
+            checked against them, but never sees them while learning.
           </p>
           {onViewDataset && (
             <button
