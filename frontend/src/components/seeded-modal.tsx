@@ -123,8 +123,8 @@ export function SeededModal({
             </li>
             <li>
               Watch the <b>agent activity</b> feed on the right, and open{" "}
-              <b>⚙ Status</b> to see what it was tested on, the result, and what
-              it learned.
+              <b>State</b> (top of the feed) to see what it was tested on, the
+              result, and what it learned.
             </li>
           </ol>
         </section>
