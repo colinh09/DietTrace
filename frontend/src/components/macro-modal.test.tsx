@@ -2,12 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MacroModal } from "@/components/macro-modal";
 import { postMacrosSave } from "@/lib/api";
-import { getSetup } from "@/lib/setup";
 
-vi.mock("@/lib/api", () => ({
-  postMacrosPlan: vi.fn(),
-  postMacrosSave: vi.fn(),
-}));
+vi.mock("@/lib/api", () => ({ postMacrosSave: vi.fn() }));
 
 const GOALS = [
   { code: "208", name: "Energy", target: 2000, unit: "kcal", consumed: 0, remaining: 2000 },
@@ -15,37 +11,11 @@ const GOALS = [
   { code: "205", name: "Carb", target: 200, unit: "g", consumed: 0, remaining: 200 },
   { code: "204", name: "Fat", target: 60, unit: "g", consumed: 0, remaining: 60 },
 ];
-vi.mock("@/lib/setup", () => ({ getSetup: vi.fn() }));
 
 describe("MacroModal", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("prefills the form from the user's saved setup (not hardcoded defaults)", () => {
-    vi.mocked(getSetup).mockReturnValue({
-      kind: "own",
-      inputs: {
-        age: 29,
-        sex: "female",
-        height_cm: 168,
-        weight_kg: 57,
-        activity: "very_active",
-        goal: "cut",
-        preference: "carb up before runs",
-      },
-      lifestyle: "marathon training",
-    });
-    render(<MacroModal onClose={vi.fn()} />);
-
-    expect(screen.getByDisplayValue("29")).toBeInTheDocument(); // age
-    expect(screen.getByDisplayValue("168")).toBeInTheDocument(); // height
-    expect(screen.getByDisplayValue("57")).toBeInTheDocument(); // weight
-    expect(screen.getByDisplayValue("carb up before runs")).toBeInTheDocument();
-    // Their gender choice is the selected segment.
-    expect(screen.getByRole("button", { name: "Female" })).toHaveClass("on");
-  });
-
-  it("defaults to quick-edit with the current targets and flags a calorie mismatch", async () => {
-    vi.mocked(getSetup).mockReturnValue(null);
+  it("quick-edits the current targets and flags a calorie mismatch", async () => {
     vi.mocked(postMacrosSave).mockResolvedValue({ ok: true } as never);
     render(<MacroModal goals={GOALS} onClose={vi.fn()} onSaved={vi.fn()} />);
 
@@ -64,11 +34,12 @@ describe("MacroModal", () => {
     );
   });
 
-  it("falls back to blanks when there's no setup (no made-up numbers)", () => {
-    vi.mocked(getSetup).mockReturnValue(null);
-    render(<MacroModal onClose={vi.fn()} />);
-    // The old hardcoded "31" / "keep protein high" are gone.
-    expect(screen.queryByDisplayValue("31")).not.toBeInTheDocument();
-    expect(screen.queryByDisplayValue("keep protein high")).not.toBeInTheDocument();
+  it("'Recalculate from your details' hands off to the onboarding chat", () => {
+    const onRecalc = vi.fn();
+    render(<MacroModal goals={GOALS} onClose={vi.fn()} onRecalc={onRecalc} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /recalculate from your details/i }),
+    );
+    expect(onRecalc).toHaveBeenCalledTimes(1);
   });
 });

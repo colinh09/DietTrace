@@ -1227,7 +1227,11 @@ body {
    Full-page calm card on the warm background. Reuses the tg-* form controls so
    it matches the macro editor; titles are serif, the eyebrow is mono. */
 .ob-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 18px; background: var(--bg); }
-.ob-card { width: 100%; max-width: 460px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 30px 30px 22px; box-shadow: 0 1px 2px rgba(27,26,22,.03), 0 12px 34px rgba(27,26,22,.06); }
+/* The reused onboarding chat as a dismissible overlay (Macros "recalculate"). */
+.ob-overlay { position: fixed; inset: 0; z-index: 70; overflow-y: auto; }
+.ob-card { position: relative; width: 100%; max-width: 460px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 30px 30px 22px; box-shadow: 0 1px 2px rgba(27,26,22,.03), 0 12px 34px rgba(27,26,22,.06); }
+.ob-close { position: absolute; top: 16px; right: 16px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: none; background: none; color: var(--faint); border-radius: 8px; cursor: pointer; transition: background .14s, color .14s; }
+.ob-close:hover { background: var(--accent-softer); color: var(--ink); }
 .ob-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 22px; }
 .ob-eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--faint); margin-bottom: 8px; }
 .ob-title { font-family: var(--serif); font-size: 28px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); line-height: 1.12; }

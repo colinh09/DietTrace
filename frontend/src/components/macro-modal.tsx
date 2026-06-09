@@ -1,37 +1,11 @@
 "use client";
 
-// The "Macro goals" modal. Two views:
-//   • Quick edit (default) — edit Calories / Protein / Carb / Fat directly; the
-//     macro-derived kcal is shown live and a mismatch with the calorie target is
-//     flagged. Fast, no recompute.
-//   • Recalculate — the full form (age/sex/… → /macros/plan) for when the user
-//     wants DietTrace to recompute everything from their details ("redo setup").
-// Save persists via /macros/save.
+// The "Macro goals" modal — a quick edit of the daily targets (Calories / Protein /
+// Carb / Fat) with a live mismatch check. "Recalculate from your details" hands off
+// to the page, which re-runs the onboarding chat to recompute everything from
+// scratch (the same conversational setup as first-run / reset).
 import { useEffect, useState } from "react";
-import { Sparkle } from "lucide-react";
-import {
-  postMacrosPlan,
-  postMacrosSave,
-  type GoalProgress,
-  type MacroActivity,
-  type MacroGoal,
-  type MacroPlan,
-  type MacroSex,
-} from "@/lib/api";
-import { getSetup } from "@/lib/setup";
-
-const ACTIVITY: { key: MacroActivity; label: string }[] = [
-  { key: "sedentary", label: "Sedentary — little exercise" },
-  { key: "light", label: "Lightly active — 1–3 days / week" },
-  { key: "moderate", label: "Moderately active — 3–5 days / week" },
-  { key: "active", label: "Active — 6–7 days / week" },
-  { key: "very_active", label: "Very active — hard daily training" },
-];
-const GOALS: { key: MacroGoal; label: string }[] = [
-  { key: "cut", label: "Cut" },
-  { key: "maintain", label: "Maintain" },
-  { key: "bulk", label: "Bulk" },
-];
+import { postMacrosSave, type GoalProgress } from "@/lib/api";
 
 // USDA codes the band + backend share.
 const ENERGY = "208";
@@ -40,72 +14,7 @@ const CARB = "205";
 const FAT = "204";
 const fmt = new Intl.NumberFormat("en-US");
 
-interface FormState {
-  age: string;
-  sex: MacroSex;
-  height: string;
-  weight: string;
-  activity: MacroActivity;
-  goal: MacroGoal;
-  ai: boolean;
-  pref: string;
-}
-
-const FALLBACK_FORM: FormState = {
-  age: "",
-  sex: "male",
-  height: "",
-  weight: "",
-  activity: "moderate",
-  goal: "maintain",
-  ai: true,
-  pref: "",
-};
-
-function initialForm(): FormState {
-  const inputs = getSetup()?.inputs;
-  if (!inputs) return FALLBACK_FORM;
-  return {
-    age: inputs.age != null ? String(inputs.age) : "",
-    sex: inputs.sex ?? "male",
-    height: inputs.height_cm != null ? String(inputs.height_cm) : "",
-    weight: inputs.weight_kg != null ? String(inputs.weight_kg) : "",
-    activity: inputs.activity ?? "moderate",
-    goal: inputs.goal ?? "maintain",
-    ai: true,
-    pref: inputs.preference ?? "",
-  };
-}
-
-function Seg<T extends string>({
-  value,
-  options,
-  onChange,
-  dots,
-}: {
-  value: T;
-  options: { key: T; label: string }[];
-  onChange: (v: T) => void;
-  dots?: boolean;
-}) {
-  return (
-    <div className="tg-seg grow">
-      {options.map((o) => (
-        <button
-          key={o.key}
-          type="button"
-          className={"tg-opt" + (value === o.key ? " on" : "")}
-          onClick={() => onChange(o.key)}
-        >
-          {dots && <span className="tg-dot" />}
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// Inline dashed-underline number field (the foundation's editable number).
+// Inline editable number as a clear bordered field (the box signals it's editable).
 function NumEdit({
   value,
   onChange,
@@ -158,23 +67,19 @@ function MacroCol({
 export function MacroModal({
   onClose,
   onSaved,
+  onRecalc,
   goals = [],
 }: {
   onClose: () => void;
   onSaved?: () => void;
-  // The user's current per-nutrient targets — seeds the quick editor.
+  // Re-run the onboarding chat to recompute targets (wired by the page).
+  onRecalc?: () => void;
+  // The user's current per-nutrient targets — seeds the editor.
   goals?: GoalProgress[];
 }) {
   const targetOf = (code: string) =>
     Math.round(goals.find((g) => g.code === code)?.target ?? 0);
-  const hasGoals = goals.some((g) => g.target > 0);
 
-  // Default to quick edit when there are targets to edit; otherwise the full form.
-  const [view, setView] = useState<"quick" | "recalc">(
-    hasGoals ? "quick" : "recalc",
-  );
-
-  // ── Quick-edit state ──────────────────────────────────────────────────────
   const [q, setQ] = useState({
     cal: targetOf(ENERGY),
     p: targetOf(PROTEIN),
@@ -203,12 +108,6 @@ export function MacroModal({
     }
   };
 
-  // ── Recalculate state ─────────────────────────────────────────────────────
-  const [inp, setInp] = useState<FormState>(initialForm);
-  const [plan, setPlan] = useState<MacroPlan | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [saving, setSaving] = useState(false);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -216,64 +115,6 @@ export function MacroModal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  const upd = <K extends keyof FormState>(k: K, v: FormState[K]) =>
-    setInp((s) => ({ ...s, [k]: v }));
-
-  async function calculate() {
-    setBusy(true);
-    try {
-      const res = await postMacrosPlan({
-        age: parseInt(inp.age || "30", 10),
-        sex: inp.sex,
-        height_cm: parseFloat(inp.height || (inp.sex === "female" ? "164" : "178")),
-        weight_kg: parseFloat(inp.weight || "70"),
-        activity: inp.activity,
-        goal: inp.goal,
-        preference: inp.pref || null,
-        ai_help: inp.ai,
-      });
-      setPlan(res);
-    } catch {
-      /* fail-soft — keep the prior plan and let the user retry */
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const editTarget = (code: string, value: number) =>
-    setPlan((p) => (p ? { ...p, targets: { ...p.targets, [code]: value } } : p));
-
-  async function save() {
-    if (!plan) return;
-    setSaving(true);
-    try {
-      await postMacrosSave(plan.targets, plan.rationale, plan.source);
-      onSaved?.();
-      onClose();
-    } catch {
-      setSaving(false);
-    }
-  }
-
-  const t = plan?.targets;
-  const kcal = t ? t[ENERGY] : 0;
-  const tdeeStep = plan?.steps?.find(
-    (s) => (s as { step?: string }).step === "tdee",
-  );
-  const tdee =
-    tdeeStep && typeof (tdeeStep as { value?: unknown }).value === "number"
-      ? (tdeeStep as { value: number }).value
-      : kcal;
-  const calFill =
-    kcal > 0 ? Math.max(4, Math.min(100, (kcal / (tdee || kcal)) * 100)) : 0;
-
-  const ev = plan?.eval;
-  const checked = ev
-    ? ev.pass
-      ? "Plan checked: the numbers add up ✓ · within a safe range ✓"
-      : "We nudged the AI's suggestion so the numbers add up and stay in a safe range."
-    : null;
 
   return (
     <div className="tg-scrim" onMouseDown={onClose}>
@@ -288,294 +129,63 @@ export function MacroModal({
         </button>
 
         <div className="tg-eyebrow mono">Macro goals</div>
+        <h2 className="tg-title">Your daily targets</h2>
+        <p className="tg-sub">
+          Edit any number directly. Your protein, carbs, and fat should add up to
+          your calorie target.
+        </p>
 
-        {view === "quick" ? (
-          <>
-            <h2 className="tg-title">Your daily targets</h2>
-            <p className="tg-sub">
-              Edit any number directly. Your protein, carbs, and fat should add up
-              to your calorie target.
-            </p>
+        <div className="tg-quick">
+          <div className="tg-quick-cal">
+            <span className="tg-quick-cal-lab">Calories</span>
+            <NumEdit
+              value={q.cal}
+              onChange={(v) => setQv("cal", v)}
+              unit="kcal"
+              size="big"
+            />
+          </div>
+          <div className="tg-quick-macros">
+            <MacroCol name="Protein" value={q.p} onChange={(v) => setQv("p", v)} />
+            <MacroCol name="Carb" value={q.c} onChange={(v) => setQv("c", v)} />
+            <MacroCol name="Fat" value={q.f} onChange={(v) => setQv("f", v)} />
+          </div>
 
-            <div className="tg-quick">
-              <div className="tg-quick-cal">
-                <span className="tg-quick-cal-lab">Calories</span>
-                <NumEdit
-                  value={q.cal}
-                  onChange={(v) => setQv("cal", v)}
-                  unit="kcal"
-                  size="big"
-                />
-              </div>
-              <div className="tg-quick-macros">
-                <MacroCol
-                  name="Protein"
-                  value={q.p}
-                  onChange={(v) => setQv("p", v)}
-                />
-                <MacroCol
-                  name="Carb"
-                  value={q.c}
-                  onChange={(v) => setQv("c", v)}
-                />
-                <MacroCol
-                  name="Fat"
-                  value={q.f}
-                  onChange={(v) => setQv("f", v)}
-                />
-              </div>
+          <div className={"tg-mismatch" + (mismatch ? " bad" : " ok")}>
+            {mismatch ? (
+              <>
+                Your macros add up to <b>{fmt.format(macroKcal)} kcal</b> —{" "}
+                {fmt.format(Math.abs(diff))} {diff > 0 ? "over" : "under"} your{" "}
+                {fmt.format(q.cal)} kcal target.
+              </>
+            ) : (
+              <>
+                Your macros add up to <b>{fmt.format(macroKcal)} kcal</b> — matches
+                your calorie target. ✓
+              </>
+            )}
+          </div>
 
-              <div className={"tg-mismatch" + (mismatch ? " bad" : " ok")}>
-                {mismatch ? (
-                  <>
-                    Your macros add up to <b>{fmt.format(macroKcal)} kcal</b> —{" "}
-                    {fmt.format(Math.abs(diff))} {diff > 0 ? "over" : "under"} your{" "}
-                    {fmt.format(q.cal)} kcal target.
-                  </>
-                ) : (
-                  <>
-                    Your macros add up to <b>{fmt.format(macroKcal)} kcal</b> —
-                    matches your calorie target. ✓
-                  </>
-                )}
-              </div>
-
-              <div className="tg-foot">
-                <button
-                  type="button"
-                  className="tg-btn-secondary"
-                  onClick={() => setView("recalc")}
-                >
-                  Recalculate from your details
-                </button>
-                <button
-                  type="button"
-                  className="tg-btn-primary"
-                  onClick={saveQuick}
-                  disabled={savingQ}
-                >
-                  {savingQ ? "Saving…" : "Save targets"}
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <h2 className="tg-title">Recalculate your targets</h2>
-            <p className="tg-sub">
-              {hasGoals && (
-                <button
-                  type="button"
-                  className="tg-relink back"
-                  onClick={() => setView("quick")}
-                >
-                  ← Back to quick edit
-                </button>
-              )}
-              Recompute everything from your details — adjust anything, then
-              recalculate.
-            </p>
-
-            {/* Stage 1 — inputs */}
-            <div className="tg-form">
-              <div className="tg-grid">
-                <label className="tg-f">
-                  <span className="tg-l">Age</span>
-                  <div className="tg-input num">
-                    <input
-                      value={inp.age}
-                      inputMode="numeric"
-                      onChange={(e) =>
-                        upd("age", e.target.value.replace(/[^0-9]/g, ""))
-                      }
-                    />
-                    <span className="tg-suf">yr</span>
-                  </div>
-                </label>
-                <div className="tg-f">
-                  <span className="tg-l">Sex</span>
-                  <Seg
-                    value={inp.sex}
-                    onChange={(v) => upd("sex", v)}
-                    options={[
-                      { key: "male", label: "Male" },
-                      { key: "female", label: "Female" },
-                    ]}
-                  />
-                </div>
-                <label className="tg-f">
-                  <span className="tg-l">Height</span>
-                  <div className="tg-input num">
-                    <input
-                      value={inp.height}
-                      inputMode="numeric"
-                      onChange={(e) =>
-                        upd("height", e.target.value.replace(/[^0-9]/g, ""))
-                      }
-                    />
-                    <span className="tg-suf">cm</span>
-                  </div>
-                </label>
-                <label className="tg-f">
-                  <span className="tg-l">Weight</span>
-                  <div className="tg-input num">
-                    <input
-                      value={inp.weight}
-                      inputMode="numeric"
-                      onChange={(e) =>
-                        upd("weight", e.target.value.replace(/[^0-9]/g, ""))
-                      }
-                    />
-                    <span className="tg-suf">kg</span>
-                  </div>
-                </label>
-              </div>
-
-              <label className="tg-f tg-full">
-                <span className="tg-l">Activity</span>
-                <div className="tg-select">
-                  <select
-                    value={inp.activity}
-                    onChange={(e) =>
-                      upd("activity", e.target.value as MacroActivity)
-                    }
-                  >
-                    {ACTIVITY.map((a) => (
-                      <option key={a.key} value={a.key}>
-                        {a.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </label>
-
-              <div className="tg-f tg-full">
-                <span className="tg-l">Goal</span>
-                <Seg
-                  value={inp.goal}
-                  onChange={(v) => upd("goal", v)}
-                  options={GOALS}
-                  dots
-                />
-              </div>
-
-              <div className="tg-f tg-full">
-                <div className="tg-l-row">
-                  <span className="tg-l">
-                    Preference <span className="opt">optional</span>
-                  </span>
-                  <button
-                    type="button"
-                    className={"tg-ai" + (inp.ai ? " on" : "")}
-                    aria-pressed={inp.ai}
-                    onClick={() => upd("ai", !inp.ai)}
-                  >
-                    <span className="tg-ai-glyph">
-                      <Sparkle size={12} />
-                    </span>
-                    AI help
-                  </button>
-                </div>
-                <div className="tg-input">
-                  <input
-                    value={inp.pref}
-                    placeholder="e.g. keep protein high"
-                    onChange={(e) => upd("pref", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="tg-actions">
-                <button
-                  type="button"
-                  className={plan ? "tg-recalc" : "tg-btn-primary"}
-                  onClick={calculate}
-                  disabled={busy}
-                >
-                  {!plan && inp.ai && (
-                    <Sparkle size={12} color="var(--on-accent)" />
-                  )}
-                  {busy ? "Calculating…" : plan ? "Recalculate" : "Calculate"}
-                </button>
-              </div>
-            </div>
-
-            {/* Stage 2 — result */}
-            <div className="tg-result" data-open={plan ? "true" : "false"}>
-              <div className="tg-result-inner">
-                <div className="tg-rule" />
-                <div className="tg-plan-eyebrow mono">Your daily plan</div>
-
-                <div className="tg-cal">
-                  <div className="tg-cal-label">Calories</div>
-                  <div className="tg-cal-val">
-                    <NumEdit
-                      value={kcal}
-                      onChange={(v) => editTarget(ENERGY, v)}
-                      unit="kcal"
-                      size="big"
-                    />
-                  </div>
-                  <div className="tg-bar">
-                    <div className="tg-bar-fill" style={{ width: calFill + "%" }} />
-                  </div>
-                  <div className="tg-cal-ref mono">
-                    {plan?.source === "ai" ? "AI-personalised" : "formula"} ·{" "}
-                    <b>{kcal > 0 ? fmt.format(Math.round(kcal)) : ""} kcal/day</b>
-                  </div>
-                </div>
-
-                <div className="tg-macros">
-                  <MacroCol
-                    name="Protein"
-                    value={t ? t[PROTEIN] : 0}
-                    onChange={(v) => editTarget(PROTEIN, v)}
-                  />
-                  <MacroCol
-                    name="Carb"
-                    value={t ? t[CARB] : 0}
-                    onChange={(v) => editTarget(CARB, v)}
-                  />
-                  <MacroCol
-                    name="Fat"
-                    value={t ? t[FAT] : 0}
-                    onChange={(v) => editTarget(FAT, v)}
-                  />
-                </div>
-
-                {plan?.rationale && (
-                  <p className="tg-rationale">
-                    <span className="tg-r-glyph">
-                      <Sparkle size={13} />
-                    </span>
-                    {plan.rationale}
-                  </p>
-                )}
-
-                {checked && (
-                  <div className={"tg-checked" + (ev && !ev.pass ? " amber" : "")}>
-                    {checked}
-                    {plan?.personalized && " · tuned to your saved preference"}
-                  </div>
-                )}
-
-                <div className="tg-foot">
-                  <button type="button" className="tg-btn-quiet" onClick={onClose}>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="tg-btn-primary"
-                    onClick={save}
-                    disabled={!plan || saving}
-                  >
-                    {saving ? "Saving…" : "Save targets"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+          <div className="tg-foot">
+            {onRecalc && (
+              <button
+                type="button"
+                className="tg-btn-secondary"
+                onClick={onRecalc}
+              >
+                Recalculate from your details
+              </button>
+            )}
+            <button
+              type="button"
+              className="tg-btn-primary"
+              onClick={saveQuick}
+              disabled={savingQ}
+            >
+              {savingQ ? "Saving…" : "Save targets"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -9,7 +9,7 @@
 //      answers compute the daily targets (deterministic, instant, no spend).
 // Whole own-data path is under a minute. The Macros tab edits targets afterward.
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Pencil, Play, Send, Sparkle } from "lucide-react";
+import { ArrowRight, Pencil, Play, Send, Sparkle, X } from "lucide-react";
 import {
   postMacrosPlan,
   postMacrosSave,
@@ -80,10 +80,20 @@ type Msg = { role: "agent" | "user"; text: string };
 
 export function Onboarding({
   onDone,
+  startMode = "choose",
+  onCancel,
 }: {
   onDone: (seededDecisions?: SeededDecision[]) => void;
+  // "chat" launches straight into the guided chat (skips the demo/own choice) —
+  // used by the Macros "recalculate from your details" flow.
+  startMode?: "choose" | "chat";
+  // When set, the card shows a close button (the recalc flow is dismissible;
+  // first-run onboarding is not).
+  onCancel?: () => void;
 }) {
-  const [phase, setPhase] = useState<"choose" | "chat">("choose");
+  const [phase, setPhase] = useState<"choose" | "chat">(
+    startMode === "chat" ? "chat" : "choose",
+  );
   const [busy, setBusy] = useState(false);
 
   // Chat state.
@@ -104,6 +114,15 @@ export function Onboarding({
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ block: "end" });
   }, [transcript]);
+
+  // Launched straight into the chat (Macros "recalculate") — seed the first question.
+  useEffect(() => {
+    if (startMode === "chat") {
+      setTranscript([{ role: "agent", text: STEPS[0].q }]);
+      setStepIndex(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Seed path ──────────────────────────────────────────────────────────────
   // Seed the persona, remember it as the active setup, then show the context
@@ -242,6 +261,16 @@ export function Onboarding({
   return (
     <div className="ob-page">
       <div className="ob-card" role="dialog" aria-label="Welcome to DietTrace">
+        {onCancel && (
+          <button
+            type="button"
+            className="ob-close"
+            aria-label="close"
+            onClick={onCancel}
+          >
+            <X size={18} />
+          </button>
+        )}
         <div className="ob-brand">
           <Sparkle size={16} fill="var(--accent)" color="var(--accent)" />
           <span className="brand-name">DietTrace</span>

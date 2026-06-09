@@ -89,6 +89,9 @@ export default function Home() {
   const [overviewOpen, setOverviewOpen] = useState(false);
   // Whether the macro editor ("Set your targets") modal is open.
   const [macroOpen, setMacroOpen] = useState(false);
+  // Whether the "recalculate from your details" flow (the reused onboarding chat)
+  // is open, overlaying the app.
+  const [recalcOpen, setRecalcOpen] = useState(false);
   // First-run gate: null while we decide, false → show onboarding, true → the app.
   // A returning browser (flag set) skips straight through; otherwise a user who
   // already has a saved profile or logged meals (a seeded judge, a returning
@@ -469,11 +472,30 @@ export default function Home() {
         <MacroModal
           goals={goals}
           onClose={() => setMacroOpen(false)}
+          onRecalc={() => {
+            // Re-run the onboarding chat to recompute everything from scratch.
+            setMacroOpen(false);
+            setRecalcOpen(true);
+          }}
           onSaved={() => {
             // Saved targets become the user's per-user goals; refresh the band.
             loadAnalysis();
           }}
         />
+      )}
+
+      {recalcOpen && (
+        <div className="ob-overlay">
+          <Onboarding
+            startMode="chat"
+            onCancel={() => setRecalcOpen(false)}
+            onDone={() => {
+              // The chat recomputed + saved new targets — refresh the band.
+              setRecalcOpen(false);
+              loadAnalysis();
+            }}
+          />
+        </div>
       )}
     </div>
   );
