@@ -191,25 +191,32 @@ EVERYDAY = Persona(
     key="everyday",
     label="Busy professional",
     blurb="Eats out a few times a week — those portions run bigger than he logs.",
-    goals={"208": 1800.0, "203": 130.0, "205": 180.0, "204": 60.0},
+    goals={"208": 2000.0, "203": 150.0, "205": 195.0, "204": 68.0},
     goal_rationale=(
-        "Sample targets for a busy professional eating a bit healthier and aiming "
-        "to lose a little weight (~1 800 kcal/day, a gentle deficit with balanced "
-        "macros — not an athlete's split). The agent under-counts the meals he eats "
-        "out, where restaurant and takeout portions run bigger than a home-cooked "
-        "plate. Correct one in plain words, then re-tune to watch it learn the pattern."
+        "Sample targets for a busy professional with moderate activity, eating "
+        "healthier to lose a little fat and put on a bit of muscle — a gentle "
+        "recomp, not an extreme cut (~2 000 kcal/day, balanced macros with enough "
+        "protein for muscle, not an athlete's split). The agent under-counts the "
+        "meals he eats out, where restaurant and takeout portions run bigger than a "
+        "home-cooked plate. Correct one in plain words, then re-tune to watch it "
+        "learn the pattern."
     ),
-    hook_meal="burrito bowl",
+    hook_meal="chicken and rice bowl",
     hook_note=(
-        "The chicken burrito bowl he grabbed for lunch logged small — the restaurant "
-        "portion is much bigger than the default serving (more rice, more chicken, "
-        "plus the guac). That's the on-screen under-count to correct."
+        "The chicken and rice bowl he grabbed for lunch logged small — the takeout "
+        "portion is bigger than the default serving (more rice and more chicken than "
+        "he'd plate at home). That's the on-screen under-count to correct."
     ),
-    learns="When he eats out his portions run big — extra rice, oil, and larger servings.",
+    learns=(
+        "When he eats out, his portions run bigger than the default — more rice "
+        "and larger servings."
+    ),
     profile=(
-        "I'm a busy professional trying to eat a bit healthier and lose a little "
-        "weight. I cook simple meals when I can, but I eat out or order takeout a "
-        "few times a week, and those portions are bigger than what I'd make at home."
+        "I'm a busy professional with a moderately active routine, eating a bit "
+        "healthier to lose a little fat and put on some muscle — nothing extreme, "
+        "just getting fitter. I cook simple meals when I can, but I eat out or order "
+        "takeout a few times a week, and those portions are bigger than what I'd "
+        "make at home."
     ),
     meals=_load_meals("demo_seed_everyday.json"),
     previous_day=_load_previous_day("demo_seed_everyday.json"),
@@ -218,16 +225,17 @@ EVERYDAY = Persona(
     # learn), plus a plain home meal guard the learned rule must NOT change.
     confirmations=_load_confirmations("demo_seed_everyday.json"),
     feedback=[
-        # Eating out runs big. Corrections target meals that are NOT held-out dataset
-        # points (kept DISJOINT, like the other personas), so the corrector never
-        # learns from a meal it's then graded on — the gate stays honest.
-        {"feedback_text": "when I order takeout the portions are way bigger than this — "
-                          "easily another cup of rice and a lot more oil than a "
-                          "home-cooked plate",
-         "meal_text": "a takeout bowl I had for dinner"},
-        {"feedback_text": "eating out my meals run bigger than I log — restaurant "
-                          "servings are much larger than what I'd plate at home",
-         "meal_text": "a restaurant lunch on a workday"},
+        # Eating out runs big — two distinct restaurant/takeout meals. Corrections
+        # target meals that are NOT held-out dataset points (kept DISJOINT, like the
+        # other personas), so the corrector never learns from a meal it's then graded
+        # on — the gate stays honest.
+        {"feedback_text": "the place piles it on — way more rice and chicken than "
+                          "this; the restaurant portion is bigger than what I'd plate "
+                          "at home",
+         "meal_text": "a chicken burrito I grabbed for lunch"},
+        {"feedback_text": "takeout always runs bigger than I log — easily another cup "
+                          "of noodles and a larger serving than a home-cooked plate",
+         "meal_text": "lo mein takeout for dinner"},
     ],
 )
 

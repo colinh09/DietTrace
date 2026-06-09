@@ -339,8 +339,8 @@ def test_demo_seed_everyday_persona(tmp_path) -> None:
     # Per-user goals are the balanced maintenance-minus-small-deficit targets
     # (NOT an athlete's split): a gentle deficit with even macros.
     goals = goal_store.get(_USER)
-    assert goals["208"] == 1800.0  # ~maintenance minus a small deficit
-    assert goals["203"] == 130.0   # balanced protein, not an athlete's high split
+    assert goals["208"] == 2000.0  # moderate activity, a gentle deficit (recomp)
+    assert goals["203"] == 150.0   # enough protein for muscle, not an athlete's split
 
     # The learning loop is pre-seeded and corrections stay DISJOINT from the
     # held-out confirmations (asserted exhaustively below).
