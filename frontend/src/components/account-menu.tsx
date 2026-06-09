@@ -119,24 +119,14 @@ export function AccountMenu({
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
         >
-          {user?.photoURL ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="avatar-img" src={user.photoURL} alt="" />
-          ) : (
-            label.name.charAt(0).toUpperCase()
-          )}
+          {label.name.charAt(0).toUpperCase()}
         </button>
         {menuOpen && (
           <div className="acct-menu" role="menu">
             <div className="acct-menu-head">
-              {user?.photoURL ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="acct-menu-avatar acct-menu-avatar-img" src={user.photoURL} alt="" />
-              ) : (
-                <span className="acct-menu-avatar" aria-hidden="true">
-                  {label.name.charAt(0).toUpperCase()}
-                </span>
-              )}
+              <span className="acct-menu-avatar" aria-hidden="true">
+                {label.name.charAt(0).toUpperCase()}
+              </span>
               <span className="acct-menu-id">
                 <span className="acct-menu-name">{label.name}</span>
                 <span className="acct-menu-sub">{label.sub}</span>
