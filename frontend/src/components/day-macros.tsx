@@ -108,7 +108,10 @@ export function DayMacros({
   const over = remaining < 0;
 
   return (
-    <section className="daymacros">
+    // dm-wrap is a container so the band can stack on its OWN width (it sits in the
+    // layout's main column, which goes narrow well before the viewport does).
+    <div className="dm-wrap">
+      <section className="daymacros">
       <div className="dm-cal">
         <Ring consumed={calConsumed} target={calTarget} size={132} stroke={11} label="calories" tone="var(--macro-cal)">
           <span className="dm-cal-val tnum">{fmt.format(Math.round(calConsumed))}</span>
@@ -171,6 +174,7 @@ export function DayMacros({
           </div>
         </div>
       </div>
-    </section>
+      </section>
+    </div>
   );
 }

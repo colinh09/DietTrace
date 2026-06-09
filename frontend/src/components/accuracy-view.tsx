@@ -167,23 +167,6 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
         </ol>
       </section>
 
-      {report.macros && (
-        <section className="acc-block">
-          <div className="acc-block-head mono">
-            macro planner · {report.macros.dataset.cases} test plans
-            {report.macros.experiments != null
-              ? ` · ${report.macros.experiments} experiment${report.macros.experiments === 1 ? "" : "s"}`
-              : ""}
-          </div>
-          <p className="acc-note">
-            When DietTrace sets your macro targets, the plan is checked too — protein
-            and fat stay in healthy ranges, and the calorie total adds up from the
-            protein, carbs, and fat (so the numbers are internally consistent). All{" "}
-            {report.macros.dataset.cases} test plans pass.
-          </p>
-        </section>
-      )}
-
       <section className="acc-foot">
         <span>
           Checked against {report.dataset.cases} test meals from {report.dataset.source}.

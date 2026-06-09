@@ -515,11 +515,13 @@ body {
 
 /* responsive — tighten the page to ~full-width and stack the band on narrow
    screens. */
-/* Stack the macro band cleanly before it flex-wraps the glance awkwardly. The band
-   is flex (not grid), so the old grid-template-columns rule was a no-op. */
-@media (max-width: 760px) {
+/* Stack the macro band on its OWN width (container query), not the viewport — it
+   lives in the layout's narrow main column, so it wraps well before the viewport
+   hits a phone breakpoint. The band is flex, so the old grid rule was a no-op. */
+.dm-wrap { container-type: inline-size; }
+@container (max-width: 720px) {
   .daymacros { flex-direction: column; align-items: stretch; gap: 20px; }
-  .dm-ring { align-self: center; }
+  .dm-cal { align-self: center; }
   .dm-glance { width: 100%; align-self: auto; border-left: none;
     border-top: 1px solid var(--line); padding-left: 0; padding-top: 18px; }
 }
