@@ -66,6 +66,27 @@ def test_log_returns_totals_and_persists(tmp_path) -> None:
     assert len(store.list()) == 1
 
 
+def test_set_meal_time_updates_created_at(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    meal_id = client.post("/log", json={"text": "1 banana"}).json()["id"]
+
+    resp = client.post(
+        f"/meals/{meal_id}/time", json={"created_at": "2026-06-09T15:30:00+00:00"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["updated"] is True
+
+    meal = client.get("/history").json()["meals"][0]
+    assert meal["created_at"].startswith("2026-06-09T15:30")
+
+
+def test_set_meal_time_rejects_a_bad_timestamp(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    meal_id = client.post("/log", json={"text": "1 banana"}).json()["id"]
+    resp = client.post(f"/meals/{meal_id}/time", json={"created_at": "nonsense"})
+    assert resp.status_code == 422
+
+
 def test_history_returns_logged_meals(tmp_path) -> None:
     client, _ = _client(tmp_path)
     client.post("/log", json={"text": "1 banana"})

@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import type { ConfidenceAxis, LoggedItem, Meal, TraceStep } from "@/lib/api";
+import { setMealTime } from "@/lib/api";
 import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
 import { formatTime } from "@/lib/date";
 import { MealTrace } from "@/components/meal-trace";
@@ -50,6 +51,39 @@ function detailFromMeal(meal: Meal): MealDetail | undefined {
     needsReview: meal.needs_review,
     reviewReason: meal.review_reason,
   };
+}
+
+// The meal's time, editable inline via a native time picker (so it stays within
+// valid hours). Only the time-of-day changes — the meal keeps its existing day.
+function MealTime({ meal, onChanged }: { meal: Meal; onChanged?: () => void }) {
+  const d = new Date(meal.created_at);
+  const hhmm =
+    String(d.getHours()).padStart(2, "0") +
+    ":" +
+    String(d.getMinutes()).padStart(2, "0");
+  const commit = async (v: string) => {
+    if (!v) return;
+    const [hh, mm] = v.split(":").map(Number);
+    const nd = new Date(meal.created_at);
+    nd.setHours(hh, mm, 0, 0); // keep the local day, set the picked local time
+    try {
+      await setMealTime(meal.id, nd.toISOString());
+      onChanged?.();
+    } catch {
+      /* a day reload would resync the input */
+    }
+  };
+  return (
+    <input
+      type="time"
+      key={meal.created_at}
+      className="meal-time meal-time-input mono"
+      defaultValue={hhmm}
+      aria-label="time eaten"
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => commit(e.target.value)}
+    />
+  );
 }
 
 // One compact meal row. Owns only its open/closed state; the expanded trace is
@@ -124,21 +158,12 @@ function MealRow({
         <span className="meal-main">
           <span className="meal-title-row">
             <span className="meal-text">{meal.text}</span>
-            {needsReview && !isDataset && (
-              <button
-                type="button"
-                className="meal-review-flag"
-                data-tip="Show me why this was flagged"
-                aria-label="Show me why this was flagged"
-                onClick={openForReview}
-              >
-                !
-              </button>
-            )}
           </span>
-          <span className="meal-time mono">
-            {isDataset ? "your confirmed intake" : formatTime(meal.created_at)}
-          </span>
+          {isDataset ? (
+            <span className="meal-time mono">your confirmed intake</span>
+          ) : (
+            <MealTime meal={meal} onChanged={onCorrected} />
+          )}
         </span>
         <span className="meal-side">
           <span className="meal-macros mono tnum">
@@ -168,6 +193,17 @@ function MealRow({
                 feedback
               </span>
             </Tooltip>
+          )}
+          {needsReview && !isDataset && (
+            <button
+              type="button"
+              className="meal-review-flag"
+              data-tip="Show me why this was flagged"
+              aria-label="Show me why this was flagged"
+              onClick={openForReview}
+            >
+              !
+            </button>
           )}
           <ConfidenceTooltip pct={conf.pct} level={conf.level} axes={detail?.axes}>
             {/* The styled tooltip replaces the giant native title when the four

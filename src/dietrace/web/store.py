@@ -83,6 +83,22 @@ class MealLogStore:
             )
             return int(cursor.lastrowid)
 
+    def set_time(
+        self,
+        meal_id: int,
+        created_at: datetime.datetime,
+        user_id: str = DEMO_USER,
+    ) -> bool:
+        """Update a meal's logged time (its ``created_at`` instant), scoped to
+        user_id. The client keeps the new time within the meal's existing day, so
+        the calendar ``date`` is left unchanged. Returns False if no such meal."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE meals SET created_at = ? WHERE id = ? AND user_id = ?",
+                (created_at.isoformat(), meal_id, user_id),
+            )
+            return cursor.rowcount > 0
+
     def update(
         self,
         meal_id: int,

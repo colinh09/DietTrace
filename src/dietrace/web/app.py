@@ -186,6 +186,13 @@ class ConfirmRequest(BaseModel):
     meal_id: int | None = None
 
 
+class MealTimeRequest(BaseModel):
+    """Change the time a meal was eaten — the client sends the new ``created_at``
+    as a UTC ISO instant, kept within the meal's existing day."""
+
+    created_at: str
+
+
 class FeedbackEditRequest(BaseModel):
     """Edit a banked correction's text and/or its emphasis weight (Input B)."""
 
@@ -854,6 +861,17 @@ def create_app(
     @app.delete("/meals/{meal_id}")
     def delete_meal(meal_id: int, user: str = Depends(current_user)) -> dict[str, Any]:
         return {"id": meal_id, "deleted": log_store.delete(meal_id, user_id=user)}
+
+    @app.post("/meals/{meal_id}/time")
+    def set_meal_time(
+        meal_id: int, req: MealTimeRequest, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """Update the time a meal was eaten (its created_at), scoped to the user."""
+        try:
+            when = datetime.datetime.fromisoformat(req.created_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="invalid created_at") from exc
+        return {"id": meal_id, "updated": log_store.set_time(meal_id, when, user_id=user)}
 
     @app.get("/history")
     def history(

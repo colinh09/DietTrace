@@ -315,7 +315,7 @@ body {
 .meal-bullet { display: flex; width: 13px; flex-shrink: 0; }
 .meal-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .meal-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.meal-text { font-family: var(--serif); font-size: 16px; font-weight: 500; color: var(--ink); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meal-text { font-family: var(--serif); font-size: 16px; font-weight: 500; color: var(--ink); line-height: 1.35; overflow-wrap: break-word; }
 /* Review flag: a small amber "!" badge next to the meal name. Clickable — opens
    the agent's work so the user can see why it's flagged and correct it. */
 .meal-review-flag { position: relative; flex: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-family: var(--ui-font); font-size: 12px; font-weight: 700; line-height: 1; color: var(--amber-ink); background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 100px; cursor: pointer; padding: 0; transition: background .14s, transform .12s; }
@@ -325,6 +325,11 @@ body {
 .meal-review-flag::before { content: ""; position: absolute; bottom: calc(100% + 3px); left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--ink); opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 20; }
 .meal-review-flag:hover::after, .meal-review-flag:hover::before { opacity: 1; }
 .meal-time { font-size: 11px; color: var(--faint); }
+/* The editable time — a native time picker styled to read like the time text. */
+.meal-time-input { font-family: var(--mono); font-size: 11px; color: var(--muted-ink); background: none; border: 1px solid transparent; border-radius: 6px; padding: 1px 4px; margin-left: -4px; width: max-content; cursor: pointer; transition: border-color .12s, background .12s; }
+.meal-time-input:hover { border-color: var(--line-strong); background: var(--accent-softer); }
+.meal-time-input:focus { outline: none; border-color: var(--accent); color: var(--ink); }
+.meal-time-input::-webkit-calendar-picker-indicator { opacity: .4; cursor: pointer; }
 .meal-side { display: flex; align-items: center; gap: 13px; flex-shrink: 0; }
 .meal-macros { font-size: 13px; color: var(--muted-ink); white-space: nowrap; }
 .meal-macros b { color: var(--ink); font-weight: 600; }

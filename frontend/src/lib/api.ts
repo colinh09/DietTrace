@@ -222,6 +222,15 @@ export async function deleteMeal(id: number): Promise<void> {
   await request(`/meals/${id}`, { method: "DELETE" });
 }
 
+// Change the time a meal was eaten — `createdAt` is a UTC ISO instant the client
+// builds from the meal's day + the picked local time.
+export async function setMealTime(id: number, createdAt: string): Promise<void> {
+  await request(`/meals/${id}/time`, {
+    method: "POST",
+    body: JSON.stringify({ created_at: createdAt }),
+  });
+}
+
 // One kept item of a corrected meal sent to POST /correct (removed items are
 // simply omitted). The backend rescales the panel from original to corrected grams.
 export interface CorrectionItemInput {

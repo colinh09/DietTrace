@@ -58,10 +58,12 @@ describe("MealList", () => {
     expect(within(row).getByText(/F\s*26/)).toBeInTheDocument();
   });
 
-  it("renders the meal's logged time", () => {
+  it("shows the meal's time as an editable time picker", () => {
     render(<MealList meals={meals} />);
     const row = screen.getByText("a mystery pastry").closest("li") as HTMLElement;
-    expect(within(row).getByText(/^\d{1,2}:\d{2}\s?(AM|PM)$/)).toBeInTheDocument();
+    const time = within(row).getByLabelText("time eaten") as HTMLInputElement;
+    expect(time).toHaveAttribute("type", "time");
+    expect(time.value).toBe("08:14"); // local 8:14 AM → 24h picker value
   });
 
   it("renders a confidence chip per row — High when macros reconcile, Medium when they diverge", () => {
