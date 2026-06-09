@@ -20,7 +20,7 @@ const HOW_STEPS: HowStep[] = [
   {
     key: "log",
     title: "Log food in plain English",
-    body: "Type what you ate the way you'd say it — “two eggs and toast.” DietTrace reads it, looks each item up against USDA data, and adds it to your log. Open a meal to see the agent's work, item by item, and why it's confident in the numbers.",
+    body: "Type what you ate the way you'd say it — “two eggs and toast.” DietTrace reads it and looks each item up against USDA data — and when something isn't there, like a restaurant or branded item, it searches the web for the real nutrition facts. Open a meal to see the agent's work, item by item, and why it's confident in the numbers.",
   },
   {
     key: "review",
@@ -65,7 +65,7 @@ export function HowItWorksGuide(): JSX.Element {
       <p className="hiw-note">
         Most trackers guess and move on. DietTrace shows its work on every meal and
         is graded against USDA data in Phoenix — so when it adapts to you, you can
-        see it stayed accurate. That&apos;s the whole idea.
+        see it stayed accurate.
       </p>
     </div>
   );
