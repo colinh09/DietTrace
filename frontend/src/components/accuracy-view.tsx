@@ -87,15 +87,6 @@ function TrendChart({ trend }: { trend: AccuracyReport["trend"] }) {
 export function AccuracyView({ report }: { report: AccuracyReport }) {
   return (
     <>
-      <section className="acc-hero">
-        <h1 className="acc-title" id="obs-modal-title">How DietTrace stays accurate</h1>
-        <p className="acc-sub">
-          DietTrace is seeded on a hand-checked USDA dataset to be accurate up front.
-          Then every meal it logs is traced and scored in Phoenix — and your
-          corrections teach it to match how you actually eat.
-        </p>
-      </section>
-
       <section className="acc-stats">
         <Stat label="Calorie accuracy" value={pct(report.headline.calorie_accuracy)} />
         <Stat label="Macro accuracy" value={pct(report.headline.macro_accuracy)} />

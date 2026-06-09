@@ -42,10 +42,10 @@ describe("OverviewModal", () => {
     render(<OverviewModal onClose={onClose} />);
 
     expect(screen.getByText(/graded on accuracy/i)).toBeInTheDocument();
+    // One header only now — the stat tiles render once the report loads (the
+    // duplicate "How DietTrace stays accurate" hero was cut).
     await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { name: /How DietTrace stays accurate/i }),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/Calorie accuracy/i)).toBeInTheDocument(),
     );
     // "How much to trust your numbers" was removed.
     expect(

@@ -51,15 +51,12 @@ export function OverviewModal({ onClose }: { onClose: () => void }) {
             An AI nutritionist graded on accuracy
           </h1>
           <p className="ov-sub">
-            DietTrace logs meals from plain English against USDA data, grades its
-            own work on every meal, and learns how <i>you</i> eat — and we test
-            every change so personalizing for you never makes it less accurate
-            overall.
+            DietTrace grades its own work on every meal against USDA data and learns
+            how <i>you</i> eat — tested so personalizing never makes it less accurate.
           </p>
           <p className="ov-source">
-            The percentages below come from DietTrace&apos;s eval suite: every
-            estimate is scored against known USDA calories as a Phoenix experiment,
-            so the accuracy is measured, not claimed.
+            Every percentage below is scored against known USDA calories as a Phoenix
+            experiment — measured, not claimed.
           </p>
         </header>
         <section className="ov-section">

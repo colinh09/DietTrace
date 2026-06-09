@@ -1441,9 +1441,10 @@ body {
 .agent-state-grid { display: flex; flex-direction: column; gap: 9px; margin-bottom: 12px; }
 .agent-state-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .agent-state-stat { display: flex; flex-direction: column; gap: 4px; background: var(--accent-softer); border-radius: 11px; padding: 13px 15px; }
-.agent-state-num { font-size: 26px; font-weight: 600; line-height: 1; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.agent-state-num { font-family: var(--serif); font-size: 28px; font-weight: 600; line-height: 1; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
 .agent-state-cap { font-size: 12.5px; line-height: 1.4; color: var(--muted-ink); }
 .agent-state-cap b { color: var(--accent-ink); font-weight: 600; }
+.agent-state-sub { font-size: 11px; letter-spacing: .03em; color: var(--faint); margin-top: 1px; }
 .agent-state-decision { gap: 5px; }
 .agent-state-dec-lab { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); }
 .agent-state-dec-text { font-size: 13px; line-height: 1.5; color: var(--ink); }

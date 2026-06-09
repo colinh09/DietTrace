@@ -695,16 +695,17 @@ export function LearningObservability({
             <div className="agent-state-row">
               <div className="agent-state-stat">
                 <span className="agent-state-num">{confirmations}</span>
-                <span className="agent-state-cap">
-                  meals in your dataset · <b>{custom}</b> from you · {seeded} seeded
+                <span className="agent-state-cap">meals in your dataset</span>
+                <span className="agent-state-sub mono">
+                  {custom} yours · {seeded} seeded
                 </span>
               </div>
               <div className="agent-state-stat">
                 <span className="agent-state-num">{corrections}</span>
                 <span className="agent-state-cap">
-                  correction{corrections === 1 ? "" : "s"} you&apos;ve made ·{" "}
-                  <b>{newCorr}</b> new to learn
+                  correction{corrections === 1 ? "" : "s"} you&apos;ve made
                 </span>
+                <span className="agent-state-sub mono">{newCorr} new to learn</span>
               </div>
             </div>
             <div className="agent-state-stat agent-state-decision">
