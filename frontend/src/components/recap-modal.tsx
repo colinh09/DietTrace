@@ -116,42 +116,46 @@ export function RecapModal({
           <p className="su-sub">{persona!.blurb}</p>
         ) : (
           <dl className="su-grid">
-            {inputs.sex && (
-              <div className="su-row">
-                <dt>Gender</dt>
-                <dd>{cap(inputs.sex)}</dd>
-              </div>
-            )}
-            {inputs.weight_kg != null && (
-              <div className="su-row">
-                <dt>Weight</dt>
-                <dd>{inputs.weight_kg} kg</dd>
-              </div>
-            )}
-            {inputs.age != null && (
-              <div className="su-row">
-                <dt>Age</dt>
-                <dd>{inputs.age} yr</dd>
-              </div>
-            )}
-            {inputs.height_cm != null && (
-              <div className="su-row">
-                <dt>Height</dt>
-                <dd>{inputs.height_cm} cm</dd>
-              </div>
-            )}
-            {inputs.activity && (
-              <div className="su-row">
-                <dt>Activity</dt>
-                <dd>{ACTIVITY_LABEL[inputs.activity] ?? inputs.activity}</dd>
-              </div>
-            )}
-            {inputs.goal && (
-              <div className="su-row">
-                <dt>Goal</dt>
-                <dd>{GOAL_LABEL[inputs.goal] ?? inputs.goal}</dd>
-              </div>
-            )}
+            {/* Always render every field so the grid stays complete — an unset one
+                shows a faint "—" box rather than leaving an orphan empty cell. */}
+            <div className="su-row">
+              <dt>Gender</dt>
+              <dd className={inputs.sex ? undefined : "su-unset"}>
+                {inputs.sex ? cap(inputs.sex) : "—"}
+              </dd>
+            </div>
+            <div className="su-row">
+              <dt>Weight</dt>
+              <dd className={inputs.weight_kg != null ? undefined : "su-unset"}>
+                {inputs.weight_kg != null ? `${inputs.weight_kg} kg` : "—"}
+              </dd>
+            </div>
+            <div className="su-row">
+              <dt>Age</dt>
+              <dd className={inputs.age != null ? undefined : "su-unset"}>
+                {inputs.age != null ? `${inputs.age} yr` : "—"}
+              </dd>
+            </div>
+            <div className="su-row">
+              <dt>Height</dt>
+              <dd className={inputs.height_cm != null ? undefined : "su-unset"}>
+                {inputs.height_cm != null ? `${inputs.height_cm} cm` : "—"}
+              </dd>
+            </div>
+            <div className="su-row">
+              <dt>Activity</dt>
+              <dd className={inputs.activity ? undefined : "su-unset"}>
+                {inputs.activity
+                  ? (ACTIVITY_LABEL[inputs.activity] ?? inputs.activity)
+                  : "—"}
+              </dd>
+            </div>
+            <div className="su-row">
+              <dt>Goal</dt>
+              <dd className={inputs.goal ? undefined : "su-unset"}>
+                {inputs.goal ? (GOAL_LABEL[inputs.goal] ?? inputs.goal) : "—"}
+              </dd>
+            </div>
           </dl>
         )}
 

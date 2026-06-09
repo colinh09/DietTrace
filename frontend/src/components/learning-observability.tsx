@@ -700,15 +700,19 @@ export function LearningObservability({
                 </span>
               </div>
             </div>
-            {latest && (
-              <div className="agent-state-stat agent-state-decision">
-                <span className="agent-state-dec-lab mono">Latest decision</span>
-                <span className="agent-state-dec-text">
-                  {latest.reason}
-                  {latest.detail ? ` (${latest.detail})` : ""}
-                </span>
-              </div>
-            )}
+            <div className="agent-state-stat agent-state-decision">
+              <span className="agent-state-dec-lab mono">Latest decision</span>
+              <span className="agent-state-dec-text">
+                {latest ? (
+                  <>
+                    {latest.reason}
+                    {latest.detail ? ` (${latest.detail})` : ""}
+                  </>
+                ) : (
+                  "None yet — log or correct a meal and the agent's call shows here."
+                )}
+              </span>
+            </div>
           </div>
           <p className="agent-state-mcp">
             Your dataset is synced to Phoenix over MCP.
