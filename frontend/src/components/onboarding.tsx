@@ -21,6 +21,7 @@ import {
   type SeedDemoResult,
   type SeededDecision,
 } from "@/lib/api";
+import { toISODate } from "@/lib/date";
 import { markOnboarded } from "@/lib/onboarding";
 import { PERSONA_INPUTS, setSetup, type ProfileInputs } from "@/lib/setup";
 import { SeededModal } from "@/components/seeded-modal";
@@ -131,7 +132,9 @@ export function Onboarding({
     if (busy) return;
     setBusy(true);
     try {
-      const result = await seedDemo(undefined, persona);
+      // Seed against the user's LOCAL today (not the server's UTC date) so the
+      // visible "today" meals land on the same day the app shows.
+      const result = await seedDemo(toISODate(new Date()), persona);
       setSetup({
         kind: "persona",
         personaKey: persona,

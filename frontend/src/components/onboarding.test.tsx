@@ -82,7 +82,13 @@ describe("Onboarding (conversational)", () => {
     // No intermediate sub-choice — clicking seeds the default persona directly.
     fireEvent.click(screen.getByRole("button", { name: /see it in action/i }));
 
-    await waitFor(() => expect(seedDemo).toHaveBeenCalledWith(undefined, "runner"));
+    // Seeds against the user's LOCAL today (an ISO date), not the server's UTC date.
+    await waitFor(() =>
+      expect(seedDemo).toHaveBeenCalledWith(
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        "runner",
+      ),
+    );
     expect(markOnboarded).toHaveBeenCalledTimes(1);
     expect(onDone).not.toHaveBeenCalled();
 
