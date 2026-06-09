@@ -24,8 +24,8 @@ const HOW_STEPS: HowStep[] = [
   },
   {
     key: "review",
-    title: "Tell it when it's off",
-    body: "Each meal asks for a quick check: “Looks right” confirms it, and “Something's off” lets you correct it. A confirm becomes part of your dataset; a correction teaches DietTrace how you actually eat.",
+    title: "Confirm it, or correct it",
+    body: "Each meal asks for a quick check — one or the other. If it's close enough, “Looks right” confirms it and the meal becomes a held-out point in your dataset, the set DietTrace is graded against. If it's way off, “Something's off” lets you correct it, and that feedback teaches it how you actually eat going forward.",
   },
   {
     key: "learning",
