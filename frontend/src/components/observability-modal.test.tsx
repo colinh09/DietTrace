@@ -35,29 +35,22 @@ const trust: TrustReport = {
 };
 
 describe("OverviewModal", () => {
-  it("shows the project intro with Accuracy and Trust stacked on one page", async () => {
+  it("shows the accuracy report (the Trust section is gone)", async () => {
     vi.mocked(getAccuracy).mockResolvedValue(accuracy);
-    vi.mocked(getTrust).mockResolvedValue(trust);
-    vi.mocked(listLearningFeedback).mockResolvedValue({ feedback: [], count: 0 });
     const onClose = vi.fn();
 
     render(<OverviewModal onClose={onClose} />);
 
-    // The project intro.
-    expect(
-      screen.getByText(/graded on accuracy/i),
-    ).toBeInTheDocument();
-
-    // Both reports render together — no tab switching.
+    expect(screen.getByText(/graded on accuracy/i)).toBeInTheDocument();
     await waitFor(() =>
       expect(
         screen.getByRole("heading", { name: /How DietTrace stays accurate/i }),
       ).toBeInTheDocument(),
     );
+    // "How much to trust your numbers" was removed.
     expect(
-      screen.getByRole("heading", { name: /How much to trust your numbers/i }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+      screen.queryByRole("heading", { name: /How much to trust your numbers/i }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /close/i }));
     expect(onClose).toHaveBeenCalled();

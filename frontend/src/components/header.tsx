@@ -49,7 +49,7 @@ export function Header({
           Macros
         </button>
         <button type="button" className="nav-item" onClick={() => onOpenOverview?.()}>
-          How it works
+          Accuracy
         </button>
       </nav>
       <div className="hdr-end">

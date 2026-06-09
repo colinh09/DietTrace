@@ -13,7 +13,7 @@ describe("Header", () => {
     expect(screen.getByText("DietTrace")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Macros" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "How it works" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accuracy" })).toBeInTheDocument();
     // The date navigation lives in the day card now, not the navbar.
     expect(screen.queryByRole("button", { name: /open calendar/i })).not.toBeInTheDocument();
   });
@@ -35,7 +35,7 @@ describe("Header", () => {
     render(
       <Header date={may30} onOpenOverview={onOpenOverview} onOpenMacros={onOpenMacros} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "How it works" }));
+    fireEvent.click(screen.getByRole("button", { name: "Accuracy" }));
     fireEvent.click(screen.getByRole("button", { name: "Macros" }));
     expect(onOpenOverview).toHaveBeenCalledTimes(1);
     expect(onOpenMacros).toHaveBeenCalledTimes(1);
