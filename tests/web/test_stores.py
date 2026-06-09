@@ -82,7 +82,7 @@ def test_unrecognized_backend_falls_through_to_sqlite(tmp_path, monkeypatch):
 def test_sqlite_branch_never_imports_firestore_module(tmp_path, monkeypatch):
     """The offline default must not pull in the Firestore client module.
 
-    the project rule: no cloud client in offline tests. The Firestore module
+    Project rule: no cloud client in offline tests. The Firestore module
     is imported lazily *inside* the firestore branch, so taking the SQLite path
     must leave it absent from ``sys.modules``.
     """
