@@ -31,7 +31,7 @@ export function ResetDialog({
   };
 
   return (
-    <Modal onClose={onClose} labelledBy="reset-title">
+    <Modal onClose={onClose} labelledBy="reset-title" className="modal-narrow">
       <div className="reset-dialog">
         <div className="reset-dialog-eyebrow mono">Reset</div>
         <h2 id="reset-title" className="reset-dialog-title display">

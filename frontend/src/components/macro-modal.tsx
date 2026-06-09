@@ -140,21 +140,16 @@ function MacroCol({
   name,
   value,
   onChange,
-  fill,
 }: {
   name: string;
   value: number;
   onChange: (v: number) => void;
-  fill: number;
 }) {
   return (
     <div className="tg-macro">
       <div className="tg-macro-label">{name}</div>
       <div className="tg-macro-val">
         <NumEdit value={value} onChange={onChange} unit="g" size="mid" />
-      </div>
-      <div className="tg-bar">
-        <div className="tg-bar-fill" style={{ width: fill + "%" }} />
       </div>
     </div>
   );
@@ -263,10 +258,6 @@ export function MacroModal({
 
   const t = plan?.targets;
   const kcal = t ? t[ENERGY] : 0;
-  const pK = t ? t[PROTEIN] * 4 : 0;
-  const cK = t ? t[CARB] * 4 : 0;
-  const fK = t ? t[FAT] * 9 : 0;
-  const macTot = Math.max(1, pK + cK + fK);
   const tdeeStep = plan?.steps?.find(
     (s) => (s as { step?: string }).step === "tdee",
   );
@@ -321,19 +312,16 @@ export function MacroModal({
                   name="Protein"
                   value={q.p}
                   onChange={(v) => setQv("p", v)}
-                  fill={(q.p * 4 * 100) / Math.max(1, macroKcal)}
                 />
                 <MacroCol
                   name="Carb"
                   value={q.c}
                   onChange={(v) => setQv("c", v)}
-                  fill={(q.c * 4 * 100) / Math.max(1, macroKcal)}
                 />
                 <MacroCol
                   name="Fat"
                   value={q.f}
                   onChange={(v) => setQv("f", v)}
-                  fill={(q.f * 9 * 100) / Math.max(1, macroKcal)}
                 />
               </div>
 
@@ -355,10 +343,10 @@ export function MacroModal({
               <div className="tg-foot">
                 <button
                   type="button"
-                  className="tg-relink"
+                  className="tg-btn-secondary"
                   onClick={() => setView("recalc")}
                 >
-                  Recalculate from your details →
+                  Recalculate from your details
                 </button>
                 <button
                   type="button"
@@ -542,19 +530,16 @@ export function MacroModal({
                     name="Protein"
                     value={t ? t[PROTEIN] : 0}
                     onChange={(v) => editTarget(PROTEIN, v)}
-                    fill={(pK / macTot) * 100}
                   />
                   <MacroCol
                     name="Carb"
                     value={t ? t[CARB] : 0}
                     onChange={(v) => editTarget(CARB, v)}
-                    fill={(cK / macTot) * 100}
                   />
                   <MacroCol
                     name="Fat"
                     value={t ? t[FAT] : 0}
                     onChange={(v) => editTarget(FAT, v)}
-                    fill={(fK / macTot) * 100}
                   />
                 </div>
 

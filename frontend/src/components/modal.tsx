@@ -8,10 +8,13 @@ import { X } from "lucide-react";
 export function Modal({
   onClose,
   labelledBy,
+  className,
   children,
 }: {
   onClose: () => void;
   labelledBy?: string;
+  // Extra class on the card — e.g. "modal-narrow" to fit a small dialog.
+  className?: string;
   children: React.ReactNode;
 }) {
   useEffect(() => {
@@ -30,7 +33,7 @@ export function Modal({
   return (
     <div className="modal-scrim" onMouseDown={onClose}>
       <div
-        className="modal-card"
+        className={"modal-card" + (className ? " " + className : "")}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}

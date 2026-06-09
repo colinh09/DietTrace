@@ -759,6 +759,7 @@ body {
 /* ── Observability popup (Accuracy / Trust as a modal over the main page) ── */
 .modal-scrim { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 20px 40px; background: rgba(27, 26, 22, 0.34); backdrop-filter: blur(2px); overflow-y: auto; animation: modal-fade .16s ease; }
 .modal-card { position: relative; width: 100%; max-width: 680px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 24px 64px -20px rgba(27,26,22,0.40); padding: 30px 32px 28px; animation: modal-rise .18s cubic-bezier(.22,.61,.36,1); }
+.modal-card.modal-narrow { max-width: 440px; }
 .modal-close { position: absolute; top: 16px; right: 16px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: none; background: none; color: var(--faint); border-radius: 8px; cursor: pointer; transition: background .14s ease, color .14s ease; }
 .modal-close:hover { background: var(--accent-softer); color: var(--ink); }
 @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -834,6 +835,9 @@ body {
 .tg-btn-primary:disabled { opacity: .55; cursor: default; filter: none; }
 .tg-btn-quiet { background: none; border: none; color: var(--muted-ink); font-family: var(--ui-font); font-size: 14px; font-weight: 500; padding: 9px 14px; border-radius: 8px; cursor: pointer; transition: background .14s, color .14s; }
 .tg-btn-quiet:hover { color: var(--accent-ink); background: var(--accent-softer); }
+/* Secondary (inverted) action — same shape as the primary, outlined */
+.tg-btn-secondary { background: var(--surface); color: var(--accent-ink); border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 18px; font-family: var(--ui-font); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .14s, border-color .14s; }
+.tg-btn-secondary:hover { background: var(--accent-softer); border-color: var(--accent); }
 .tg-recalc { display: inline-flex; align-items: center; gap: 7px; background: none; border: none; color: var(--muted-ink); font-family: var(--ui-font); font-size: 13px; font-weight: 500; padding: 8px 11px; border-radius: 8px; cursor: pointer; transition: background .14s, color .14s; }
 .tg-recalc:hover { color: var(--accent-ink); background: var(--accent-softer); }
 .tg-result { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .36s cubic-bezier(.22,.61,.36,1); }
@@ -863,14 +867,15 @@ body {
 .tg-relink { background: none; border: none; padding: 0; font-family: var(--ui-font); font-size: 12.5px; font-weight: 500; color: var(--accent-ink); cursor: pointer; }
 .tg-relink:hover { text-decoration: underline; }
 .tg-relink.back { display: block; margin-bottom: 8px; }
-.tg-num-edit { display: inline-flex; align-items: baseline; gap: 3px; }
-.tg-num-edit input { border: none; border-bottom: 1px dashed var(--line-strong); background: transparent; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--accent-ink); text-align: left; padding: 0 1px 1px; transition: border-color .16s; }
-.tg-num-edit input:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }
-.tg-num-edit .tg-num-unit { font-family: var(--mono); color: var(--faint); margin-left: 3px; }
-.tg-num-edit.big input { font-size: 28px; font-weight: 500; letter-spacing: -.018em; color: var(--ink); padding-bottom: 3px; }
-.tg-num-edit.big input:focus { color: var(--accent-ink); }
+/* Editable number as a clear bordered field (the box signals it's editable). */
+.tg-num-edit { display: inline-flex; align-items: baseline; gap: 4px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); padding: 8px 12px; transition: border-color .16s, box-shadow .16s; }
+.tg-num-edit:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-softer); }
+.tg-num-edit input { border: none; background: transparent; font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); text-align: left; padding: 0; }
+.tg-num-edit input:focus { outline: none; }
+.tg-num-edit .tg-num-unit { font-family: var(--mono); color: var(--faint); }
+.tg-num-edit.big input { font-size: 28px; font-weight: 600; letter-spacing: -.018em; color: var(--ink); }
 .tg-num-edit.big .tg-num-unit { font-size: 16px; }
-.tg-num-edit.mid input { font-size: 18px; font-weight: 500; }
+.tg-num-edit.mid input { font-size: 18px; font-weight: 600; }
 .tg-num-edit.mid .tg-num-unit { font-size: 12px; }
 .tg-rationale { display: flex; align-items: flex-start; gap: 9px; font-family: var(--serif); font-style: italic; font-size: 14px; line-height: 1.5; color: var(--accent-ink); margin: 20px 0 0; padding: 13px 15px; background: var(--accent-softer); border-radius: 11px; }
 .tg-r-glyph { color: var(--accent); font-style: normal; margin-top: 1px; flex-shrink: 0; display: flex; }
@@ -914,7 +919,7 @@ body {
 .acct-menu-sep { height: 1px; background: var(--line); margin: 5px 4px; }
 
 /* ── Reset confirmation dialog (a real modal, no in-place navbar morph) ── */
-.reset-dialog { max-width: 400px; padding: 4px 2px; }
+.reset-dialog { padding: 2px; }
 .reset-dialog-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--danger-ink); margin-bottom: 9px; }
 .reset-dialog-title { font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); margin-bottom: 9px; }
 .reset-dialog-body { font-size: 13.5px; color: var(--muted-ink); line-height: 1.6; margin-bottom: 22px; }
