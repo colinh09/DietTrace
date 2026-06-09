@@ -670,6 +670,8 @@ body {
 .lo-counts b { color: var(--accent-ink); font-weight: 600; }
 .lo-learned { margin-top: 12px; }
 .lo-empty { font-size: 13px; line-height: 1.5; color: var(--muted-ink); margin: 10px 0 0; }
+.lo-corr-group { margin-top: 12px; }
+.lo-corr-grouplab { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
 .lo-corr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .lo-corr { display: flex; align-items: flex-start; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .lo-corr:last-child { border-bottom: none; }

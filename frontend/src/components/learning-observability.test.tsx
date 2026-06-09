@@ -49,6 +49,8 @@ async function openState() {
 describe("LearningObservability", () => {
   it("shows corrections as meal + what you said (persisted, not a bare count)", async () => {
     await openState();
+    // Corrections are collapsed by default — expand the section first.
+    fireEvent.click(await screen.findByRole("button", { name: /your corrections/i }));
     expect(await screen.findByText("a big plate of spaghetti")).toBeInTheDocument();
     expect(
       screen.getByText(/before a run I carb up way more/i),

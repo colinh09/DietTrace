@@ -373,6 +373,7 @@ export function LearningObservability({
   // Link to the Phoenix experiment when the fit set is scored in Arize over MCP.
   const [experimentUrl, setExperimentUrl] = useState("");
   const [showData, setShowData] = useState(false);
+  const [showCorr, setShowCorr] = useState(false);
   // The agent-state modal (the deep dive behind the icon).
   const [stateOpen, setStateOpen] = useState(false);
   // The user's freeform "goals & eating style" — the corrector's standing context.
@@ -711,51 +712,64 @@ export function LearningObservability({
 
       {/* ── Corrections you've taught (meal + what you said), persisted ───── */}
       <section className="dash-card lo-corrs">
-        <div className="dash-card-head mono">your corrections</div>
-        {feedback.length === 0 ? (
-          <p className="lo-empty">
-            None yet. Tell DietTrace what it got wrong on any meal — your fixes
-            land here.
-          </p>
-        ) : (
-          <>
-            <p className="lo-hint">
-              What you told DietTrace it got wrong. An update only learns from{" "}
-              <b>new</b> ones — those it&apos;s already learned show{" "}
-              <span className="lo-done-inline">✓ learned</span>.
+        <button
+          type="button"
+          className="lo-dataset-head"
+          aria-expanded={showCorr}
+          onClick={() => setShowCorr((s) => !s)}
+        >
+          {showCorr ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <span className="dash-card-head mono">
+            your corrections · {feedback.length}
+          </span>
+        </button>
+        {showCorr &&
+          (feedback.length === 0 ? (
+            <p className="lo-empty">
+              None yet. Tell DietTrace what it got wrong on any meal — your fixes
+              land here.
             </p>
-            <ul className="lo-corr-list">
-              {feedback.map((f) => (
-                <li className={"lo-corr" + (f.processed ? " done" : "")} key={f.id}>
-                  <div className="lo-corr-body">
-                    <div className="lo-corr-meal">
-                      {f.meal_text || "general note"}
-                      {f.processed && (
-                        <span className="lo-corr-done mono" title="Already learned — an update won't re-learn it">
-                          ✓ learned
-                        </span>
-                      )}
-                      {!f.processed && (
-                        <span className="lo-corr-new mono">new</span>
-                      )}
+          ) : (
+            <>
+              {[
+                { lab: "Not used in an update yet", rows: feedback.filter((f) => !f.processed) },
+                { lab: "Already learned", rows: feedback.filter((f) => f.processed) },
+              ]
+                .filter((g) => g.rows.length > 0)
+                .map((g) => (
+                  <div className="lo-corr-group" key={g.lab}>
+                    <div className="lo-corr-grouplab mono">
+                      {g.lab} · {g.rows.length}
                     </div>
-                    <div className="lo-corr-text">“{f.feedback_text}”</div>
+                    <ul className="lo-corr-list">
+                      {g.rows.map((f) => (
+                        <li
+                          className={"lo-corr" + (f.processed ? " done" : "")}
+                          key={f.id}
+                        >
+                          <div className="lo-corr-body">
+                            <div className="lo-corr-meal">
+                              {f.meal_text || "general note"}
+                            </div>
+                            <div className="lo-corr-text">“{f.feedback_text}”</div>
+                          </div>
+                          <div className="lo-corr-actions">
+                            <button
+                              type="button"
+                              className="lo-corr-del"
+                              aria-label="delete correction"
+                              onClick={() => removeCorrection(f.id)}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <div className="lo-corr-actions">
-                    <button
-                      type="button"
-                      className="lo-corr-del"
-                      aria-label="delete correction"
-                      onClick={() => removeCorrection(f.id)}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+                ))}
+            </>
+          ))}
       </section>
 
       {/* ── The test set the agent is checked against ─────────────────────── */}
