@@ -1,11 +1,16 @@
 "use client";
 
-// The "Accuracy" modal — DietTrace's measured accuracy report: the headline eval
-// numbers, the before→after bars, the accuracy-over-time trend, and the
-// self-supervision loop. Cached at module scope: the first open fetches (with a
-// skeleton), later opens show cached data instantly and refresh in the background.
+// The "Accuracy" modal — two tabs over one popup:
+//   • Accuracy      — DietTrace's measured accuracy report: the headline eval
+//     numbers, the before→after bars, the accuracy-over-time trend, and the
+//     self-supervision loop. Cached at module scope: the first open fetches (with
+//     a skeleton), later opens show cached data instantly and refresh in the
+//     background.
+//   • How it works  — a plain-language written guide to each part of the app, with
+//     a button to launch the proactive step-through tour.
 import { useEffect, useState } from "react";
 import { AccuracyView } from "@/components/accuracy-view";
+import { HowItWorksGuide } from "@/components/how-it-works";
 import { Modal } from "@/components/modal";
 import { getAccuracy, type AccuracyReport } from "@/lib/api";
 
@@ -26,8 +31,16 @@ function Skeleton() {
   );
 }
 
-export function OverviewModal({ onClose }: { onClose: () => void }) {
+export function OverviewModal({
+  onClose,
+  onStartTour,
+}: {
+  onClose: () => void;
+  // Launch the interactive tour (the page closes this modal and opens the tour).
+  onStartTour?: () => void;
+}) {
   const [acc, setAcc] = useState<AccuracyReport | null>(accCache);
+  const [tab, setTab] = useState<"accuracy" | "guide">("accuracy");
 
   useEffect(() => {
     getAccuracy()
@@ -41,27 +54,54 @@ export function OverviewModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal onClose={onClose} labelledBy="overview-title">
       <div className="ov">
-        <header className="ov-head">
-          <span className="ov-eyebrow mono">Accuracy</span>
-          <h1 id="overview-title" className="ov-title">
-            An AI nutritionist graded on accuracy
-          </h1>
-          <p className="ov-sub">
-            DietTrace logs meals from plain English against USDA data, grades its
-            own work on every meal, and learns how <i>you</i> eat — and we test
-            every change so personalizing for you never makes it less accurate
-            overall.
-          </p>
-          <p className="ov-source">
-            The percentages below come from DietTrace&apos;s eval suite: every
-            estimate is scored against known USDA calories as a Phoenix experiment,
-            so the accuracy is measured, not claimed.
-          </p>
-        </header>
+        <div className="obs-tabs" role="tablist" aria-label="Sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "accuracy"}
+            className={"obs-tab" + (tab === "accuracy" ? " on" : "")}
+            onClick={() => setTab("accuracy")}
+          >
+            Accuracy
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "guide"}
+            className={"obs-tab" + (tab === "guide" ? " on" : "")}
+            onClick={() => setTab("guide")}
+          >
+            How it works
+          </button>
+        </div>
 
-        <section className="ov-section">
-          {acc ? <AccuracyView report={acc} /> : <Skeleton />}
-        </section>
+        {tab === "accuracy" ? (
+          <>
+            <header className="ov-head">
+              <h1 id="overview-title" className="ov-title">
+                An AI nutritionist graded on accuracy
+              </h1>
+              <p className="ov-sub">
+                DietTrace logs meals from plain English against USDA data, grades
+                its own work on every meal, and learns how <i>you</i> eat — and we
+                test every change so personalizing for you never makes it less
+                accurate overall.
+              </p>
+              <p className="ov-source">
+                The percentages below come from DietTrace&apos;s eval suite: every
+                estimate is scored against known USDA calories as a Phoenix
+                experiment, so the accuracy is measured, not claimed.
+              </p>
+            </header>
+            <section className="ov-section obs-body">
+              {acc ? <AccuracyView report={acc} /> : <Skeleton />}
+            </section>
+          </>
+        ) : (
+          <section className="ov-section obs-body">
+            <HowItWorksGuide onStartTour={onStartTour} />
+          </section>
+        )}
       </div>
     </Modal>
   );
