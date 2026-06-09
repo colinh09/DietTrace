@@ -619,18 +619,20 @@ export function LearningObservability({
             Agent state
           </h2>
           <div className="agent-state-grid">
-            <div className="agent-state-stat">
-              <span className="agent-state-num">{confirmations}</span>
-              <span className="agent-state-cap">
-                meals in your dataset · <b>{custom}</b> from you · {seeded} seeded
-              </span>
-            </div>
-            <div className="agent-state-stat">
-              <span className="agent-state-num">{newCorr}</span>
-              <span className="agent-state-cap">
-                of {corrections} correction{corrections === 1 ? "" : "s"} not yet
-                learned
-              </span>
+            <div className="agent-state-row">
+              <div className="agent-state-stat">
+                <span className="agent-state-num">{confirmations}</span>
+                <span className="agent-state-cap">
+                  meals in your dataset · <b>{custom}</b> from you · {seeded} seeded
+                </span>
+              </div>
+              <div className="agent-state-stat">
+                <span className="agent-state-num">{corrections}</span>
+                <span className="agent-state-cap">
+                  correction{corrections === 1 ? "" : "s"} you&apos;ve made ·{" "}
+                  <b>{newCorr}</b> new to learn
+                </span>
+              </div>
             </div>
             {latest && (
               <div className="agent-state-stat agent-state-decision">
@@ -786,11 +788,13 @@ export function LearningObservability({
               your dataset · {confirmations} meal{confirmations === 1 ? "" : "s"}
             </span>
           </button>
-          <p className="lo-dataset-note">
-            Meals you&apos;ve confirmed as right, synced to your Phoenix dataset over
-            MCP. Every update is checked against these — but never learns from them — so
-            the test stays honest.
-          </p>
+          {showData && (
+            <p className="lo-dataset-note">
+              Meals you&apos;ve confirmed as right, synced to your Phoenix dataset
+              over MCP. Every update is checked against these — but never learns from
+              them — so the test stays honest.
+            </p>
+          )}
           {showData && (
             <ul className="lo-data-list">
               {confirmed.map((c) => (

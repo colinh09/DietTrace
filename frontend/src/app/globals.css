@@ -1386,8 +1386,9 @@ body {
 
 /* Agent-state modal: the summary at the top of the deep dive. */
 .agent-state-title { font-size: 17px; font-weight: 600; color: var(--ink); margin: 0 0 14px; }
-/* Top-level overview: three consistent cards stacked vertically (dashboard-esque) */
+/* Top-level overview: two side-by-side stats + the latest decision below */
 .agent-state-grid { display: flex; flex-direction: column; gap: 9px; margin-bottom: 12px; }
+.agent-state-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .agent-state-stat { display: flex; flex-direction: column; gap: 4px; background: var(--accent-softer); border-radius: 11px; padding: 13px 15px; }
 .agent-state-num { font-size: 26px; font-weight: 600; line-height: 1; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
 .agent-state-cap { font-size: 12.5px; line-height: 1.4; color: var(--muted-ink); }
