@@ -110,6 +110,12 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
               }`
             : "measured improvement"}
         </div>
+        <p className="acc-block-sub">
+          Each bar is <b>before → after</b>: how accurate DietTrace was on its untuned
+          baseline vs after its prompts were tuned. Every estimate is scored against
+          known USDA calories as a Phoenix experiment, and the tuning is held to those
+          scores — a change only ships if accuracy actually improves.
+        </p>
         <div className="acc-bars">
           {report.metrics.map((m) => (
             <div className="acc-bar-row" key={m.key}>
