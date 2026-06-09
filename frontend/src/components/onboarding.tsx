@@ -91,6 +91,10 @@ export function Onboarding({
   const [answers, setAnswers] = useState<Answers>({});
   const [transcript, setTranscript] = useState<Msg[]>([]);
   const [numDraft, setNumDraft] = useState("");
+  // Inches draft (height in ft/in mode) + the chosen units for weight/height.
+  const [inDraft, setInDraft] = useState("");
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
+  const [heightUnit, setHeightUnit] = useState<"cm" | "ft">("cm");
   const [textDraft, setTextDraft] = useState("");
   // After a demo seed: the persona context preview shown before landing.
   const [seedResult, setSeedResult] = useState<SeedDemoResult | null>(null);
@@ -146,10 +150,36 @@ export function Onboarding({
         : []),
     ]);
     setNumDraft("");
+    setInDraft("");
     setStepIndex(next);
   };
 
   const submitNumber = (step: Step) => {
+    // Weight: store kg (convert from lbs if chosen). Display the entered unit.
+    if (step.key === "weight") {
+      const v = parseInt(numDraft, 10);
+      if (numDraft.trim()) {
+        const kg = weightUnit === "lbs" ? Math.round(v * 0.453592) : v;
+        advance({ weight: kg }, `${v} ${weightUnit}`);
+      } else advance({}, "Skip");
+      return;
+    }
+    // Height: store cm (convert from ft + in if chosen).
+    if (step.key === "height") {
+      if (heightUnit === "ft") {
+        const ft = parseInt(numDraft, 10) || 0;
+        const inch = parseInt(inDraft, 10) || 0;
+        if (ft || inch) {
+          const cm = Math.round((ft * 12 + inch) * 2.54);
+          advance({ height: cm }, `${ft}′ ${inch}″`);
+        } else advance({}, "Skip");
+      } else {
+        const v = numDraft.trim();
+        if (v) advance({ height: parseInt(v, 10) }, `${v} cm`);
+        else advance({}, "Skip");
+      }
+      return;
+    }
     const v = numDraft.trim();
     if (v) advance({ [step.key]: parseInt(v, 10) }, `${v} ${step.unit}`);
     else advance({}, "Skip");
@@ -308,27 +338,89 @@ export function Onboarding({
 
             {!busy && step?.kind === "number" && (
               <div className="ob-num-row">
-                <div className="ob-num-input">
-                  <input
-                    value={numDraft}
-                    inputMode="numeric"
-                    autoFocus
-                    aria-label={step.q}
-                    placeholder="—"
-                    onChange={(e) =>
-                      setNumDraft(e.target.value.replace(/[^0-9]/g, ""))
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") submitNumber(step);
-                    }}
-                  />
-                  <span className="ob-num-unit">{step.unit}</span>
-                </div>
+                {step.key === "height" && heightUnit === "ft" ? (
+                  <div className="ob-num-input ob-num-ft">
+                    <input
+                      value={numDraft}
+                      inputMode="numeric"
+                      autoFocus
+                      aria-label="feet"
+                      placeholder="5"
+                      onChange={(e) =>
+                        setNumDraft(e.target.value.replace(/[^0-9]/g, ""))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitNumber(step);
+                      }}
+                    />
+                    <span className="ob-num-unit">ft</span>
+                    <input
+                      value={inDraft}
+                      inputMode="numeric"
+                      aria-label="inches"
+                      placeholder="10"
+                      onChange={(e) =>
+                        setInDraft(e.target.value.replace(/[^0-9]/g, ""))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitNumber(step);
+                      }}
+                    />
+                    <span className="ob-num-unit">in</span>
+                  </div>
+                ) : (
+                  <div className="ob-num-input">
+                    <input
+                      value={numDraft}
+                      inputMode="numeric"
+                      autoFocus
+                      aria-label={step.q}
+                      placeholder="—"
+                      onChange={(e) =>
+                        setNumDraft(e.target.value.replace(/[^0-9]/g, ""))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") submitNumber(step);
+                      }}
+                    />
+                    <span className="ob-num-unit">
+                      {step.key === "weight" ? weightUnit : step.unit}
+                    </span>
+                  </div>
+                )}
+                {step.key === "weight" && (
+                  <div className="ob-unit-seg" role="group" aria-label="weight unit">
+                    {(["kg", "lbs"] as const).map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        className={"ob-unit-opt" + (weightUnit === u ? " on" : "")}
+                        onClick={() => setWeightUnit(u)}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {step.key === "height" && (
+                  <div className="ob-unit-seg" role="group" aria-label="height unit">
+                    {(["cm", "ft"] as const).map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        className={"ob-unit-opt" + (heightUnit === u ? " on" : "")}
+                        onClick={() => setHeightUnit(u)}
+                      >
+                        {u === "ft" ? "ft / in" : u}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <button
                   type="button"
                   className="ob-send"
                   aria-label="send"
-                  disabled={!numDraft}
+                  disabled={!numDraft && !inDraft}
                   onClick={() => submitNumber(step)}
                 >
                   <Send size={16} aria-hidden="true" />

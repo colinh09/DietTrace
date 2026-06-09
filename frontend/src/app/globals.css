@@ -1308,6 +1308,12 @@ body {
 .ob-num-input input { width: 72px; border: none; background: none; outline: none; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 16px; color: var(--ink); }
 .ob-num-input input::placeholder { color: var(--faint); }
 .ob-num-unit { font-family: var(--mono); font-size: 12px; color: var(--muted-ink); }
+/* ft / in mode: two narrower inputs side by side */
+.ob-num-ft input { width: 40px; }
+/* Unit toggle (kg/lbs, cm/ft·in) */
+.ob-unit-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 9px; padding: 2px; background: var(--card); gap: 2px; }
+.ob-unit-opt { border: none; background: none; font-family: var(--ui-font); font-size: 12px; font-weight: 500; color: var(--muted-ink); padding: 6px 10px; border-radius: 7px; cursor: pointer; transition: background .14s, color .14s; white-space: nowrap; }
+.ob-unit-opt.on { background: var(--accent); color: var(--on-accent); }
 .ob-send { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--accent); color: var(--on-accent); border: none; cursor: pointer; transition: filter .15s; }
 .ob-send:hover:not(:disabled) { filter: brightness(.93); }
 .ob-send:disabled { opacity: .45; cursor: default; }

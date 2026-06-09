@@ -132,6 +132,42 @@ describe("Onboarding (conversational)", () => {
     expect(markOnboarded).toHaveBeenCalledTimes(1);
   });
 
+  it("converts imperial units (lbs, ft/in) to kg/cm", async () => {
+    const onDone = vi.fn();
+    render(<Onboarding onDone={onDone} />);
+    fireEvent.click(screen.getByRole("button", { name: /set up your own/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Male" }));
+
+    // Weight in lbs: 165 lb → 75 kg.
+    await screen.findByLabelText(/what do you weigh/i);
+    fireEvent.click(screen.getByRole("button", { name: "lbs" }));
+    fireEvent.change(screen.getByLabelText(/what do you weigh/i), {
+      target: { value: "165" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    // Age: skip.
+    fireEvent.click(await screen.findByRole("button", { name: /^skip$/i }));
+
+    // Height in ft/in: 5'10" → 178 cm.
+    await screen.findByText(/your height/i);
+    fireEvent.click(screen.getByRole("button", { name: "ft / in" }));
+    fireEvent.change(screen.getByLabelText("feet"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("inches"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    // Activity, goal, lifestyle-skip → finish.
+    fireEvent.click(await screen.findByRole("button", { name: "Moderately" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Maintain" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^skip$/i }));
+
+    await waitFor(() => expect(postMacrosPlan).toHaveBeenCalled());
+    expect(postMacrosPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ weight_kg: 75, height_cm: 178 }),
+    );
+  });
+
   it("a fully-skipped chat still finishes with default targets", async () => {
     const onDone = vi.fn();
     render(<Onboarding onDone={onDone} />);
