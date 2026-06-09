@@ -21,7 +21,7 @@ _MODES = (CONSERVATIVE, POWERFUL)
 # New corrections are the PRIMARY trigger (feedback is the signal a retune acts on);
 # the held-out floor is a precondition so a retune can be validated, not a co-trigger.
 DEFAULT_MIN_NEW_FEEDBACK = 3
-DEFAULT_MIN_NEW_DATASET_POINTS = 4
+DEFAULT_MIN_NEW_DATASET_POINTS = 3
 DEFAULT_MAX_RUNS_PER_DAY = 10
 
 
