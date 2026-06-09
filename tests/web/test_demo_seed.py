@@ -319,14 +319,55 @@ def test_demo_seed_goals_not_set_without_goal_store(tmp_path) -> None:
     assert body["meals"] == len(DEMO_MEALS)
 
 
+def test_demo_seed_everyday_persona(tmp_path) -> None:
+    """The third (generalist) persona — a busy average person eating a bit healthier
+    and losing a little weight — loads its own visible day, per-user balanced (not
+    athletic) goals, and a learning seed, so a non-athlete judge sees themselves."""
+    client, _, goal_store = _client(tmp_path)
+    resp = client.post("/demo/seed", headers=_H, json={"persona": "everyday"}).json()
+
+    persona = resp["persona"]
+    assert persona["key"] == "everyday"
+
+    # The visible playground meals landed on TODAY.
+    day = resp["meal_date"]
+    meals = client.get(f"/history?date={day}", headers=_H).json()["meals"]
+    assert len(meals) == len(persona["meal_texts"]) > 0
+    # The on-screen under-count (an eaten-out portion-creep meal) is one of them.
+    assert any(persona["hook_meal"] in t for t in persona["meal_texts"])
+
+    # Per-user goals are the balanced maintenance-minus-small-deficit targets
+    # (NOT an athlete's split): a gentle deficit with even macros.
+    goals = goal_store.get(_USER)
+    assert goals["208"] == 1800.0  # ~maintenance minus a small deficit
+    assert goals["203"] == 130.0   # balanced protein, not an athlete's high split
+
+    # The learning loop is pre-seeded and corrections stay DISJOINT from the
+    # held-out confirmations (asserted exhaustively below).
+    assert resp["confirmations"] >= 3
+    assert resp["corrections"] >= 1
+    assert len(persona["correction_texts"]) == resp["corrections"]
+
+
+def test_everyday_persona_registered_for_picker() -> None:
+    """The generalist persona is registered in PERSONAS so the picker (the frontend
+    DEMO_PERSONAS) and the SeededModal switcher list it alongside the two athletes."""
+    from dietrace.web.demo_seed import EVERYDAY, PERSONAS
+
+    assert "everyday" in PERSONAS
+    assert PERSONAS["everyday"] is EVERYDAY
+    # Three distinct selectable personas: runner + bodybuilder + everyday generalist.
+    assert {"runner", "bodybuilder", "everyday"} <= set(PERSONAS)
+
+
 def test_persona_corrections_are_disjoint_from_dataset_points() -> None:
     """A seeded correction must NOT target a held-out dataset point — otherwise the
     corrector learns from a meal it's then graded on (training on the test set), which
     skews the gate and the retune-trigger counts. Keep corrections and dataset points
     disjoint, for every persona."""
-    from dietrace.web.demo_seed import BODYBUILDER, RUNNER
+    from dietrace.web.demo_seed import PERSONAS
 
-    for persona in (RUNNER, BODYBUILDER):
+    for persona in PERSONAS.values():
         dataset_meals = {c["meal_text"] for c in persona.confirmations}
         correction_meals = {f["meal_text"] for f in persona.feedback}
         overlap = dataset_meals & correction_meals

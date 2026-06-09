@@ -644,6 +644,11 @@ export const DEMO_PERSONAS = [
     label: "Bodybuilder",
     blurb: "Under-logs his post-lift protein.",
   },
+  {
+    key: "everyday",
+    label: "Busy professional",
+    blurb: "Eats out a lot — those portions run big.",
+  },
 ] as const;
 
 export async function seedDemo(

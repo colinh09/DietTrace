@@ -85,4 +85,13 @@ export const PERSONA_INPUTS: Record<string, ProfileInputs> = {
     goal: "bulk",
     preference: "keep protein very high for muscle gain",
   },
+  everyday: {
+    age: 38,
+    sex: "male",
+    height_cm: 178,
+    weight_kg: 84,
+    activity: "light",
+    goal: "cut",
+    preference: "eats out a few times a week; trying to lose a little weight",
+  },
 };

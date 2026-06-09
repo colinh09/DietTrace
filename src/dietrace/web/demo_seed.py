@@ -7,11 +7,13 @@ JSON file. Nothing here is hand-authored — the confidence is the genuine mean 
 the four eval axes, so the "why this confidence" breakdown adds up. Loading the
 canned data keeps /demo/seed deterministic and offline (no Gemini call, no spend).
 
-Two selectable personas (the persona loader, ): an **endurance runner** who
-under-logs her training carbs, and a **bodybuilder** who under-logs his post-lift
-protein portions. Each ships a visible day + the learning-loop seed (confirmed
-meals as the held-out gate set + a couple of corrections) so a judge can hit
-"retune" immediately and watch the gate ship a persona-specific rule.
+Three selectable personas (the persona loader, ): an **endurance runner** who
+under-logs her training carbs, a **bodybuilder** who under-logs his post-lift
+protein portions, and a generalist **busy professional** whose eaten-out portions
+run bigger than he logs (so a non-athlete judge sees themselves). Each ships a
+visible day + the learning-loop seed (confirmed meals as the held-out gate set + a
+couple of corrections) so a judge can hit "retune" immediately and watch the gate
+ship a persona-specific rule.
 """
 
 from __future__ import annotations
@@ -178,7 +180,59 @@ BODYBUILDER = Persona(
 )
 
 
-PERSONAS: dict[str, Persona] = {p.key: p for p in (RUNNER, BODYBUILDER)}
+# ──────────────────────────────────────────────────────────────────────────────
+# Persona C — Busy professional (EATING-OUT portion creep). The generalist, non-
+# athlete persona: a chicken burrito bowl grabbed for lunch logs small because the
+# restaurant portion is much bigger than the default serving — the visible
+# under-count. Eating out a few times a week is where his tracking drifts.
+# ──────────────────────────────────────────────────────────────────────────────
+
+EVERYDAY = Persona(
+    key="everyday",
+    label="Busy professional",
+    blurb="Eats out a few times a week — those portions run bigger than he logs.",
+    goals={"208": 1800.0, "203": 130.0, "205": 180.0, "204": 60.0},
+    goal_rationale=(
+        "Sample targets for a busy professional eating a bit healthier and aiming "
+        "to lose a little weight (~1 800 kcal/day, a gentle deficit with balanced "
+        "macros — not an athlete's split). The agent under-counts the meals he eats "
+        "out, where restaurant and takeout portions run bigger than a home-cooked "
+        "plate. Correct one in plain words, then re-tune to watch it learn the pattern."
+    ),
+    hook_meal="burrito bowl",
+    hook_note=(
+        "The chicken burrito bowl he grabbed for lunch logged small — the restaurant "
+        "portion is much bigger than the default serving (more rice, more chicken, "
+        "plus the guac). That's the on-screen under-count to correct."
+    ),
+    learns="When he eats out his portions run big — extra rice, oil, and larger servings.",
+    profile=(
+        "I'm a busy professional trying to eat a bit healthier and lose a little "
+        "weight. I cook simple meals when I can, but I eat out or order takeout a "
+        "few times a week, and those portions are bigger than what I'd make at home."
+    ),
+    meals=_load_meals("demo_seed_everyday.json"),
+    previous_day=_load_previous_day("demo_seed_everyday.json"),
+    # Held-out test set, derived from the previous day's dataset-point meals (real
+    # agent output): the eaten-out meals the agent under-portions (the pattern to
+    # learn), plus a plain home meal guard the learned rule must NOT change.
+    confirmations=_load_confirmations("demo_seed_everyday.json"),
+    feedback=[
+        # Eating out runs big. Corrections target meals that are NOT held-out dataset
+        # points (kept DISJOINT, like the other personas), so the corrector never
+        # learns from a meal it's then graded on — the gate stays honest.
+        {"feedback_text": "when I order takeout the portions are way bigger than this — "
+                          "easily another cup of rice and a lot more oil than a "
+                          "home-cooked plate",
+         "meal_text": "a takeout bowl I had for dinner"},
+        {"feedback_text": "eating out my meals run bigger than I log — restaurant "
+                          "servings are much larger than what I'd plate at home",
+         "meal_text": "a restaurant lunch on a workday"},
+    ],
+)
+
+
+PERSONAS: dict[str, Persona] = {p.key: p for p in (RUNNER, BODYBUILDER, EVERYDAY)}
 DEFAULT_PERSONA = RUNNER.key
 
 
