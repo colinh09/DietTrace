@@ -1251,6 +1251,24 @@ body {
 /* ── Onboarding (first-run welcome + 30-second profile) ─────────────────────
    Full-page calm card on the warm background. Reuses the tg-* form controls so
    it matches the macro editor; titles are serif, the eyebrow is mono. */
+/* Full-page sign-in split: brand/hero left, sign-in card right (stacks narrow) */
+.si-page { min-height: 100dvh; display: grid; grid-template-columns: 1.05fr 1fr; background: var(--bg); }
+.si-hero { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 9vh 6vw; background: linear-gradient(155deg, var(--accent-softer) 0%, var(--bg) 72%); overflow: hidden; }
+.si-hero .ob-brand { margin-bottom: 6px; }
+.si-hero-title { font-family: var(--serif); font-size: clamp(32px, 4vw, 46px); font-weight: 600; line-height: 1.07; letter-spacing: -0.015em; color: var(--ink); margin: 0; }
+.si-hero-sub { font-size: 15px; line-height: 1.6; color: var(--muted-ink); max-width: 40ch; margin: 0; }
+.si-hero-mark { position: absolute; right: -56px; bottom: -48px; opacity: .08; pointer-events: none; }
+.si-panel { display: flex; align-items: center; justify-content: center; padding: 6vh 6vw; }
+.si-card { width: 100%; max-width: 384px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 30px 30px 24px; box-shadow: 0 1px 2px rgba(27,26,22,.03), 0 12px 34px rgba(27,26,22,.06); }
+.si-card-eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 7px; }
+.si-card-title { font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--ink); margin: 0 0 18px; }
+@media (max-width: 860px) {
+  .si-page { grid-template-columns: 1fr; }
+  .si-hero { padding: 7vh 8vw 4vh; }
+  .si-hero-mark { display: none; }
+  .si-panel { padding: 0 8vw 8vh; align-items: flex-start; }
+  .si-card { max-width: none; }
+}
 .ob-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 18px; background: var(--bg); }
 /* The reused onboarding chat as a dismissible overlay (Macros "recalculate"). */
 .ob-overlay { position: fixed; inset: 0; z-index: 70; overflow-y: auto; }

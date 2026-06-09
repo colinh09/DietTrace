@@ -53,45 +53,55 @@ export function SignIn({ onContinueAnon }: { onContinueAnon: () => void }) {
   };
 
   return (
-    <div className="ob-page">
-      <div className="ob-card">
+    <div className="si-page">
+      {/* Left: brand + hero value prop, with a faint apple-trace watermark */}
+      <section className="si-hero">
         <div className="ob-brand">
-          <BrandMark size={30} />
+          <BrandMark size={34} />
           <span className="brand-name">DietTrace</span>
         </div>
-        <div className="ob-eyebrow">Welcome</div>
-        <h1 className="ob-title">
+        <h1 className="si-hero-title">
           Know what you eat,
           <br />
           held to the gram.
         </h1>
-        <p className="ob-sub">
-          Sign in to keep your food log across devices — or jump straight in and
-          use DietTrace anonymously. You can always sign in later from the
-          account menu.
+        <p className="si-hero-sub">
+          An AI nutritionist that logs meals from plain English, shows its work on
+          every one, and is graded on accuracy — so you can trust the numbers.
         </p>
-        <div className="ob-actions">
-          {configured && (
+        <BrandMark size={320} className="si-hero-mark" />
+      </section>
+
+      {/* Right: the sign-in card */}
+      <section className="si-panel">
+        <div className="si-card">
+          <div className="si-card-eyebrow mono">Get started</div>
+          <h2 className="si-card-title">Sign in</h2>
+          <div className="ob-actions">
+            {configured && (
+              <button
+                type="button"
+                className="si-google"
+                onClick={google}
+                disabled={busy}
+              >
+                <GoogleMark />
+                Continue with Google
+              </button>
+            )}
             <button
               type="button"
-              className="si-google"
-              onClick={google}
-              disabled={busy}
+              className="ob-btn-secondary"
+              onClick={onContinueAnon}
             >
-              <GoogleMark />
-              Continue with Google
+              Continue without an account
             </button>
-          )}
-          <button
-            type="button"
-            className="ob-btn-secondary"
-            onClick={onContinueAnon}
-          >
-            Continue without an account
-          </button>
+          </div>
+          <p className="si-fine">
+            No email, no spam — your log stays on this device unless you sign in.
+          </p>
         </div>
-        <p className="si-fine">No email, no spam — your log stays on this device unless you sign in.</p>
-      </div>
+      </section>
     </div>
   );
 }
