@@ -958,6 +958,10 @@ body {
 .reset-dialog-actions .btn-danger { background: var(--danger-ink); color: #fff; border: none; border-radius: 100px; padding: 9px 18px; font-family: var(--ui-font); font-size: 13px; font-weight: 600; cursor: pointer; transition: filter .15s; }
 .reset-dialog-actions .btn-danger:hover:not(:disabled) { filter: brightness(.94); }
 .reset-dialog-actions button:disabled { opacity: .55; cursor: default; }
+/* Retune confirm — same dialog shell as Reset, but accent (not danger) */
+.retune-dialog-eyebrow { color: var(--accent-ink); }
+.reset-dialog-actions .btn-accent { background: var(--accent); color: var(--on-accent); border: none; border-radius: 100px; padding: 9px 18px; font-family: var(--ui-font); font-size: 13px; font-weight: 600; cursor: pointer; transition: filter .15s; }
+.reset-dialog-actions .btn-accent:hover:not(:disabled) { filter: brightness(.94); }
 
 /* ── Accuracy modal: wrap the self-supervision loop + quiet explainer notes ── */
 .acc-loop .tstep-line-btn { align-items: flex-start; }
@@ -1405,9 +1409,15 @@ body {
 .agent-feed-reason { font-size: 12px; color: var(--muted-ink); line-height: 1.45; }
 
 /* Agent-activity rail header: the "state" button that opens the state modal. */
+.dash-head-actions { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .dash-state-btn { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-ink); background: none; border: 1px solid var(--line-strong); border-radius: 8px; padding: 4px 9px; cursor: pointer; transition: color .14s, border-color .14s; }
 .dash-state-btn:hover { color: var(--ink); border-color: var(--accent); }
 .dash-state-btn svg { color: var(--faint); }
+/* "Retune now" — manual trigger, accent variant of the state button */
+.dash-retune-btn { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-ink); background: none; border: 1px solid var(--accent); border-radius: 8px; padding: 4px 9px; cursor: pointer; transition: color .14s, border-color .14s, background .14s, opacity .14s; }
+.dash-retune-btn:hover:not(:disabled) { background: var(--accent-softer); }
+.dash-retune-btn:disabled { color: var(--faint); border-color: var(--line); cursor: default; }
+.dash-retune-btn svg { color: currentColor; }
 
 /* Feed extras: timing label, re-tune detail line, the live running row, empty. */
 .agent-feed-when { flex: none; margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--faint); }

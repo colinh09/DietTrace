@@ -13,9 +13,11 @@ import {
   ChevronRight,
   Gauge,
   Pencil,
+  RotateCcw,
   Sparkles,
   Trash2,
 } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
   AgentFeed,
   type AgentEvent,
@@ -376,6 +378,8 @@ export function LearningObservability({
   const [showCorr, setShowCorr] = useState(false);
   // The agent-state modal (the deep dive behind the icon).
   const [stateOpen, setStateOpen] = useState(false);
+  // The "Retune now" confirm modal — manual override of the auto-retune threshold.
+  const [retuneConfirmOpen, setRetuneConfirmOpen] = useState(false);
   // The user's freeform "goals & eating style" — the corrector's standing context.
   const [profileText, setProfileText] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
@@ -566,14 +570,35 @@ export function LearningObservability({
             )}
           </div>
         </div>
-        <button
-          type="button"
-          className="dash-state-btn"
-          onClick={() => setStateOpen(true)}
-          aria-label="Open agent state"
-        >
-          <Gauge size={14} /> state
-        </button>
+        <div className="dash-head-actions">
+          <Tooltip
+            label={
+              retuning
+                ? "A retune is already running"
+                : newCorr === 0
+                  ? "Correct a meal first — there's nothing new to fold in"
+                  : "Fold your corrections into the agent now"
+            }
+          >
+            <button
+              type="button"
+              className="dash-retune-btn"
+              onClick={() => setRetuneConfirmOpen(true)}
+              disabled={newCorr === 0 || retuning}
+              aria-label="Retune now"
+            >
+              <RotateCcw size={13} /> Retune now
+            </button>
+          </Tooltip>
+          <button
+            type="button"
+            className="dash-state-btn"
+            onClick={() => setStateOpen(true)}
+            aria-label="Open agent state"
+          >
+            <Gauge size={14} /> state
+          </button>
+        </div>
       </div>
       {/* While a re-tune streams, show the live per-meal scoring right in the
           rail — every dataset point re-scored base vs tuned as the eval runs. */}
@@ -613,6 +638,47 @@ export function LearningObservability({
       )}
 
       {/* ── State modal: the deep dive behind the icon ────────────────────── */}
+      {retuneConfirmOpen && (
+        <Modal
+          onClose={() => setRetuneConfirmOpen(false)}
+          labelledBy="retune-confirm-title"
+          className="modal-narrow"
+        >
+          <div className="reset-dialog">
+            <div className="reset-dialog-eyebrow retune-dialog-eyebrow mono">
+              Retune
+            </div>
+            <h2 id="retune-confirm-title" className="reset-dialog-title">
+              Retune DietTrace now?
+            </h2>
+            <p className="reset-dialog-body">
+              You&apos;ve taught it {corrections} correction
+              {corrections === 1 ? "" : "s"}. Retuning turns them into a rule it
+              follows — but it only keeps the change if your meals come out more
+              accurate. If not, nothing changes.
+            </p>
+            <div className="reset-dialog-actions">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setRetuneConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-accent"
+                onClick={() => {
+                  setRetuneConfirmOpen(false);
+                  runRetune();
+                }}
+              >
+                Retune now
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {stateOpen && (
         <Modal onClose={() => setStateOpen(false)} labelledBy="agent-state-title">
           <h2 id="agent-state-title" className="agent-state-title">

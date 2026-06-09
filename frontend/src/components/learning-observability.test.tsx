@@ -125,6 +125,34 @@ describe("LearningObservability", () => {
     finish();
   });
 
+  it("force-retunes from the rail header via the confirm modal", async () => {
+    vi.mocked(api.learningRetuneStream).mockImplementation(async () => {});
+    render(<LearningObservability reloadSignal={0} />);
+
+    // The rail button enables once a correction is banked (new_corrections=1).
+    const railBtn = await screen.findByRole("button", { name: /retune now/i });
+    await waitFor(() => expect(railBtn).not.toBeDisabled());
+    fireEvent.click(railBtn);
+
+    // The confirm modal opens; confirming fires the retune (no auto-threshold).
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("heading", { name: /retune diettrace now/i }),
+    ).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: /retune now/i }));
+    await waitFor(() => expect(api.learningRetuneStream).toHaveBeenCalled());
+  });
+
+  it("disables the rail retune button when nothing new is banked", async () => {
+    vi.mocked(api.getPreferences).mockResolvedValue({
+      block: null, corrections: 2, new_corrections: 0, confirmations: 3,
+      confirmed, min_corrections: 1,
+    });
+    render(<LearningObservability reloadSignal={0} />);
+    const railBtn = await screen.findByRole("button", { name: /retune now/i });
+    await waitFor(() => expect(railBtn).toBeDisabled());
+  });
+
   it("shows the user's context (the corrector's standing profile) and lets them edit it", async () => {
     vi.mocked(api.getProfile).mockResolvedValue({
       profile_text: "Marathon training, mostly plant-based",
