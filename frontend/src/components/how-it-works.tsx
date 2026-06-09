@@ -1,8 +1,9 @@
 "use client";
 
-// The "How it works" section — a plain-language walkthrough of each part of the
-// app, shown as a tab inside the Accuracy modal. Read top to bottom; optional.
+// The "How it works" explainer — a plain-language walkthrough of each part of the
+// app. `HowItWorksGuide` is the body; `HowItWorksModal` is the navbar-opened modal.
 import type { JSX } from "react";
+import { Modal } from "@/components/modal";
 
 interface HowStep {
   key: string;
@@ -37,10 +38,13 @@ export function HowItWorksGuide(): JSX.Element {
   return (
     <div className="hiw">
       <header className="hiw-head">
-        <h1 className="ov-title">How DietTrace works</h1>
+        <span className="ov-eyebrow mono">How it works</span>
+        <h1 id="hiw-title" className="ov-title">
+          An AI nutritionist that shows its work
+        </h1>
         <p className="ov-sub">
-          A quick walkthrough of each part of the app — log a meal, check the
-          numbers, and watch it learn how you eat.
+          Log a meal in plain English, check the numbers, and watch DietTrace learn
+          how you eat — without ever getting less accurate. Here&apos;s each part.
         </p>
       </header>
 
@@ -57,6 +61,26 @@ export function HowItWorksGuide(): JSX.Element {
           </li>
         ))}
       </ol>
+
+      <p className="hiw-note">
+        Most trackers guess and move on. DietTrace shows its work on every meal and
+        is graded against USDA data in Phoenix — so when it adapts to you, you can
+        see it stayed accurate. That&apos;s the whole idea.
+      </p>
     </div>
+  );
+}
+
+export function HowItWorksModal({
+  onClose,
+}: {
+  onClose: () => void;
+}): JSX.Element {
+  return (
+    <Modal onClose={onClose} labelledBy="hiw-title">
+      <div className="ov">
+        <HowItWorksGuide />
+      </div>
+    </Modal>
   );
 }

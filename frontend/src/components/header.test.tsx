@@ -14,6 +14,7 @@ describe("Header", () => {
     expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Macros" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Accuracy" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "How it works" })).toBeInTheDocument();
     // The date navigation lives in the day card now, not the navbar.
     expect(screen.queryByRole("button", { name: /open calendar/i })).not.toBeInTheDocument();
   });
@@ -39,5 +40,12 @@ describe("Header", () => {
     fireEvent.click(screen.getByRole("button", { name: "Macros" }));
     expect(onOpenOverview).toHaveBeenCalledTimes(1);
     expect(onOpenMacros).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the How it works explainer from the navbar", () => {
+    const onOpenHowItWorks = vi.fn();
+    render(<Header date={may30} onOpenHowItWorks={onOpenHowItWorks} />);
+    fireEvent.click(screen.getByRole("button", { name: "How it works" }));
+    expect(onOpenHowItWorks).toHaveBeenCalledTimes(1);
   });
 });

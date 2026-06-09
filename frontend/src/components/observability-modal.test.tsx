@@ -56,24 +56,6 @@ describe("OverviewModal", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("has a 'How it works' tab with the written guide", async () => {
-    vi.mocked(getAccuracy).mockResolvedValue(accuracy);
-    render(<OverviewModal onClose={vi.fn()} />);
-
-    // Defaults to the Accuracy report.
-    await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { name: /How DietTrace stays accurate/i }),
-      ).toBeInTheDocument(),
-    );
-
-    fireEvent.click(screen.getByRole("tab", { name: /how it works/i }));
-    expect(
-      screen.getByRole("heading", { name: /how diettrace works/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/your day at a glance/i)).toBeInTheDocument();
-  });
-
   it("closes on Escape", () => {
     vi.mocked(getAccuracy).mockResolvedValue(accuracy);
     vi.mocked(getTrust).mockResolvedValue(trust);

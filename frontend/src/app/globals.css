@@ -783,11 +783,6 @@ body {
 @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.obs-tabs { display: flex; gap: 4px; margin: 2px 0 18px; border-bottom: 1px solid var(--line); }
-.obs-tab { background: none; border: none; cursor: pointer; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); padding: 6px 10px 10px; margin-bottom: -1px; border-bottom: 2px solid transparent; transition: color .14s ease, border-color .14s ease; }
-.obs-tab:hover { color: var(--muted-ink); }
-.obs-tab.on { color: var(--accent-ink); border-bottom-color: var(--accent); }
-.obs-body .acc-hero { margin-top: 2px; }
 
 /* loading skeleton so the (slow) live Phoenix read never looks frozen */
 .obs-skel { display: flex; flex-direction: column; gap: 16px; }
@@ -817,6 +812,7 @@ body {
 .hiw-body { min-width: 0; }
 .hiw-title { font-size: 15px; font-weight: 600; color: var(--ink); margin: 2px 0 4px; }
 .hiw-text { font-size: 13.5px; line-height: 1.6; color: var(--muted-ink); margin: 0; max-width: 60ch; }
+.hiw-note { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.6; color: var(--muted-ink); max-width: 62ch; }
 
 /* ── Macro editor modal (Set your targets) ─────────────────────────────── */
 .tg-scrim { position: fixed; inset: 0; background: rgba(27,26,22,0.26); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 90; }

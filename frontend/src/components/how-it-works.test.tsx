@@ -6,7 +6,7 @@ describe("HowItWorksGuide", () => {
   it("renders the written how-it-works section with each part of the app", () => {
     render(<HowItWorksGuide />);
     expect(
-      screen.getByRole("heading", { name: /how diettrace works/i }),
+      screen.getByRole("heading", { name: /shows its work/i }),
     ).toBeInTheDocument();
     expect(screen.getByText(/your day at a glance/i)).toBeInTheDocument();
     expect(screen.getByText(/log food in plain english/i)).toBeInTheDocument();

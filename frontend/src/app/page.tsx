@@ -17,6 +17,7 @@ import type { AgentEvent } from "@/components/agent-decision";
 import { Dashboard } from "@/components/dashboard";
 import { OverviewModal } from "@/components/observability-modal";
 import { MacroModal } from "@/components/macro-modal";
+import { HowItWorksModal } from "@/components/how-it-works";
 import { Onboarding } from "@/components/onboarding";
 import {
   deleteMeal,
@@ -89,6 +90,8 @@ export default function Home() {
   const [overviewOpen, setOverviewOpen] = useState(false);
   // Whether the macro editor ("Set your targets") modal is open.
   const [macroOpen, setMacroOpen] = useState(false);
+  // Whether the "How it works" explainer modal is open.
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   // Whether the "recalculate from your details" flow (the reused onboarding chat)
   // is open, overlaying the app.
   const [recalcOpen, setRecalcOpen] = useState(false);
@@ -417,6 +420,7 @@ export default function Home() {
           date={date}
           onOpenOverview={() => setOverviewOpen(true)}
           onOpenMacros={() => setMacroOpen(true)}
+          onOpenHowItWorks={() => setHowItWorksOpen(true)}
           onSeeded={() => {
             loadHistory();
             loadAnalysis();
@@ -469,6 +473,9 @@ export default function Home() {
       </main>
       {overviewOpen && (
         <OverviewModal onClose={() => setOverviewOpen(false)} />
+      )}
+      {howItWorksOpen && (
+        <HowItWorksModal onClose={() => setHowItWorksOpen(false)} />
       )}
       {macroOpen && (
         <MacroModal

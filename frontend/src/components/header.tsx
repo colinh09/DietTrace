@@ -17,6 +17,8 @@ interface HeaderProps {
   onOpenOverview?: () => void;
   // Open the macro editor ("Set your targets") modal.
   onOpenMacros?: () => void;
+  // Open the "How it works" explainer modal.
+  onOpenHowItWorks?: () => void;
   // Called after POST /demo/seed completes so the page can refresh its data.
   onSeeded?: () => void;
   // Navigate the page to a given ISO day (the seed modal's "see the dataset").
@@ -30,6 +32,7 @@ interface HeaderProps {
 export function Header({
   onOpenOverview,
   onOpenMacros,
+  onOpenHowItWorks,
   onSeeded,
   onViewDay,
   onReset,
@@ -50,6 +53,13 @@ export function Header({
         </button>
         <button type="button" className="nav-item" onClick={() => onOpenOverview?.()}>
           Accuracy
+        </button>
+        <button
+          type="button"
+          className="nav-item"
+          onClick={() => onOpenHowItWorks?.()}
+        >
+          How it works
         </button>
       </nav>
       <div className="hdr-end">
