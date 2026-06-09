@@ -135,3 +135,42 @@ def test_load_overlay_returns_populated_dict_on_valid_json(tmp_path, monkeypatch
     assert result[normalize("almond")] == 1234
     assert result[normalize("chicken breast")] == 5678
     assert result[normalize("Green Beans")] == 9000
+
+
+def test_load_overlay_skips_bad_entries_keeping_the_valid_pins(
+    tmp_path, monkeypatch
+) -> None:
+    """One uncoercible value must not discard the whole curated map (per-entry fail-soft).
+
+    A hand-maintained mappings file can carry a typo'd value. Building the table
+    in a single dict comprehension meant one ``int(v)`` failure threw straight out
+    and ``load_overlay`` fell back to ``{}`` — silently degrading *every* pinned
+    common food back to the ranked search,
+    with no error. Each entry must fail soft on its own so the good pins survive.
+    """
+    f = tmp_path / "foods.json"
+    f.write_text('{"almond": 1234, "broken": "not_a_number", "carrot": 5678}')
+    monkeypatch.setenv("DIETRACE_OVERLAY", str(f))
+    load_overlay.cache_clear()
+    try:
+        result = load_overlay()
+    finally:
+        load_overlay.cache_clear()
+    assert result[normalize("almond")] == 1234
+    assert result[normalize("carrot")] == 5678
+    assert normalize("broken") not in result
+
+
+def test_load_overlay_returns_empty_when_json_is_not_an_object(
+    tmp_path, monkeypatch
+) -> None:
+    """Valid JSON of the wrong shape (a list/scalar, not an object) → {} (fail-soft)."""
+    f = tmp_path / "list.json"
+    f.write_text("[1234, 5678]")
+    monkeypatch.setenv("DIETRACE_OVERLAY", str(f))
+    load_overlay.cache_clear()
+    try:
+        result = load_overlay()
+    finally:
+        load_overlay.cache_clear()
+    assert result == {}

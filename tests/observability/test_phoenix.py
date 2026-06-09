@@ -118,3 +118,36 @@ def test_in_process_buffer_attached_when_key_set(
     added = [c.args[0] for c in m["provider"].add_span_processor.call_args_list]
     assert get_buffer() in added  # buffer attached alongside the OTLP batch processor
     assert len(added) == 2
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        # Bare collector endpoint: the /v1/traces path is appended (Phoenix Cloud
+        # rejects spans posted to the space root).
+        ("https://app.phoenix.example/s/space", "https://app.phoenix.example/s/space/v1/traces"),
+        # Already-suffixed endpoint: left intact, NOT doubled to /v1/traces/v1/traces
+        # (a doubled path 404s and silently drops every span — the idempotency guard).
+        ("http://localhost:6006/v1/traces", "http://localhost:6006/v1/traces"),
+        # A trailing slash is normalized before the suffix decision, both ways.
+        ("https://app.phoenix.example/s/space/", "https://app.phoenix.example/s/space/v1/traces"),
+        ("http://localhost:6006/v1/traces/", "http://localhost:6006/v1/traces"),
+    ],
+)
+def test_traces_endpoint_normalized_idempotently(
+    monkeypatch: pytest.MonkeyPatch, configured: str, expected: str
+) -> None:
+    """The OTLP exporter always targets a single /v1/traces path regardless of how
+    PHOENIX_COLLECTOR_ENDPOINT is written — appended when absent, left intact when
+    already present, with any trailing slash normalized first. Pins phoenix.py's
+    idempotency guard so a regression that blindly re-appends the path (producing
+    a span-dropping /v1/traces/v1/traces) is caught."""
+    mod = _reload_phoenix(
+        monkeypatch,
+        {"PHOENIX_API_KEY": "fake-key", "PHOENIX_COLLECTOR_ENDPOINT": configured},
+    )
+    m = _patch_otel(monkeypatch)
+
+    mod.init_tracer("dietrace-svc")
+
+    assert m["OTLPSpanExporter"].call_args.kwargs["endpoint"] == expected

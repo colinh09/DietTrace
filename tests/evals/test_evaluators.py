@@ -510,3 +510,63 @@ def test_macro_pct_error_non_finite_macro_keeps_score_finite(bad: float) -> None
     assert result.score == 0.75
     assert result.metadata["per_macro"]["protein_g"] == 1.0  # bad macro → full error
     assert math.isfinite(result.metadata["mean_pct_error"])
+
+
+# --- a garbled per-case tolerance falls back to the default band -----
+#
+# The pass/fail band is overridable per case via ``metadata["tolerance"]``, and
+# that metadata can arrive from a replayed/stored case or an MCP-written dataset
+# point — the same untrusted channel ``_pct_error`` already guards against. An
+# unusable tolerance must degrade to the ±15% default rather than crash the
+# evaluator (a non-numeric value makes ``float()`` raise, aborting the whole
+# experiment run) or silently corrupt every label (``err <= nan`` is always
+# False, flagging a false regression; ``+inf`` masks real ones; a negative band
+# flips pass/fail). The score is unaffected by the band, so only the label is at
+# stake — and the label must reflect the real ±15% default verdict.
+
+
+@pytest.mark.parametrize("bad", ["abc", None, float("nan"), float("inf"), -0.10])
+def test_macro_pct_error_garbled_tolerance_falls_back_to_default(bad: object) -> None:
+    # mean |%error| 0.0875 — passes under the default ±15% but would fail at ±5%.
+    output = _totals(calories=440.0, protein_g=18.0, fat_g=34.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = macro_pct_error(output, expected, {"tolerance": bad})
+
+    assert result.label == "pass"  # default ±15% band restored, no crash
+    assert result.score == 0.9125  # score never depended on the band
+
+
+@pytest.mark.parametrize("bad", ["", {}, None, float("inf"), float("-inf"), -1.0])
+def test_within_tolerance_garbled_tolerance_uses_default(bad: object) -> None:
+    # Every macro exact except fat at 12% off — inside ±15%, outside ±5%.
+    output = _totals(calories=400.0, protein_g=20.0, fat_g=44.8, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = within_tolerance(output, expected, {"tolerance": bad})
+
+    assert result.label == "pass"  # default ±15% restored
+    assert result.metadata["tolerance"] == 0.15
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_macro_mae_non_finite_macro_is_worst_miss_not_nan(bad: float) -> None:
+    # macro_mae scores ABSOLUTE error, so it bypasses _pct_error's guard entirely:
+    # abs(nan - 20) is nan, the NMAE becomes nan, and 1 - min(nan, 1.0) is a nan
+    # score — off the [0,1] contract  promises, and a nan never flags as a
+    # regression. An unusable macro must be a full miss (NMAE ≥ 1 → score 0.0), like
+    # the percent-based evaluators above.
+    output = _totals(calories=400.0, protein_g=bad, fat_g=40.0, carb_g=10.0)
+    expected = {"calories": 400.0, "protein_g": 20.0, "fat_g": 40.0, "carb_g": 10.0}
+
+    result = macro_mae(output, expected)
+
+    assert math.isfinite(result.score)
+    assert result.score == 0.0  # unusable output → worst miss, keeps [0,1]
+    assert result.label == "fail"
+    assert math.isfinite(result.metadata["nmae"])  # the score-companion stays finite
+    # The bad macro's raw error is +inf (well-ordered), never a comparison-breaking
+    # nan — including the unnormalized native-unit MAE the supervisor may read.
+    assert result.metadata["per_macro_abs"]["protein_g"] == float("inf")
+    assert result.metadata["mae"] == float("inf")
+    assert not math.isnan(result.metadata["mae"])

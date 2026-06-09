@@ -81,6 +81,18 @@ ALLERGEN_CONFLICT = [
     "I have a shellfish allergy and ate shellfish tonight",
 ]
 
+# A low calorie figure in the same sentence as an unrelated "... a day" phrase
+# (steps a day, an hour a day, twice a day) is an ordinary log, NOT an extreme
+# deficit: the cadence modifies the activity, not the calorie target. The deficit
+# detector must only fire when the cadence directly follows the calorie figure
+#.
+DEFICIT_UNRELATED_CADENCE = [
+    "ate about 700 calories of trail mix on my hike, I aim for 10k steps a day",
+    "600 calories at lunch, then I do some yoga twice a day",
+    "had 500 calories of almonds, I try to walk for an hour a day",
+    "I had 600 calories and I usually drink 2 liters of water a day",
+]
+
 # Allergy declared and the allergen named twice, but NOT eaten — no eating verb.
 # An allergen conflict requires the person to actually log eating the allergen, so
 # the eating-verb gate must keep these clear.
@@ -167,6 +179,54 @@ def test_one_above_ceiling_does_not_flag():
     # 801 kcal/day is just above the ceiling; the pattern matches but must not flag.
     result = safety_check("eating 801 calories per day")
     assert result["flagged"] is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Thousands separators must be read as the whole number, not just the
+        # digits after the comma. Before the fix the pattern captured "200"/"500"/
+        # "400" — all ≤ 800 — and false-flagged these healthy, even surplus,
+        # targets as an extreme deficit, the exact false positive the module's
+        # "zero false positives on normal logs" constraint forbids.
+        "I'm aiming for 1,200 calories a day to lose weight gradually",
+        "maintaining on 2,500 calories per day",
+        "bulking on 3,400 calories a day",
+    ],
+)
+def test_comma_grouped_calorie_target_does_not_flag(text):
+    result = safety_check(text)
+    assert result["flagged"] is False
+    assert result["category"] is None
+
+
+@pytest.mark.parametrize("text", DEFICIT_UNRELATED_CADENCE)
+def test_unrelated_per_day_cadence_does_not_flag(text):
+    # The calorie figure and the "... a day" phrase are unrelated clauses; the
+    # cadence describes activity, not the calorie target. Without bounding the gap
+    # between the figure and the cadence, the deficit pattern reaches across the
+    # whole sentence and false-flags these benign logs.
+    result = safety_check(text)
+    assert result["flagged"] is False
+    assert result["category"] is None
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A qualifier directly modifying the calorie target ("...calories of food
+        # a day") is still a genuine deficit and must flag — the bounded window is
+        # wide enough for a natural multi-word food descriptor, only not a whole
+        # unrelated clause.
+        "trying to live on 600 calories of food a day",
+        "trying to live on 600 calories of almonds and seeds per day",
+        "living on 500 calories of whole vegetables a day",
+    ],
+)
+def test_deficit_with_qualifier_between_figure_and_cadence_flags(text):
+    result = safety_check(text)
+    assert result["flagged"] is True
+    assert result["category"] == "extreme_deficit"
 
 
 def test_safe_result_is_fresh_copy():

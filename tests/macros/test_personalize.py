@@ -288,6 +288,48 @@ class TestSoftFallback:
 
 
 # ---------------------------------------------------------------------------
+# Non-finite delta → soft fallback (not a silent +10 pp shift)
+#
+# json.loads accepts the bare ``NaN`` / ``Infinity`` tokens a model can emit in
+# its raw text, and pydantic admits them by default, so a garbled delta used to
+# slip through to the defensive ``max(-10, min(10, x))`` clamp — where a NaN
+# coerces to the +10.0 bound, applying a real, large macro shift presented as a
+# legitimate ``source="ai"`` plan. A non-finite delta is malformed model output
+# of the same class as bad JSON: it must fall back to the formula targets.
+# ---------------------------------------------------------------------------
+
+
+class TestNonFiniteDeltaFallsBack:
+    def _client(self, protein_token: str = "0.0", fat_token: str = "0.0") -> MagicMock:
+        response = MagicMock()
+        response.text = (
+            f'{{"rationale": "shift", "protein_pct_delta": {protein_token}, '
+            f'"fat_pct_delta": {fat_token}}}'
+        )
+        client = MagicMock()
+        client.models.generate_content.return_value = response
+        return client
+
+    def test_nan_protein_delta_falls_back_to_formula(self):
+        base = _base_targets(kcal=2000.0)
+        plan = personalize_plan(_profile(), base, self._client(protein_token="NaN"))
+        assert plan.source == "formula"
+        assert plan.targets == base
+
+    def test_infinite_fat_delta_falls_back_to_formula(self):
+        base = _base_targets(kcal=2000.0)
+        plan = personalize_plan(_profile(), base, self._client(fat_token="Infinity"))
+        assert plan.source == "formula"
+        assert plan.targets == base
+
+    def test_negative_infinite_protein_delta_falls_back_to_formula(self):
+        base = _base_targets(kcal=2000.0)
+        plan = personalize_plan(_profile(), base, self._client(protein_token="-Infinity"))
+        assert plan.source == "formula"
+        assert plan.targets == base
+
+
+# ---------------------------------------------------------------------------
 # Fenced JSON response — mirrors parse_meal.py's test_strips_markdown_code_fences.
 # Gemini sometimes wraps its JSON in a markdown code block even with
 # response_mime_type="application/json"; _strip_fences must remove it before

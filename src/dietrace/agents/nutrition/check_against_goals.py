@@ -90,6 +90,23 @@ def _amount(totals: dict[str, Nutrient], code: str) -> float:
     return nutrient.amount
 
 
+def _band_tolerance(goal: NutrientGoal) -> float:
+    """The goal's tolerance fraction, degraded to the ±10% default if unusable.
+
+    ``tolerance`` is model-supplied on this ADK ``FunctionTool`` just like
+    ``target``, so a garbled value can be non-finite (``NaN``/``±inf``) or
+    negative. Used directly it silently corrupts the verdict: ``NaN``/negative
+    makes ``abs(consumed - target) <= tolerance * target`` always False, so an
+    on-track nutrient reads as "under"/"over", while ``+inf`` makes it always
+    True, swallowing every real over/under as "within". An unusable tolerance
+    falls back to the default band rather than mislabelling ( fail-soft,
+    mirroring the ``target`` guard below and ``evals._tolerance``).
+    """
+    if math.isfinite(goal.tolerance) and goal.tolerance >= 0:
+        return goal.tolerance
+    return _DEFAULT_TOLERANCE
+
+
 def _message(name: str, label: GoalLabel, pct_off: int, consumed: float, goal: NutrientGoal) -> str:
     """Supportive phrasing for *label* in the non-preachy logging voice."""
     figures = f"{consumed:g}{goal.unit} of {goal.target:g}{goal.unit}"
@@ -116,15 +133,18 @@ def check_against_goals(totals: list[Nutrient], goals: list[NutrientGoal]) -> Go
 
     statuses: list[GoalStatus] = []
     for goal in goals:
-        # A non-finite target defines no band to score against — skip it rather
-        # than crash the percent maths, the same way a total with no goal is
-        # left unreported.
-        if not math.isfinite(goal.target):
+        # A non-finite target defines no band to score against, and a negative
+        # one is meaningless (you cannot aim for less than zero of a nutrient) —
+        # it yields a negative tolerance band and a nonsensical "-3320% over … of
+        # -100mg" message. Skip either rather than crash or surface garbage, the
+        # same way a total with no goal is left unreported. A
+        # zero target is valid (a limit goal like 0 added sugar) and handled below.
+        if not math.isfinite(goal.target) or goal.target < 0:
             continue
         consumed = _amount(by_code, goal.code)
         pct_of_goal = (consumed / goal.target * 100.0) if goal.target else 0.0
 
-        if abs(consumed - goal.target) <= goal.tolerance * goal.target:
+        if abs(consumed - goal.target) <= _band_tolerance(goal) * goal.target:
             label: GoalLabel = "within"
             pct_off = 0
         elif consumed > goal.target:

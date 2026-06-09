@@ -16,6 +16,7 @@ production (``DIETRACE_STORE=firestore``). Latest save wins.
 
 from __future__ import annotations
 
+import math
 import os
 import sqlite3
 import time
@@ -81,17 +82,24 @@ def split_of(targets: dict[str, float]) -> dict[str, float] | None:
 
     Returns ``{"protein_pct": float, "fat_pct": float}`` derived only from the
     energy/protein/fat targets — never the profile. None when kcal is missing or
-    non-positive (nothing meaningful to remember).
+    non-positive, or when the derived split is non-finite (nothing meaningful to
+    remember). ``MacroSaveRequest.targets`` is an unconstrained ``dict[str, float]``
+    so pydantic admits ``NaN``/``Infinity``; a non-finite split would poison every
+    consumer — it is persisted as a REAL (and NaN even violates the NOT NULL column,
+    crashing ``remember``), recalled into ``macro_adherence``'s deltas, and pushed to
+    the Phoenix prefs dataset, all serializing as invalid JSON (fail-soft, /§9,
+    mirrors :func:`dietrace.web.goals._valid_target`).
     """
     kcal = float(targets.get(_ENERGY, 0.0) or 0.0)
     if kcal <= 0.0:
         return None
     protein = float(targets.get(_PROTEIN, 0.0) or 0.0)
     fat = float(targets.get(_FAT, 0.0) or 0.0)
-    return {
-        "protein_pct": round(_ATWATER_P * protein / kcal, 4),
-        "fat_pct": round(_ATWATER_F * fat / kcal, 4),
-    }
+    protein_pct = round(_ATWATER_P * protein / kcal, 4)
+    fat_pct = round(_ATWATER_F * fat / kcal, 4)
+    if not (math.isfinite(protein_pct) and math.isfinite(fat_pct)):
+        return None
+    return {"protein_pct": protein_pct, "fat_pct": fat_pct}
 
 
 class SqliteMacroMemory:

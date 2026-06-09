@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,16 +45,22 @@ class ExpectedNutrition(BaseModel):
     portion weight for ``portion_error`` (a separate surface from lookup), and
     ``micros`` is the per-code panel scored only on the ``full`` tier; both are
     optional so branded label cases can omit them.
+
+    Every value is finite: a NaN/inf ground truth is meaningless and silently
+    distorts scoring (the evaluators treat non-finite error as a full miss, so a
+    corrupt case scores every output maximally wrong without failing to load), so
+    the schema rejects it loudly — the same guard ``CaseMetadata.tolerance`` uses
+    below, in keeping with this module's ``extra="forbid"`` fail-loud contract.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    calories: float
-    protein_g: float
-    fat_g: float
-    carb_g: float
-    grams: float | None = None
-    micros: dict[str, float] = {}
+    calories: float = Field(allow_inf_nan=False)
+    protein_g: float = Field(allow_inf_nan=False)
+    fat_g: float = Field(allow_inf_nan=False)
+    carb_g: float = Field(allow_inf_nan=False)
+    grams: float | None = Field(default=None, allow_inf_nan=False)
+    micros: dict[str, Annotated[float, Field(allow_inf_nan=False)]] = {}
 
 
 class CaseMetadata(BaseModel):

@@ -14,7 +14,12 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from dietrace.evals.schema import CaseMetadata, EvalCase, load_case
+from dietrace.evals.schema import (
+    CaseMetadata,
+    EvalCase,
+    ExpectedNutrition,
+    load_case,
+)
 
 _FULL_CASE = {
     "input": {"text": "two eggs and half an avocado"},
@@ -130,3 +135,27 @@ def test_case_metadata_rejects_non_finite_or_negative_tolerance():
     # 0.0 (require exact match) and positive bands remain valid.
     assert CaseMetadata(nutrient_tier="full", tolerance=0.0).tolerance == 0.0
     assert CaseMetadata(nutrient_tier="full", tolerance=0.2).tolerance == 0.2
+
+
+def test_expected_nutrition_rejects_non_finite_ground_truth():
+    """A NaN/inf ground-truth value is meaningless and silently distorts scoring:
+    every evaluator compares against ``expected`` and falls back to a full-miss
+    (1.0) for non-finite error, so a corrupt case would score every output as
+    maximally wrong without ever failing to load. The schema must reject it
+    loudly — matching ``CaseMetadata.tolerance`` in the same file."""
+    base = {"calories": 100.0, "protein_g": 5.0, "fat_g": 2.0, "carb_g": 10.0}
+    for field in ("calories", "protein_g", "fat_g", "carb_g", "grams"):
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with pytest.raises(ValidationError):
+                ExpectedNutrition(**{**base, field: bad})
+
+    # A non-finite value buried in the optional micro panel is rejected too.
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(ValidationError):
+            ExpectedNutrition(**base, micros={"307": bad})
+
+    # Finite ground truth (including an omitted grams / empty micros) is valid.
+    ok = ExpectedNutrition(**base, grams=200.0, micros={"307": 142.0})
+    assert ok.calories == 100.0
+    assert ok.grams == 200.0
+    assert ExpectedNutrition(**base).grams is None

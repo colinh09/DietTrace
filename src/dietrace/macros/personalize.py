@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from dietrace.llm.config import GEMINI_MODEL
 from dietrace.macros.models import MacroPlan, MacroProfile
@@ -53,8 +53,13 @@ class _PersonalizeDelta(BaseModel):
     """
 
     rationale: str
-    protein_pct_delta: float = 0.0
-    fat_pct_delta: float = 0.0
+    # Reject non-finite deltas (json.loads admits the bare ``NaN``/``Infinity``
+    # tokens a model can emit): a garbled delta would otherwise reach the
+    # ``max(-10, min(10, x))`` clamp where a NaN coerces to the +10 pp bound,
+    # silently applying a real, large macro shift. Failing validation here routes
+    # it to the module's fail-soft-to-formula path instead (mirrors evals/schema.py).
+    protein_pct_delta: float = Field(default=0.0, allow_inf_nan=False)
+    fat_pct_delta: float = Field(default=0.0, allow_inf_nan=False)
 
 
 def _clamp(value: float, lo: float, hi: float) -> tuple[float, bool]:

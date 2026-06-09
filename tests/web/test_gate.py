@@ -161,6 +161,31 @@ def test_genuine_sub_margin_gain_still_rejected_after_tolerance() -> None:
     assert ship_decision(current, proposed)["fit_gain"] is False
 
 
+def test_empty_fit_set_scores_zero_without_dividing_by_zero() -> None:
+    """A user with corrections but *zero* confirmed meals yields an empty fit set.
+    ``_calorie_accuracy`` must return 0.0 for no cases rather than dividing by
+    ``len(cases) == 0`` — a ZeroDivisionError here would crash the whole retune
+    scoring loop the moment a brand-new user (no confirmations yet) banks a
+    correction. The USDA axis still scores normally from its own non-empty set."""
+    scores = score_block("any block", [], _USDA, _stub_logger)
+    assert scores["fit"] == 0.0
+    assert scores["usda"] == 1.0
+
+
+def test_retune_cannot_ship_without_a_held_out_fit_set() -> None:
+    """ / : the gate ships a retune only if it
+    *improves your data* — so with no held-out confirmations to prove fit against,
+    a retune must never ship, however good the proposed block looks on USDA. An
+    empty fit set scores 0.0 for both current and proposed, so the +fit_delta gain
+    is unreachable (0.0 ≥ 0.0 + 0.02 is False) and the gate rejects: personalization
+    stays proven on real held-out meals, never vibed on an empty set."""
+    current = score_block("", [], _USDA, _stub_logger)
+    proposed = score_block("carbs run high preworkout", [], _USDA, _stub_logger)
+    decision = ship_decision(current, proposed)
+    assert decision["fit_gain"] is False
+    assert decision["ship"] is False
+
+
 def test_confirmations_to_cases_uses_confirmed_calories_as_truth() -> None:
     confirmations = [
         {"meal_text": "oatmeal", "totals": _totals(214)},

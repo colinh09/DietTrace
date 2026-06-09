@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from dietrace.agents.nutrition.corrector import (
     ProposedBlock,
@@ -63,6 +63,17 @@ def test_model_exception_is_fail_soft() -> None:
     client = Mock()
     client.models.generate_content.side_effect = RuntimeError("vertex down")
     assert propose_preference_block(_FEEDBACK, "", client=client) is None
+
+
+def test_client_build_failure_is_fail_soft() -> None:
+    # When the client is omitted, the lazy Vertex build (_default_client) can raise
+    # on a credentials/init failure. That axis must degrade to None like every other
+    # failure — the retune endpoint treats None as "corrector_failed", not a 500.
+    with patch(
+        "dietrace.agents.nutrition.corrector._default_client",
+        side_effect=RuntimeError("no credentials"),
+    ):
+        assert propose_preference_block(_FEEDBACK, "") is None
 
 
 def test_non_json_returns_none() -> None:

@@ -102,6 +102,31 @@ def test_calories_of_returns_zero_for_empty_list() -> None:
     assert calories_of([]) == 0.0
 
 
+# calories_of feeds the deterministic gate (gate.py) and the /history +
+# /eval-case endpoints (app.py), reading totals straight from persisted
+# confirmations and request bodies. A garbled energy total — an explicit null
+# amount, a non-numeric value, or a non-finite NaN/inf — must degrade to "no
+# reliable calories" (0.0), not crash the retune or the endpoint, mirroring the
+# isfinite guards in parse_meal / web_nutrition / estimate_portion /
+# check_against_goals.
+
+
+def test_calories_of_returns_zero_when_208_amount_is_null() -> None:
+    totals = [{"code": "208", "name": "Energy", "amount": None, "unit": "kcal"}]
+    assert calories_of(totals) == 0.0
+
+
+def test_calories_of_returns_zero_when_208_amount_non_numeric() -> None:
+    totals = [{"code": "208", "name": "Energy", "amount": "lots", "unit": "kcal"}]
+    assert calories_of(totals) == 0.0
+
+
+def test_calories_of_returns_zero_when_208_amount_non_finite() -> None:
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        totals = [{"code": "208", "name": "Energy", "amount": bad, "unit": "kcal"}]
+        assert calories_of(totals) == 0.0
+
+
 # ---------------------------------------------------------------------------
 # count — the SqliteMemory method checked indirectly in the overwrite test but
 # never at zero. A fresh store must return 0, not raise.

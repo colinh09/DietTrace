@@ -10,8 +10,8 @@ rule for observability.
 Mirrors ``interpret_feedback.py``:
 - Injectable client so tests never hit Vertex (offline + mocked).
 - ``response_schema=ProposedBlock`` so Gemini returns schema-valid JSON.
-- Fail-soft on every axis (model error, no text, non-JSON, wrong shape) → returns
-  ``None`` so the caller keeps the current block unchanged.
+- Fail-soft on every axis (client build, model error, no text, non-JSON, wrong
+  shape) → returns ``None`` so the caller keeps the current block unchanged.
 
 The output is *proposed*, never shipped here — the gate decides (P3).
 """
@@ -123,13 +123,20 @@ def propose_preference_block(
     FeedbackLog rows). *user_profile* is the user's freeform "goals + eating
     style" — standing context so the generalized rules reflect who they are, not
     just the meals they've fixed. Returns a :class:`ProposedBlock`, or ``None`` on
-    any failure — the caller keeps *current_block* unchanged. The returned block
+    any failure — including the lazy client build raising when *client* is omitted
+    — the caller keeps *current_block* unchanged. The returned block
     is capped to ~``token_cap`` words defensively even if the model overruns.
     """
     if not corrections:
         return None
     if client is None:
-        client = _default_client()
+        try:
+            client = _default_client()
+        except Exception:
+            # A credentials/Vertex-init failure must not 500 the retune endpoint —
+            # degrade to None like every other axis (the caller treats None as
+            # "corrector_failed"), matching parse_meal's guard around this build.
+            return None
 
     try:
         response = client.models.generate_content(

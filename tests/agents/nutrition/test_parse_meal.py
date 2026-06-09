@@ -214,6 +214,32 @@ def test_drops_non_positive_and_non_finite_quantities() -> None:
     assert [i.food for i in result.items] == ["egg"]
 
 
+def test_drops_blank_food_names() -> None:
+    """An empty or whitespace-only food name is dropped fail-soft.
+
+    ``food: str`` carries no validation constraint (it doubles as Gemini's
+    response schema), so an empty or all-whitespace name passes ``model_validate``
+    where a *missing* food key would not. A nameless item resolves to nothing — a
+    blank DB query returns no candidates — yet still costs a grounded web lookup
+    for "" downstream, so it is dropped at the parse boundary like any other
+    malformed item; the valid item alongside it survives.
+    """
+    client = _client(
+        _items_json(
+            [
+                {"food": "", "quantity": 1, "unit": "each"},
+                {"food": "   ", "quantity": 2, "unit": "cup"},
+                {"food": "\t\n", "quantity": 1, "unit": ""},
+                {"food": "egg", "quantity": 2, "unit": "each"},
+            ]
+        )
+    )
+
+    result = parse_meal("a nameless meal", client=client)
+
+    assert [i.food for i in result.items] == ["egg"]
+
+
 def test_calls_client_with_model_and_text() -> None:
     """The free text is sent to the model named by config."""
     from dietrace.llm.config import GEMINI_MODEL

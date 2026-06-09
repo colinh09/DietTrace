@@ -29,6 +29,7 @@ Each failing axis adds a short machine ``flag`` and a human-readable ``reason``.
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
@@ -219,6 +220,20 @@ def _calorie_plausibility(totals: Any) -> dict[str, Any] | None:
             "reason": f"{energy:.0f} kcal logged but the macros total zero energy",
         }
     rel_err = abs(energy - atwater) / atwater
+    if not math.isfinite(rel_err):
+        # A non-finite logged energy (or macro) can't be reconciled with the
+        # macros. Scoring it the worst miss is essential: `1 - min(nan, 1.0)` is
+        # `nan`, and the final confidence clamp `min(1.0, nan)` silently returns
+        # 1.0 — so without this a garbage-calorie meal would score a *perfect*
+        # confidence and never flag for review.
+        return {
+            "score": 0.0,
+            "flag": "calorie_mismatch",
+            "reason": (
+                "the logged calories could not be reconciled with the "
+                "protein, carbs & fat totals"
+            ),
+        }
     if rel_err <= _CALORIE_TOLERANCE:
         return {"score": 1.0}
     return {

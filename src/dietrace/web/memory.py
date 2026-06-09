@@ -18,6 +18,7 @@ one, so the latest fix always wins.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sqlite3
@@ -48,10 +49,21 @@ def sum_totals(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def calories_of(totals: list[dict[str, Any]]) -> float:
-    """The energy (USDA 208) amount from a totals list, or 0.0 if absent."""
+    """The energy (USDA 208) amount from a totals list, or 0.0 if absent.
+
+    Totals come straight from persisted confirmations and request bodies, so the
+    208 entry's ``amount`` can be a garbled null, non-numeric, or non-finite
+    (NaN/inf) value. This feeds the deterministic gate (gate.py) and the
+    /history + /eval-case endpoints, so an unusable amount degrades to 0.0 ("no
+    reliable calories") rather than raising — mirroring the isfinite guards in
+    parse_meal / estimate_portion / check_against_goals.
+    """
     for nutrient in totals:
         if nutrient.get("code") == "208":
-            return float(nutrient.get("amount", 0.0))
+            amount = nutrient.get("amount", 0.0)
+            if not isinstance(amount, (int, float)) or not math.isfinite(amount):
+                return 0.0
+            return float(amount)
     return 0.0
 
 

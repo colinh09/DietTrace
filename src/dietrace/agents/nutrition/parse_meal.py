@@ -145,8 +145,12 @@ def _coerce_items(raw: list[Any]) -> list[ParsedItem]:
 
     A real portion is positive and finite, so a non-positive or NaN/inf quantity
     drops the item fail-soft rather than poisoning the deterministic math (a NaN
-    propagates into totals; a negative quantity subtracts). The guard is here
-    rather than on the model so the model stays a clean Gemini response schema.
+    propagates into totals; a negative quantity subtracts). A blank/whitespace-only
+    food name is likewise dropped: ``food: str`` carries no constraint (it doubles
+    as Gemini's response schema), so an empty name passes validation where a
+    *missing* key would not, yet resolves to nothing downstream while still costing
+    a grounded web lookup for "". The guard is here rather than on the model so the
+    model stays a clean Gemini response schema.
     """
     items: list[ParsedItem] = []
     for entry in raw:
@@ -156,6 +160,8 @@ def _coerce_items(raw: list[Any]) -> list[ParsedItem]:
             item = ParsedItem.model_validate(entry)
         except ValidationError:
             continue  # missing food, non-numeric quantity, … — skip fail-soft
+        if not item.food.strip():
+            continue  # blank/whitespace-only food name — skip fail-soft
         if not math.isfinite(item.quantity) or item.quantity <= 0:
             continue  # non-positive / non-finite portion — skip fail-soft
         items.append(item)

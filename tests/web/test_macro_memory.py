@@ -22,6 +22,40 @@ def test_split_of_none_when_no_kcal() -> None:
     assert split_of({"203": 150.0}) is None
 
 
+def test_split_of_none_when_protein_non_finite() -> None:
+    # MacroSaveRequest.targets is an unconstrained dict[str, float], so pydantic
+    # admits NaN/Infinity. A non-finite protein/fat poisons the derived split (and
+    # everything that consumes it: the persisted preference, macro_adherence's
+    # deltas, the Phoenix prefs push) and serializes as invalid JSON. The split is
+    # "nothing meaningful to remember" — None, like the non-positive-kcal case.
+    assert split_of({"208": 2000.0, "203": float("nan"), "204": 67.0}) is None
+    assert split_of({"208": 2000.0, "203": float("inf"), "204": 67.0}) is None
+    assert split_of({"208": 2000.0, "203": float("-inf"), "204": 67.0}) is None
+
+
+def test_split_of_none_when_fat_non_finite() -> None:
+    assert split_of({"208": 2000.0, "203": 150.0, "204": float("nan")}) is None
+    assert split_of({"208": 2000.0, "203": 150.0, "204": float("inf")}) is None
+    assert split_of({"208": 2000.0, "203": 150.0, "204": float("-inf")}) is None
+
+
+def test_split_of_none_when_kcal_nan() -> None:
+    # A NaN kcal escapes the `kcal <= 0.0` guard (`nan <= 0.0` is False); the
+    # derived-split isfinite check is the backstop (4*protein/nan = nan → None).
+    # (An inf kcal stays finite — 4*protein/inf = 0.0 — so it yields a degenerate
+    # zero split rather than None, which is harmless to every consumer.)
+    assert split_of({"208": float("nan"), "203": 150.0, "204": 67.0}) is None
+
+
+def test_remember_skips_non_finite_target(tmp_path) -> None:
+    # A non-finite target never reaches the store: remember degrades to False and
+    # recall stays None, so no NaN/Infinity is persisted as a REAL or recalled into
+    # macro_adherence (mirrors the no-kcal skip).
+    mem = SqliteMacroMemory(tmp_path / "macro_mem.sqlite")
+    assert mem.remember("alice", {"208": 2000.0, "203": float("nan"), "204": 67.0}) is False
+    assert mem.recall("alice") is None
+
+
 def test_remember_and_recall_round_trip(tmp_path) -> None:
     mem = SqliteMacroMemory(tmp_path / "macro_mem.sqlite")
     assert mem.recall("alice") is None

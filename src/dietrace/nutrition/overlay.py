@@ -54,15 +54,29 @@ def normalize(text: str) -> str:
 
 @lru_cache(maxsize=1)
 def load_overlay() -> dict[str, int]:
-    """Load the curated ``normalized-name → fdc_id`` map (fail-soft empty if absent)."""
+    """Load the curated ``normalized-name → fdc_id`` map (fail-soft empty if absent).
+
+    Each entry is coerced independently: a single uncoercible value (a typo in the
+    hand-maintained map) drops *that* pin and is skipped, rather than throwing out
+    of a single comprehension and discarding the whole overlay — which would
+    silently degrade every pinned common food back to the ranked search.
+    """
     path = Path(os.environ.get("DIETRACE_OVERLAY", _DEFAULT_PATH))
     if not path.exists():
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-        return {normalize(k): int(v) for k, v in data.items()}
     except Exception:
         return {}
+    if not isinstance(data, dict):
+        return {}
+    table: dict[str, int] = {}
+    for key, value in data.items():
+        try:
+            table[normalize(key)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return table
 
 
 def overlay_fdc_id(food: str, overlay: dict[str, int] | None = None) -> int | None:

@@ -136,7 +136,16 @@ def _to_food(payload: Any, food: str, brand: str) -> Food | None:
             Nutrient(code=code, name=name, amount=value / grams * 100.0, unit=unit)
         )
 
-    label = payload.get("description") or " ".join(p for p in (brand, food) if p).strip()
+    # Fall back to a brand+food label whenever the model's description isn't a
+    # usable string — a non-empty str only. A truthy-but-wrong-type value (a list/
+    # dict from garbled JSON) would otherwise reach Food.description (a str field
+    # pydantic won't coerce) and raise, crashing the meal log instead of degrading.
+    desc = payload.get("description")
+    label = (
+        desc.strip()
+        if isinstance(desc, str) and desc.strip()
+        else " ".join(p for p in (brand, food) if p).strip()
+    )
     return Food(
         fdc_id=0,  # synthetic: not a USDA food, so no reproducible fdc_id
         description=label or food,

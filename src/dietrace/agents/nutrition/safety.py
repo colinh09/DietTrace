@@ -68,8 +68,19 @@ _PURGE_CONTEXT = re.compile(
 # Requires an explicit per-day cadence so one-off low days don't trip it. The
 # ceiling is inclusive — 800 kcal/day and below is treated as dangerously low.
 _DEFICIT_CALORIE_CEILING = 800
+# The calorie count must be captured whole, including any thousands separators:
+# matching only the digits after a comma would read "2,400" as "400" and flag a
+# healthy (even surplus) target as a deficit — the false positive this module
+# exists to avoid. The separators are stripped before the numeric comparison.
+#
+# The cadence must directly follow the calorie figure: a genuine deficit reads
+# "600 calories a day" / "600 calories of food per day", with the cadence next to
+# the target. The gap is bounded to a short window so an unrelated "... a day"
+# elsewhere in the sentence ("700 calories of trail mix ... 10k steps a day") can
+# no longer reach back and false-flag a benign log.
 _DEFICIT_PATTERN = re.compile(
-    r"(\d{2,4})\s*(?:k?cal(?:orie)?s?)\b[^.]*?\b(a\s+day|per\s+day|daily|each\s+day|/\s*day)",
+    r"(\d{1,3}(?:,\d{3})+|\d{2,4})\s*(?:k?cal(?:orie)?s?)\b"
+    r"[^.]{0,25}?\b(a\s+day|per\s+day|daily|each\s+day|/\s*day)",
 )
 
 # Major food allergens (singular stems). An allergen counts as a conflict only
@@ -132,7 +143,7 @@ def _has_disordered_eating(text: str) -> bool:
 
 def _has_extreme_deficit(text: str) -> bool:
     for match in _DEFICIT_PATTERN.finditer(text):
-        if int(match.group(1)) <= _DEFICIT_CALORIE_CEILING:
+        if int(match.group(1).replace(",", "")) <= _DEFICIT_CALORIE_CEILING:
             return True
     return False
 

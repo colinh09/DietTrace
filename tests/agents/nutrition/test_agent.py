@@ -174,6 +174,38 @@ def test_log_entry_tool_computes_totals(repository) -> None:
     assert meal["per_item"][0]["fdc_id"] == EGG_FDC_ID
 
 
+@pytest.mark.parametrize(
+    "bad_item",
+    [
+        {"grams": 100.0},  # missing fdc_id key
+        {"fdc_id": EGG_FDC_ID},  # missing grams key
+        {"fdc_id": EGG_FDC_ID, "grams": "100g"},  # non-numeric grams
+        {"fdc_id": "egg", "grams": 100.0},  # non-numeric fdc_id
+        {"fdc_id": EGG_FDC_ID, "grams": None},  # null grams
+    ],
+)
+def test_log_entry_tool_skips_malformed_items(repository, bad_item) -> None:
+    """A malformed item dict is skipped, not crashed on (wrapper fail-soft).
+
+    The log_entry tool is an ADK FunctionTool the model calls with its own
+    free-form ``{"fdc_id", "grams"}`` dicts, so a garbled item (a missing key, a
+    non-numeric value the model wrote as text) must degrade to skipping that one
+    item — the wrapper docstring's "Foods that cannot be resolved are skipped" —
+    rather than raising out of the tool and failing the entire meal log. A valid
+    item alongside it must still be totalled.
+    """
+    agent = NutritionAgent(repository, client=_client(None))
+
+    meal = _tool(agent, "log_entry").func(
+        [bad_item, {"fdc_id": EGG_FDC_ID, "grams": 100.0}]
+    )
+
+    assert len(meal["per_item"]) == 1
+    assert meal["per_item"][0]["fdc_id"] == EGG_FDC_ID
+    totals = {n["code"]: n["amount"] for n in meal["totals"]}
+    assert totals[_PROTEIN] == pytest.approx(12.6)
+
+
 def test_check_against_goals_tool_reports_status(repository) -> None:
     """The check_against_goals tool compares totals to goals and labels each."""
     agent = NutritionAgent(repository, client=_client(None))

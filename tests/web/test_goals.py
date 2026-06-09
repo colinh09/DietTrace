@@ -4,6 +4,8 @@ Targets are keyed by USDA number code (208/203/205/204) with env-overridable
 defaults; these exercise the config purely offline.
 """
 
+import math
+
 from dietrace.web.goals import load_goals, targets_to_goals
 
 
@@ -57,6 +59,23 @@ def test_non_finite_env_override_falls_back_to_default(monkeypatch) -> None:
     assert by_code["203"]["target"] == 150.0  # protein default, not NaN
     assert by_code["205"]["target"] == 200.0  # carb default, not +inf
     assert by_code["204"]["target"] == 65.0  # fat default, not -inf
+    assert by_code["208"]["target"] == 1800.0  # a valid sibling override still applies
+
+
+def test_non_positive_env_override_falls_back_to_default(monkeypatch) -> None:
+    # Zero/negative parse as finite floats, so they slip past both the ValueError
+    # and isfinite guards — but a daily target ≤ 0 is just as malformed: it makes
+    # the /analysis progress bars divide consumed by a zero or negative target
+    # (the frontend's consumed/target ratio → division by zero / a negative bar)
+    # and violates the target > 0 invariant. Degrade to the built-in default.
+    monkeypatch.setenv("DIETRACE_GOAL_PROTEIN", "0")
+    monkeypatch.setenv("DIETRACE_GOAL_CARB", "-50")
+    monkeypatch.setenv("DIETRACE_GOAL_CALORIES", "1800")
+
+    by_code = {g["code"]: g for g in load_goals()}
+
+    assert by_code["203"]["target"] == 150.0  # protein default, not 0
+    assert by_code["205"]["target"] == 200.0  # carb default, not -50
     assert by_code["208"]["target"] == 1800.0  # a valid sibling override still applies
 
 
@@ -124,3 +143,45 @@ def test_targets_to_goals_injects_name_and_unit_from_goal_defs() -> None:
     assert goals[0]["unit"] == "kcal"
     assert goals[0]["target"] == 1800.0
     assert goals[0]["code"] == "208"
+
+
+def test_targets_to_goals_malformed_saved_target_falls_back_to_default() -> None:
+    """A non-finite or non-positive saved target degrades to the built-in default.
+
+    Unlike the env-override path (guarded in goals._target) and the ADK tool path
+    (guarded in check_against_goals), these saved targets reach here straight from
+    the client's POST /macros/save body — MacroSaveRequest.targets is an
+    unconstrained ``dict[str, float]``, so pydantic admits NaN/Infinity, and the
+    GoalStore persists them verbatim (``json.dumps`` writes ``NaN``/``Infinity``)
+    and reads them back as-is. A non-finite target poisons the /analysis
+    remaining-vs-target math (remaining = target − consumed → NaN/inf) and
+    serializes as invalid JSON; a target ≤ 0 breaks the progress-bar ratio
+    (consumed / target). Each malformed code degrades to its _GOAL_DEFS default —
+    the same fail-soft outcome the other two ingress points already give — while a
+    valid sibling target is preserved.
+    """
+    # Covers each malformed class: non-finite (NaN, +inf), negative-finite, zero.
+    targets = {
+        "203": float("nan"),  # NaN → protein default
+        "205": float("inf"),  # +inf → carb default
+        "204": -50.0,         # negative-finite → fat default
+        "208": 0.0,           # zero → calories default
+    }
+    by_code = {g["code"]: g for g in targets_to_goals(targets)}
+
+    assert by_code["203"]["target"] == 150.0  # protein default, not NaN
+    assert by_code["205"]["target"] == 200.0  # carb default, not +inf
+    assert by_code["204"]["target"] == 65.0   # fat default, not -50
+    assert by_code["208"]["target"] == 2000.0  # calories default, not 0
+    # Every target that ships is finite and positive — the goals invariant holds.
+    for goal in by_code.values():
+        assert math.isfinite(goal["target"]) and goal["target"] > 0
+
+
+def test_targets_to_goals_valid_saved_target_alongside_malformed_is_preserved() -> None:
+    """A valid saved target is carried through unchanged even when a sibling is bad."""
+    targets = {"203": 180.0, "205": float("nan")}
+    by_code = {g["code"]: g for g in targets_to_goals(targets)}
+
+    assert by_code["203"]["target"] == 180.0  # valid override preserved
+    assert by_code["205"]["target"] == 200.0  # carb default, not NaN

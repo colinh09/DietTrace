@@ -127,10 +127,21 @@ def macro_pct_error(
 
 
 def _per_macro_abs_errors(output: Any, expected: Any) -> dict[str, float]:
-    """The absolute error |actual - expected| of each scored macro, native units."""
+    """The absolute error |actual - expected| of each scored macro, native units.
+
+    A non-finite output amount (a NaN/inf reaching the evaluator from a replayed or
+    MCP-written output) has no finite absolute error, so its error is reported as
+    ``+inf`` rather than a NaN: ``abs(nan - x)`` is ``nan``, which would poison the
+    mean-driven MAE/NMAE and break any comparison, whereas ``+inf`` is well-ordered
+    and drives the macro to a full miss (mirrors ``_pct_error``'s non-finite guard).
+    """
     by_code = _output_by_code(output)
     exp = _expected_macros(expected)
-    return {key: abs(by_code.get(code, 0.0) - exp[key]) for key, code in _MACROS}
+    out: dict[str, float] = {}
+    for key, code in _MACROS:
+        err = abs(by_code.get(code, 0.0) - exp[key])
+        out[key] = err if math.isfinite(err) else math.inf
+    return out
 
 
 def macro_mae(
@@ -159,6 +170,11 @@ def macro_mae(
         nmae = 0.0 if sum(per_macro_abs.values()) == 0.0 else 1.0
     else:
         nmae = sum(per_macro_abs.values()) / total_expected
+    # A +inf abs error (an unusable, non-finite output macro) makes NMAE non-finite;
+    # pin it to the worst miss so the score and its metadata companion stay in [0,1]
+    # for Phoenix charts and regression flagging — a finite NMAE is untouched.
+    if not math.isfinite(nmae):
+        nmae = 1.0
 
     score = 1.0 - min(nmae, 1.0)
     label = "pass" if nmae <= _tolerance(metadata) else "fail"
@@ -188,8 +204,24 @@ def _per_macro_errors(output: Any, expected: Any) -> dict[str, float]:
 
 
 def _tolerance(metadata: dict[str, Any] | None) -> float:
-    """The per-case ±band, defaulting to ±15%."""
-    return float((metadata or {}).get("tolerance", _DEFAULT_TOLERANCE))
+    """The per-case ±band, defaulting to ±15%.
+
+    The override travels in case metadata, which can arrive from a replayed/stored
+    case or an MCP-written dataset point — the same untrusted channel ``_pct_error``
+    guards against. A non-numeric value (``float()`` would raise, aborting the
+    experiment), a non-finite one (``err <= nan`` always False flags a false
+    regression; ``+inf`` masks real ones), or a negative band (flips pass/fail) is
+    unusable, so it degrades to the default rather than crashing or corrupting the
+    label  relies on for regression flagging.
+    """
+    raw = (metadata or {}).get("tolerance", _DEFAULT_TOLERANCE)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _DEFAULT_TOLERANCE
+    if not math.isfinite(value) or value < 0:
+        return _DEFAULT_TOLERANCE
+    return value
 
 
 def _not_applicable(explanation: str) -> EvalResult:

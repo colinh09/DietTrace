@@ -109,6 +109,27 @@ def test_unbranded_db_match_never_calls_the_web(tmp_path) -> None:
     assert meal.per_item[0].description.startswith("Egg")
 
 
+def test_weak_db_match_is_logged_when_the_web_lookup_comes_back_empty(tmp_path) -> None:
+    # The last-resort branch (: "keeps the DB match as a last resort over
+    # dropping the item"): a substring-only match ("read" → "Bread", score 1) is too
+    # weak to win outright, so the web is tried — but when the grounded lookup itself
+    # returns nothing, dropping the item would lose nutrition the DB *can* approximate.
+    # The weak DB match must be logged rather than the meal coming back empty.
+    client = _parse_client([{"food": "read", "quantity": 1, "unit": "", "brand": ""}])
+    calls: list[str] = []
+
+    def web_lookup(food: str, brand: str, _client) -> Food | None:
+        calls.append(food)
+        return None  # grounded lookup found nothing
+
+    meal = log_meal("read", _repo(tmp_path), client=client, web_lookup=web_lookup)
+
+    assert calls == ["read"]  # the web was tried before falling back
+    assert len(meal.per_item) == 1  # item NOT dropped
+    assert meal.per_item[0].description.startswith("Bread")  # the weak match stands
+    assert meal.per_item[0].grams > 0  # resolved to a usable portion
+
+
 def test_stream_emits_a_web_search_step_for_a_branded_fallback(tmp_path) -> None:
     client = _parse_client(
         [{"food": "bacon cheeseburger", "quantity": 1, "unit": "", "brand": "Five Guys"}]

@@ -144,3 +144,27 @@ def test_missing_description_falls_back_to_brand_food_label() -> None:
 
     assert food is not None
     assert "Five Guys" in food.description or "bacon cheeseburger" in food.description
+
+
+def test_non_string_description_falls_back_instead_of_raising() -> None:
+    """A garbled non-string ``description`` must not crash the lookup.
+
+    ``Food.description`` is a ``str`` and pydantic v2 does NOT coerce a list/dict to
+    one, so a truthy-but-wrong-type description (a plausible garbled-JSON shape)
+    bypasses the falsy ``or`` fallback and makes ``Food(...)`` raise ``ValidationError``
+    — and ``_to_food`` is called outside ``_lookup_once``'s try, so the error
+    propagates straight out of ``web_nutrition`` and crashes the meal-log path,
+    breaking the module's "any garbled field degrades rather than raising" promise.
+    The valid macros should survive with the brand+food label, not be lost.
+    """
+    for bad in (["Five Guys", "burger"], {"name": "burger"}, 123):
+        payload = dict(_FIVE_GUYS)
+        payload["description"] = bad
+        food = web_nutrition(
+            "bacon cheeseburger", "Five Guys", client=_client(json.dumps(payload))
+        )
+
+        assert food is not None  # no raise; food preserved
+        assert food.description == "Five Guys bacon cheeseburger"
+        # Macros still resolved — only the bad label was replaced.
+        assert food.nutrient("208") is not None

@@ -180,3 +180,59 @@ def test_non_finite_goal_target_is_skipped(bad: float) -> None:
     check = check_against_goals(totals, goals)
     assert check.status(_SODIUM) is None
     assert check.status(_PROTEIN).status == "under"
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("-inf"), -0.10])
+def test_unusable_tolerance_falls_back_to_default_band(bad: float) -> None:
+    """A non-finite or negative per-goal tolerance degrades to the ±10% default.
+
+    ``tolerance`` is model-supplied on this ADK FunctionTool just like ``target``,
+    so a garbled value can be ``NaN``/``-inf`` or negative. Used directly, such a
+    band silently mislabels an on-track nutrient: ``goal.tolerance * goal.target``
+    is then ``NaN``/negative, so ``abs(consumed - target) <= band`` is always
+    False and a meal sitting exactly on goal reads as "under" rather than "within"
+   . The unusable band must fall back to the default so the
+    verdict stays correct.
+    """
+    totals = [Nutrient(code=_ENERGY, name="Energy", amount=2000.0, unit="kcal")]
+    goals = [NutrientGoal(code=_ENERGY, name="Energy", target=2000.0, unit="kcal", tolerance=bad)]
+
+    assert check_against_goals(totals, goals).status(_ENERGY).status == "within"
+
+
+def test_infinite_tolerance_does_not_swallow_a_real_over() -> None:
+    """A ``+inf`` tolerance must not turn a clear over-goal into a false "within".
+
+    An infinite band would make ``abs(consumed - target) <= band`` always True,
+    masking every genuine over/under as on-track — the opposite failure to the
+    NaN/negative case but the same unusable-tolerance class. It degrades to the
+    default ±10%, so a meal well over goal still reads as "over".
+    """
+    totals = [Nutrient(code=_ENERGY, name="Energy", amount=3000.0, unit="kcal")]
+    goals = [
+        NutrientGoal(
+            code=_ENERGY, name="Energy", target=2000.0, unit="kcal", tolerance=float("inf")
+        )
+    ]
+
+    assert check_against_goals(totals, goals).status(_ENERGY).status == "over"
+
+
+def test_negative_goal_target_is_skipped() -> None:
+    """A negative goal target defines no meaningful band — it is left unreported.
+
+    You cannot aim for less than zero of a nutrient, so a finite-but-negative
+    target (a garbled tool-call argument, since ``check_against_goals`` is an ADK
+    FunctionTool) is meaningless: scored, it yields a negative tolerance band and
+    a nonsensical "-3320% over ... of -100mg" message. It is skipped like a
+    non-finite target, while other well-formed goals are still scored.
+    """
+    totals = _totals()
+    goals = [
+        NutrientGoal(code=_SODIUM, name="Sodium, Na", target=-100.0, unit="mg"),
+        NutrientGoal(code=_PROTEIN, name="Protein", target=140.0, unit="g"),
+    ]
+
+    check = check_against_goals(totals, goals)
+    assert check.status(_SODIUM) is None
+    assert check.status(_PROTEIN).status == "under"

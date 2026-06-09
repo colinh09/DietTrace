@@ -214,6 +214,59 @@ def test_micro_codes_set_contains_expected_codes() -> None:
         assert code in MICRO_CODES, f"{code!r} missing from MICRO_CODES"
 
 
+def test_micro_progress_non_finite_amount_treated_as_zero() -> None:
+    """A non-finite total amount (NaN/±inf) reads as nothing consumed, not NaN/inf.
+
+    pydantic admits non-finite floats and a garbled tool-call / corrupted total can
+    supply one; left unguarded it flows through to ``consumed`` and ``pct_dv``,
+    where it both surfaces in the UI and serializes as the invalid-JSON token
+    ``NaN``/``Infinity`` from ``/analysis``. Mirrors the isfinite guard in
+    check_against_goals / estimate_portion / parse_meal.
+    """
+    import json
+    import math
+
+    totals = [
+        {"code": _SODIUM, "name": "Sodium, Na", "amount": float("nan"), "unit": "mg"},
+        {"code": _FIBER, "name": "Fiber, total dietary", "amount": float("inf"), "unit": "g"},
+        {"code": _IRON, "name": "Iron, Fe", "amount": float("-inf"), "unit": "mg"},
+    ]
+    result = micro_progress(totals)
+
+    for code in (_SODIUM, _FIBER, _IRON):
+        entry = next(r for r in result if r["code"] == code)
+        assert entry["consumed"] == 0.0, f"non-finite {code!r} must read as 0.0 consumed"
+        assert entry["pct_dv"] == 0.0
+        assert math.isfinite(entry["consumed"])
+        assert math.isfinite(entry["pct_dv"])
+
+    # The whole panel must stay strict-JSON serializable (no NaN/Infinity tokens).
+    json.dumps(result, allow_nan=False)
+
+
+def test_micro_progress_skips_total_without_code() -> None:
+    """A total missing its ``code`` key is skipped, not a crash.
+
+    ``micro_progress`` already coerces a junk/non-finite ``amount`` defensively via
+    ``t.get("amount")``, but it read ``t["code"]`` directly — so one partial or
+    malformed total (a code-less dict from a garbled tool-call or a corrupted
+    aggregate) raised ``KeyError`` and took down the entire ``/analysis`` micro
+    panel. The rest of the pipeline reads the code defensively (online
+    ``_totals_by_code`` / memory ``calories_of`` use ``.get("code")``); this aligns
+    micros with that, dropping the code-less entry while the valid totals still land.
+    """
+    totals = [
+        {"name": "mystery", "amount": 5.0, "unit": "g"},  # no "code" — must be skipped
+        {"code": _SODIUM, "name": "Sodium, Na", "amount": 1150.0, "unit": "mg"},
+    ]
+    result = micro_progress(totals)  # must not raise
+
+    # The full tracked set is still returned and the valid total still lands.
+    assert {r["code"] for r in result} == set(MICRO_CODES)
+    sodium = next(r for r in result if r["code"] == _SODIUM)
+    assert sodium["consumed"] == pytest.approx(1150.0)
+
+
 # ---------------------------------------------------------------------------
 # 4. /analysis micro aggregation + RDA comparison
 # ---------------------------------------------------------------------------

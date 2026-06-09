@@ -121,10 +121,19 @@ def build_nutrition_tools(
         """
         meal_items: list[MealItem] = []
         for item in items:
-            food = repository.get(int(item["fdc_id"]))
-            if food is None:
+            # The model calls this tool with its own free-form item dicts, so a
+            # garbled one — a missing fdc_id/grams key, or a value it wrote as
+            # text ("100g") — can fail the int/float coercion. Skip that one
+            # item rather than letting the error abort the whole meal log; an
+            # unusable item is no different from an unresolvable food (a
+            # non-finite/non-positive grams is then dropped by _log_entry).
+            try:
+                food = repository.get(int(item["fdc_id"]))
+                if food is None:
+                    continue
+                meal_items.append(MealItem(food=food, grams=float(item["grams"])))
+            except (KeyError, TypeError, ValueError):
                 continue
-            meal_items.append(MealItem(food=food, grams=float(item["grams"])))
         return _log_entry(meal_items).model_dump()
 
     def check_against_goals(totals: list[dict], goals: list[dict]) -> dict:

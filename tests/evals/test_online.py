@@ -14,6 +14,10 @@ just the plumbing. Both dict and pydantic-model item shapes are covered, since
 the pipeline hands the web layer dicts but tools return models.
 """
 
+import math
+
+import pytest
+
 from dietrace.agents.nutrition.log_entry import LoggedItem
 from dietrace.evals.online import REVIEW_THRESHOLD, evaluate_log, review_flag, sources_of
 from dietrace.nutrition.models import Nutrient
@@ -145,6 +149,31 @@ def test_missing_energy_total_is_not_a_calorie_mismatch() -> None:
     ]
     result = evaluate_log("eggs and toast", [_item(1, 100), _item(2, 50)], macros_only)
     assert "calorie_mismatch" not in result["flags"]
+
+
+@pytest.mark.parametrize(
+    "calories, protein",
+    [
+        (float("nan"), 30.0),  # non-finite logged energy
+        (290.0, float("nan")),  # non-finite macro poisons the Atwater estimate
+    ],
+)
+def test_non_finite_calories_score_worst_miss_not_perfect(calories, protein) -> None:
+    """A non-finite logged energy (or macro) must score the calorie axis as a
+    worst miss, not silently inflate confidence to a perfect 1.0.
+
+    ``rel_err`` goes non-finite, and ``1 - min(nan, 1.0)`` is ``nan`` (order
+    dependent), which the final ``min(1.0, nan)`` clamp turns back into ``1.0`` —
+    so a garbage-calorie meal would score a perfect confidence and never get
+    flagged for review, the opposite of the calorie-plausibility axis's job and a
+    break of the [0,1] contract.
+    """
+    result = evaluate_log("oatmeal", [_item(1, 150)], _macros(calories, protein, 10.0, 40.0))
+    assert math.isfinite(result["confidence"])
+    assert 0.0 <= result["confidence"] < 1.0
+    assert "calorie_mismatch" in result["flags"]
+    # The user-facing impact: an unreconcilable calorie total warrants a review.
+    assert review_flag(result)["needs_review"] is True
 
 
 def test_accepts_pydantic_model_items() -> None:
