@@ -6,8 +6,8 @@
 // (`.meals` / `.meal`). Expanding a row reveals the agent's-work trace — its
 // ordered steps plus the per-item editable table — from that meal's `/log`
 // detail when we have it.
-import { useState } from "react";
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import type { ConfidenceAxis, LoggedItem, Meal, TraceStep } from "@/lib/api";
 import { setMealTime } from "@/lib/api";
 import { confidenceFromScore, confidenceOf, macrosOf } from "@/lib/meal";
@@ -56,6 +56,7 @@ function detailFromMeal(meal: Meal): MealDetail | undefined {
 // The meal's time, editable inline via a native time picker (so it stays within
 // valid hours). Only the time-of-day changes — the meal keeps its existing day.
 function MealTime({ meal, onChanged }: { meal: Meal; onChanged?: () => void }) {
+  const ref = useRef<HTMLInputElement>(null);
   const d = new Date(meal.created_at);
   const hhmm =
     String(d.getHours()).padStart(2, "0") +
@@ -74,15 +75,29 @@ function MealTime({ meal, onChanged }: { meal: Meal; onChanged?: () => void }) {
     }
   };
   return (
-    <input
-      type="time"
-      key={meal.created_at}
-      className="meal-time meal-time-input mono"
-      defaultValue={hhmm}
-      aria-label="time eaten"
-      onClick={(e) => e.stopPropagation()}
-      onChange={(e) => commit(e.target.value)}
-    />
+    <span className="meal-time-edit" onClick={(e) => e.stopPropagation()}>
+      <input
+        ref={ref}
+        type="time"
+        key={meal.created_at}
+        className="meal-time meal-time-input mono"
+        defaultValue={hhmm}
+        aria-label="time eaten"
+        onChange={(e) => commit(e.target.value)}
+      />
+      <button
+        type="button"
+        className="meal-time-pencil"
+        aria-label="edit time"
+        onClick={() => {
+          const el = ref.current;
+          if (el?.showPicker) el.showPicker();
+          else el?.focus();
+        }}
+      >
+        <Pencil size={12} aria-hidden="true" />
+      </button>
+    </span>
   );
 }
 

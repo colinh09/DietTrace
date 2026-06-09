@@ -325,11 +325,14 @@ body {
 .meal-review-flag::before { content: ""; position: absolute; bottom: calc(100% + 3px); left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--ink); opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 20; }
 .meal-review-flag:hover::after, .meal-review-flag:hover::before { opacity: 1; }
 .meal-time { font-size: 11px; color: var(--faint); }
-/* The editable time — a native time picker styled to read like the time text. */
-.meal-time-input { font-family: var(--mono); font-size: 11px; color: var(--muted-ink); background: none; border: 1px solid transparent; border-radius: 6px; padding: 1px 4px; margin-left: -4px; width: max-content; cursor: pointer; transition: border-color .12s, background .12s; }
-.meal-time-input:hover { border-color: var(--line-strong); background: var(--accent-softer); }
-.meal-time-input:focus { outline: none; border-color: var(--accent); color: var(--ink); }
-.meal-time-input::-webkit-calendar-picker-indicator { opacity: .4; cursor: pointer; }
+/* The editable time — a native time picker reading like plain time text, with a
+   small pencil affordance (the native clock indicator is hidden). */
+.meal-time-edit { display: inline-flex; align-items: center; gap: 2px; }
+.meal-time-input { font-family: var(--mono); font-size: 15px; color: var(--muted-ink); background: none; border: none; padding: 0; width: max-content; }
+.meal-time-input:focus { outline: none; color: var(--accent-ink); }
+.meal-time-input::-webkit-calendar-picker-indicator { display: none; }
+.meal-time-pencil { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: none; background: none; color: var(--faint); border-radius: 5px; cursor: pointer; transition: color .12s, background .12s; }
+.meal-time-pencil:hover { color: var(--accent-ink); background: var(--accent-softer); }
 .meal-side { display: flex; align-items: center; gap: 13px; flex-shrink: 0; }
 .meal-macros { font-size: 13px; color: var(--muted-ink); white-space: nowrap; }
 .meal-macros b { color: var(--ink); font-weight: 600; }
