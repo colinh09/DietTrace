@@ -7,7 +7,7 @@
 // Firebase isn't configured the Google option is hidden and the anonymous path
 // is the only one — so the screen never crashes and never dead-ends.
 import { useState } from "react";
-import { Sparkle } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 import { useAuth } from "@/lib/auth";
 
 // Google's "G" mark — inline so it needs no asset and inherits sizing.
@@ -56,7 +56,7 @@ export function SignIn({ onContinueAnon }: { onContinueAnon: () => void }) {
     <div className="ob-page">
       <div className="ob-card">
         <div className="ob-brand">
-          <Sparkle size={18} fill="var(--accent)" color="var(--accent)" />
+          <BrandMark size={30} />
           <span className="brand-name">DietTrace</span>
         </div>
         <div className="ob-eyebrow">Welcome</div>

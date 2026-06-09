@@ -1316,7 +1316,8 @@ body {
 
 /* ── Onboarding: the guided chat ─────────────────────────────────────────────── */
 .ob-chat { display: flex; flex-direction: column; margin-top: 18px; }
-.ob-progress { align-self: flex-end; font-size: 10px; letter-spacing: .12em; color: var(--faint); margin-bottom: 8px; }
+.ob-progress { align-self: stretch; height: 3px; background: var(--line); border-radius: 100px; overflow: hidden; margin-bottom: 16px; }
+.ob-progress-fill { display: block; height: 100%; background: var(--accent); border-radius: 100px; transition: width .35s cubic-bezier(.22,.61,.36,1); }
 .ob-msgs { display: flex; flex-direction: column; gap: 10px; max-height: 46dvh; overflow-y: auto; padding: 2px 2px 6px; }
 .ob-msg { display: flex; align-items: flex-end; gap: 8px; max-width: 90%; }
 .ob-msg.agent { align-self: flex-start; }

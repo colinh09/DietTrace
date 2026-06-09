@@ -5,9 +5,9 @@
 // right. Per  the navbar is CONSTANT chrome — the modal-opener
 // "Persona details" and the destructive "Reset" no longer sit among the tabs;
 // they fold into the avatar's account menu. The day/calendar navigation lives in
-// the day-summary card below, not here. The leaf is the brand
-// placeholder until the final apple "trace" mark lands.
-import { Leaf } from "lucide-react";
+// the day-summary card below, not here. The brand is the apple
+// "echo trail" trace mark (the agent's reasoning made visible).
+import { BrandMark } from "@/components/brand-mark";
 import { AccountMenu } from "@/components/account-menu";
 
 interface HeaderProps {
@@ -41,7 +41,7 @@ export function Header({
   return (
     <header className="hdr">
       <div className="brand">
-        <Leaf size={18} color="var(--accent)" strokeWidth={1.7} />
+        <BrandMark size={26} className="brand-mark" />
         <span className="brand-name">DietTrace</span>
       </div>
       <nav className="hdr-nav" aria-label="Primary">

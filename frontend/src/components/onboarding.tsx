@@ -9,7 +9,8 @@
 //      answers compute the daily targets (deterministic, instant, no spend).
 // Whole own-data path is under a minute. The Macros tab edits targets afterward.
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Pencil, Play, Send, Sparkle, X } from "lucide-react";
+import { ArrowRight, Pencil, Play, Send, X } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 import {
   postMacrosPlan,
   postMacrosSave,
@@ -275,7 +276,7 @@ export function Onboarding({
           </button>
         )}
         <div className="ob-brand">
-          <Sparkle size={16} fill="var(--accent)" color="var(--accent)" />
+          <BrandMark size={24} />
           <span className="brand-name">DietTrace</span>
         </div>
 
@@ -328,15 +329,27 @@ export function Onboarding({
           </>
         ) : (
           <div className="ob-chat">
-            <div className="ob-progress mono">
-              {Math.min(stepIndex + 1, STEPS.length)} / {STEPS.length}
+            <div
+              className="ob-progress"
+              role="progressbar"
+              aria-valuenow={Math.min(stepIndex + 1, STEPS.length)}
+              aria-valuemin={0}
+              aria-valuemax={STEPS.length}
+              aria-label="setup progress"
+            >
+              <span
+                className="ob-progress-fill"
+                style={{
+                  width: `${(Math.min(stepIndex + 1, STEPS.length) / STEPS.length) * 100}%`,
+                }}
+              />
             </div>
             <div className="ob-msgs">
               {transcript.map((m, i) => (
                 <div className={"ob-msg " + m.role} key={i}>
                   {m.role === "agent" && (
                     <span className="ob-avatar" aria-hidden="true">
-                      <Sparkle size={12} fill="var(--accent)" color="var(--accent)" />
+                      <BrandMark size={15} echo={false} />
                     </span>
                   )}
                   <span className="ob-bubble">{m.text}</span>
