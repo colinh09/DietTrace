@@ -11,13 +11,14 @@
 //   • doing   — avg confidence + meals logged on their meals (/trust)
 //   • test set — meals confirmed as held-out ground truth (/preferences)
 import { useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Pencil, Sparkles } from "lucide-react";
 import {
   getGoals,
   getPreferences,
   getProfile,
   getTrust,
   listLearningFeedback,
+  setProfile as saveProfile,
   type FeedbackItem,
   type Goal,
   type PreferencesResponse,
@@ -56,6 +57,25 @@ export function RecapModal({
   const [goals, setGoals] = useState<Goal[]>([]);
   const [trust, setTrust] = useState<TrustReport | null>(null);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  // Inline editing of the lifestyle/context note (so it can be added/edited here,
+  // not just when one already exists).
+  const [editingContext, setEditingContext] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [savingContext, setSavingContext] = useState(false);
+
+  const saveContext = async () => {
+    if (savingContext) return;
+    setSavingContext(true);
+    try {
+      const r = await saveProfile(draft);
+      setProfile(r.profile_text ?? draft);
+      setEditingContext(false);
+    } catch {
+      /* leave the editor open so the user can retry */
+    } finally {
+      setSavingContext(false);
+    }
+  };
 
   useEffect(() => {
     getPreferences().then(setPrefs).catch(() => {});
@@ -153,14 +173,58 @@ export function RecapModal({
           </div>
         </section>
 
-        {/* ── What it knows about you ─────────────────────────────────────── */}
+        {/* ── What it knows about you (editable) ──────────────────────────── */}
         <section className="rc-section">
-          <div className="su-sub mono">What it knows about you</div>
-          {profile ? (
+          <div className="rc-context-head">
+            <span className="su-sub mono">What it knows about you</span>
+            {!editingContext && (
+              <button
+                type="button"
+                className="lo-context-edit"
+                onClick={() => {
+                  setDraft(profile);
+                  setEditingContext(true);
+                }}
+              >
+                <Pencil size={12} aria-hidden="true" /> {profile ? "Edit" : "Add"}
+              </button>
+            )}
+          </div>
+          {editingContext ? (
+            <div className="lo-context-edit-box">
+              <textarea
+                className="lo-context-textarea"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                aria-label="your goals and eating style"
+                placeholder="Your goals and eating style, in your words — e.g. “marathon training, mostly plant-based, big appetite after long runs.”"
+                autoFocus
+              />
+              <div className="lo-context-actions">
+                <button
+                  type="button"
+                  className="lo-context-cancel"
+                  onClick={() => setEditingContext(false)}
+                  disabled={savingContext}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="lo-context-save"
+                  onClick={saveContext}
+                  disabled={savingContext}
+                >
+                  {savingContext ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          ) : profile ? (
             <blockquote className="su-lifestyle">{profile}</blockquote>
           ) : (
             <p className="su-empty">
-              No lifestyle note yet — add one in “your context” so it tunes to you.
+              No note yet — add your goals and eating style so DietTrace tunes to
+              you.
             </p>
           )}
         </section>

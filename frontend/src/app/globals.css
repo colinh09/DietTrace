@@ -1375,10 +1375,12 @@ body {
 /* ── "Persona details" recap modal ─────────────────────────────────────────── */
 .rc { display: flex; flex-direction: column; }
 .rc-section { margin-top: 18px; }
-.rc-macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 8px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.rc-macro { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 13px 6px; background: var(--surface); text-align: center; }
+.rc-macros { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.rc-macro { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 13px 6px; background: var(--surface); text-align: center; border-left: 1px solid var(--line); }
+.rc-macro:first-child { border-left: none; }
 .rc-macro-val { font-family: var(--serif); font-size: 22px; font-weight: 600; line-height: 1; }
 .rc-macro-label { font-size: 10px; color: var(--muted-ink); }
+.rc-context-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
 .rc-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .rc-corr { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
 .rc-corr-meal { font-size: 13px; font-weight: 600; color: var(--ink); }
@@ -1392,7 +1394,12 @@ body {
 .rc-foot { font-size: 12px; line-height: 1.5; color: var(--muted-ink); margin-top: 12px; }
 .rc-link { background: none; border: none; color: var(--accent-ink); font-family: var(--ui-font); font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
 .rc-link:hover { text-decoration: underline; }
-@media (max-width: 460px) { .rc-macros { grid-template-columns: 1fr 1fr; } .rc-stats { grid-template-columns: 1fr; } }
+@media (max-width: 460px) {
+  .rc-macros { grid-template-columns: 1fr 1fr; }
+  .rc-macro:nth-child(3) { border-left: none; }
+  .rc-macro:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .rc-stats { grid-template-columns: 1fr; }
+}
 
 /* Agent-observability feed: the supervisor's per-meal decisions (newest first),
    styled like the corrections list (.lo-corr) for consistency. */
