@@ -1,8 +1,5 @@
 # ─────────────────────────────────────────────────────────────
 # DietTrace .gitignore
-# Public repo = the agent loop, evals harness, API, and frontend.
-# Hidden = secrets, raw data, the food-DB pipeline/schema, curated
-# mappings, all planning/context docs, and local build tooling.
 # ─────────────────────────────────────────────────────────────
 
 # --- Secrets (NEVER commit) ---
@@ -25,13 +22,7 @@ __pycache__/
 build/
 dist/
 
-# --- Planning & context docs (kept locally, never tracked) ---
-docs/
-
-# --- Autonomous build tooling (kept locally, never tracked) ---
-tools/
-
-# --- Deploy context (kept locally, never tracked) ---
+# --- Deploy context ---
 .gcloudignore
 frontend/.gcloudignore
 cloudbuild*.yaml
