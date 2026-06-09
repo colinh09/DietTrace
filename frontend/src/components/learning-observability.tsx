@@ -373,11 +373,8 @@ export function LearningObservability({
   // Link to the Phoenix experiment when the fit set is scored in Arize over MCP.
   const [experimentUrl, setExperimentUrl] = useState("");
   const [showData, setShowData] = useState(false);
-  const [explain, setExplain] = useState(false);
   // The agent-state modal (the deep dive behind the icon).
   const [stateOpen, setStateOpen] = useState(false);
-  // Quick = sample of standard foods (fast, good for demos); full = the whole set.
-  const [mode, setMode] = useState<"quick" | "full">("quick");
   // The user's freeform "goals & eating style" — the corrector's standing context.
   const [profileText, setProfileText] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
@@ -535,11 +532,6 @@ export function LearningObservability({
   const newCorr = prefs?.new_corrections ?? 0;
   const confirmations = prefs?.confirmations ?? 0;
   const confirmed = prefs?.confirmed ?? [];
-  // The threshold is the backend's ground truth (min_corrections) so the UI can
-  // never drift from it. A retune only folds in NEW (fresh) corrections.
-  const minCorr = prefs?.min_corrections ?? 1;
-  const ready = newCorr >= minCorr;
-  const block = prefs?.block ?? null;
   const custom = prefs?.confirmations_custom ?? 0;
   const seeded = prefs?.confirmations_seeded ?? 0;
   // The feed: re-tune events the panel raised + the per-meal decisions from the page.
@@ -639,153 +631,21 @@ export function LearningObservability({
                 learned
               </span>
             </div>
+            {latest && (
+              <div className="agent-state-stat agent-state-decision">
+                <span className="agent-state-dec-lab mono">Latest decision</span>
+                <span className="agent-state-dec-text">
+                  {latest.reason}
+                  {latest.detail ? ` (${latest.detail})` : ""}
+                </span>
+              </div>
+            )}
           </div>
-          {latest && (
-            <p className="agent-state-latest">
-              <b>Latest decision:</b> {latest.reason}
-              {latest.detail ? ` (${latest.detail})` : ""}
-            </p>
-          )}
           <p className="agent-state-mcp">
             Your dataset is synced to Phoenix over MCP.
           </p>
 
           <div className="lo">
-      {/* ── Re-tune: the gated eval, streaming live, always visible ───────── */}
-      <section className="dash-card lo-retune">
-        <div className="dash-card-head mono">self-tuning · agent-driven</div>
-        <p className="lo-counts">
-          DietTrace updates on its own once there are enough corrections: it learns
-          from your <b>{corrections}</b> correction{corrections === 1 ? "" : "s"}, then
-          checks itself on <b>{confirmations}</b> of your meal{confirmations === 1 ? "" : "s"} before keeping any change.
-        </p>
-        <p className={"lo-fresh" + (ready ? " ready" : "")} aria-live="polite">
-          <span className="lo-fresh-dot" aria-hidden="true" />
-          {ready
-            ? `${newCorr} fresh correction${newCorr === 1 ? "" : "s"} — ready to update`
-            : `${newCorr} of ${minCorr} fresh correction${minCorr === 1 ? "" : "s"} — ${
-                newCorr === 0 ? "correct a meal" : "one more"
-              } to update`}
-        </p>
-        <div className="lo-retune-action">
-          <button
-            type="button"
-            className="lo-retune-btn"
-            onClick={() => runRetune(mode === "full")}
-            disabled={retuning || !ready}
-            title={
-              ready
-                ? ""
-                : corrections === 0
-                  ? "Correct a meal first"
-                  : "All corrections are already learned — make a new one to update"
-            }
-          >
-            {retuning ? "updating…" : "Update"}
-          </button>
-          <span className="lo-mode-seg" role="group" aria-label="Update depth">
-            <button
-              type="button"
-              className={"lo-mode-opt" + (mode === "quick" ? " on" : "")}
-              aria-pressed={mode === "quick"}
-              disabled={retuning}
-              onClick={() => setMode("quick")}
-            >
-              Quick
-            </button>
-            <button
-              type="button"
-              className={"lo-mode-opt" + (mode === "full" ? " on" : "")}
-              aria-pressed={mode === "full"}
-              disabled={retuning}
-              onClick={() => setMode("full")}
-            >
-              Full
-            </button>
-          </span>
-        </div>
-        <p className="lo-mode-hint">
-          {mode === "quick"
-            ? "Quick: a sample of standard foods — fast."
-            : "Full: the entire standard set — slower, best accuracy."}
-        </p>
-
-        <button
-          type="button"
-          className="lo-explain-cta"
-          aria-expanded={explain}
-          onClick={() => setExplain((s) => !s)}
-        >
-          {explain ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          What is this doing?
-        </button>
-        {explain && (
-          <div className="lo-explain">
-            <p>
-              Updating takes the corrections you gave on your logged meals and
-              folds them into DietTrace, so it estimates portions
-              <i> your</i> way.
-            </p>
-            <p>
-              To make sure it adapts to you <b>without just memorizing your meals</b> — without
-              getting worse at logging ordinary foods — it re-scores two sets and
-              applies the change only if both hold up:
-            </p>
-            <ul>
-              <li>
-                <b>Your Dataset</b> — the meals you confirmed, kept <i>out</i> of
-                learning so the test stays honest (your dataset).
-              </li>
-              <li>
-                <b>USDA accuracy</b> — a curated set of standard reference foods,
-                so general accuracy can&apos;t get worse.
-              </li>
-            </ul>
-            <p>
-              Each row below is one meal&apos;s <b>calorie accuracy</b> — DietTrace{" "}
-              <b>before → after</b> tuning (100% = matches the known calories).{" "}
-              <span className="lm-tag mono lm-set-fit">you</span> = a meal you
-              confirmed · <span className="lm-tag mono lm-set-usda">usda</span> = a
-              standard reference food. It&apos;s kept only if your meals improve and
-              everyday foods hold.
-            </p>
-            <p>
-              <b>Quick</b> checks a sample of standard foods (fast);{" "}
-              <b>Full</b> checks the whole set (slower — best accuracy,
-              the strongest guard against just memorizing your meals).
-            </p>
-          </div>
-        )}
-
-        {/* The live streaming view lives in the rail (always visible); here the
-            modal just shows the ship verdict once the re-tune is done. */}
-        {retuning && (
-          <p className="lo-mode-hint">Updating live — watch it in the rail →</p>
-        )}
-        {result && !retuning && <RetuneResult result={result} />}
-
-        {/* The current learned profile, when nothing is mid-flight. */}
-        {!retuning && !result && block && block.provenance.length > 0 && (
-          <div className="lm-rules lo-learned">
-            <div className="lm-sub mono">what it&apos;s learned</div>
-            {block.provenance.map((r, i) => (
-              <div className="lm-rule" key={i}>
-                <Sparkles size={13} className="lm-rule-icon" aria-hidden="true" />
-                <div className="lm-rule-body">
-                  <div className="lm-rule-text">{r.rule}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {!retuning && !result && !block && (
-          <p className="lo-empty">
-            {ready
-              ? "Update to turn your corrections into a rule DietTrace follows — it's only kept if your meals get more accurate."
-              : "Tell DietTrace what it got wrong on a meal, then update to watch it learn."}
-          </p>
-        )}
-      </section>
 
       {/* ── Your context: the freeform profile the corrector reads when tuning ─ */}
       <section className="dash-card lo-context">

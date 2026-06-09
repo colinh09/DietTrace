@@ -62,9 +62,11 @@ describe("LearningObservability", () => {
     await waitFor(() => expect(api.listLearningFeedback).toHaveBeenCalledTimes(2));
   });
 
-  it("streams the re-tune live — phase, rule, per-meal scores, then verdict", async () => {
+  it("auto-runs the gated retune on a new signal and hands the outcome to the page", async () => {
+    // Retunes are agent-driven now (no manual button) — a new supervisor signal
+    // (autoRetune increment) fires the stream; the outcome goes to the feed.
     vi.mocked(api.learningRetuneStream).mockImplementation(async (onEvent) => {
-      onEvent({ type: "phase", phase: "propose", label: "Generalizing your corrections…" });
+      onEvent({ type: "phase", phase: "propose", label: "Suggesting a change…" });
       onEvent({ type: "rule", rules: [{ rule: "Pre-run carbs run high", rationale: "x", from_feedback: [1] }] });
       onEvent({ type: "score", set: "fit", i: 1, n: 1, text: "oatmeal before my long run", expected: 520, before: 0.6, after: 0.9 });
       onEvent({
@@ -75,21 +77,30 @@ describe("LearningObservability", () => {
         version: 1, fit_cases: 1, usda_cases: 2,
       });
     });
-    await openState();
-    fireEvent.click(await screen.findByRole("button", { name: /^update$/i }));
+    const onComplete = vi.fn();
+    const { rerender } = render(
+      <LearningObservability reloadSignal={0} autoRetune={0} onRetuneComplete={onComplete} />,
+    );
+    rerender(
+      <LearningObservability reloadSignal={0} autoRetune={1} onRetuneComplete={onComplete} />,
+    );
 
-    await waitFor(() => expect(screen.getByText(/Kept/)).toBeInTheDocument());
-    expect(screen.getByText(/On your meals/)).toBeInTheDocument();
-    expect(screen.getAllByText(/90%/).length).toBeGreaterThan(0);
+    await waitFor(() => expect(api.learningRetuneStream).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(onComplete).toHaveBeenCalledWith(
+        expect.objectContaining({ op: "retune" }),
+        true,
+        1,
+      ),
+    );
   });
 
-  it("shows the rule + status live but no premature score panels", async () => {
-    // Both sets run as atomic Phoenix experiments (no trickle), so the live view is
-    // status + the new rule only — the per-meal panels appear in the collapsible
-    // results AFTER, not as a half-baked preview during the run.
+  it("streams the new rule + status live, but no premature score panels", async () => {
+    // The live view (in the rail) is status + the new rule only — the per-meal
+    // panels appear in the collapsible results AFTER, not as a half-baked preview.
     let finish: () => void = () => {};
     vi.mocked(api.learningRetuneStream).mockImplementation(async (onEvent) => {
-      onEvent({ type: "phase", phase: "fit", label: "Running an experiment in Arize…" });
+      onEvent({ type: "phase", phase: "fit", label: "Running an experiment in Phoenix…" });
       onEvent({ type: "rule", rules: [{ rule: "Pre-run carbs run high", rationale: "x", from_feedback: [1] }] });
       onEvent({
         type: "manifest",
@@ -100,14 +111,13 @@ describe("LearningObservability", () => {
       });
       await new Promise<void>((r) => { finish = r; });
     });
-    await openState();
-    fireEvent.click(await screen.findByRole("button", { name: /^update$/i }));
+    const { rerender } = render(<LearningObservability reloadSignal={0} autoRetune={0} />);
+    rerender(<LearningObservability reloadSignal={0} autoRetune={1} />);
 
-    // The rule + Arize status show; the Base/Tuned panels do NOT (no preview).
     await waitFor(() =>
       expect(screen.getByText(/Pre-run carbs run high/)).toBeInTheDocument(),
     );
-    expect(screen.getByText(/Running an experiment in Arize/)).toBeInTheDocument();
+    expect(screen.getByText(/Running an experiment in Phoenix/)).toBeInTheDocument();
     expect(screen.queryAllByText("Base")).toHaveLength(0);
     expect(screen.queryByText("a medium banana")).not.toBeInTheDocument();
     finish();
@@ -134,16 +144,6 @@ describe("LearningObservability", () => {
     await waitFor(() =>
       expect(api.setProfile).toHaveBeenCalledWith("Marathon training, eats high carb"),
     );
-  });
-
-  it("shows the fresh-corrections indicator from the backend threshold", async () => {
-    vi.mocked(api.getPreferences).mockResolvedValue({
-      block: null, corrections: 3, new_corrections: 0, confirmations: 2,
-      confirmed, min_corrections: 1,
-    });
-    await openState();
-    expect(await screen.findByText(/0 of 1 fresh correction/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^update$/i })).toBeDisabled();
   });
 
   it("expands the test set", async () => {

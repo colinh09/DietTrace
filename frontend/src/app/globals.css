@@ -757,7 +757,12 @@ body {
 .conf-chip[title] { cursor: help; }
 
 /* ── Observability popup (Accuracy / Trust as a modal over the main page) ── */
-.modal-scrim { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 20px 40px; background: rgba(27, 26, 22, 0.34); backdrop-filter: blur(2px); overflow-y: auto; animation: modal-fade .16s ease; }
+.modal-scrim { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 20px 40px; background: rgba(27, 26, 22, 0.34); backdrop-filter: blur(2px); overflow-y: auto; animation: modal-fade .16s ease;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.35) transparent; }
+.modal-scrim::-webkit-scrollbar { width: 10px; }
+.modal-scrim::-webkit-scrollbar-thumb { background: rgba(255,255,255,.35); border-radius: 100px; border: 3px solid transparent; background-clip: padding-box; }
+.modal-scrim::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.5); background-clip: padding-box; }
+.modal-scrim::-webkit-scrollbar-track { background: transparent; }
 .modal-card { position: relative; width: 100%; max-width: 680px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: 0 24px 64px -20px rgba(27,26,22,0.40); padding: 30px 32px 28px; animation: modal-rise .18s cubic-bezier(.22,.61,.36,1); }
 .modal-card.modal-narrow { max-width: 440px; }
 .modal-close { position: absolute; top: 16px; right: 16px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: none; background: none; color: var(--faint); border-radius: 8px; cursor: pointer; transition: background .14s ease, color .14s ease; }
@@ -1379,12 +1384,15 @@ body {
 
 /* Agent-state modal: the summary at the top of the deep dive. */
 .agent-state-title { font-size: 17px; font-weight: 600; color: var(--ink); margin: 0 0 14px; }
-.agent-state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-.agent-state-stat { display: flex; flex-direction: column; gap: 3px; background: var(--accent-softer); border-radius: 10px; padding: 12px 14px; }
+/* Top-level overview: three consistent cards stacked vertically (dashboard-esque) */
+.agent-state-grid { display: flex; flex-direction: column; gap: 9px; margin-bottom: 12px; }
+.agent-state-stat { display: flex; flex-direction: column; gap: 4px; background: var(--accent-softer); border-radius: 11px; padding: 13px 15px; }
 .agent-state-num { font-size: 26px; font-weight: 600; line-height: 1; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
-.agent-state-cap { font-size: 12px; line-height: 1.4; color: var(--muted-ink); }
+.agent-state-cap { font-size: 12.5px; line-height: 1.4; color: var(--muted-ink); }
 .agent-state-cap b { color: var(--accent-ink); font-weight: 600; }
-.agent-state-latest { font-size: 13px; line-height: 1.5; color: var(--ink); margin: 0 0 6px; }
+.agent-state-decision { gap: 5px; }
+.agent-state-dec-lab { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); }
+.agent-state-dec-text { font-size: 13px; line-height: 1.5; color: var(--ink); }
 .agent-state-mcp { font-size: 12px; line-height: 1.5; color: var(--muted-ink); margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 
 /* ============================================================
