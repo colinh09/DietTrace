@@ -575,16 +575,20 @@ export function LearningObservability({
             label={
               retuning
                 ? "A retune is already running"
-                : newCorr === 0
-                  ? "Correct a meal first — there's nothing new to fold in"
-                  : "Fold your corrections into the agent now"
+                : newCorr === 0 && confirmations === 0
+                  ? "Correct a meal and confirm one first — the agent needs both to retune"
+                  : newCorr === 0
+                    ? "Correct a meal first — there's nothing new to fold in"
+                    : confirmations === 0
+                      ? "Confirm a meal first — there's nothing to test the change against"
+                      : "Fold your corrections into the agent now"
             }
           >
             <button
               type="button"
               className="dash-retune-btn"
               onClick={() => setRetuneConfirmOpen(true)}
-              disabled={newCorr === 0 || retuning}
+              disabled={newCorr === 0 || confirmations === 0 || retuning}
               aria-label="Retune now"
             >
               <RotateCcw size={13} /> Retune now
@@ -652,10 +656,13 @@ export function LearningObservability({
               Retune DietTrace now?
             </h2>
             <p className="reset-dialog-body">
-              You&apos;ve taught it {corrections} correction
-              {corrections === 1 ? "" : "s"}. Retuning turns them into a rule it
-              follows — but it only keeps the change if your meals come out more
-              accurate. If not, nothing changes.
+              You&apos;ve banked {corrections} correction
+              {corrections === 1 ? "" : "s"} and {confirmations} confirmed meal
+              {confirmations === 1 ? "" : "s"}. Retuning folds your corrections into a
+              rule, then tests it against your confirmed meals — kept separate, never
+              learned from — and only keeps it if you get more accurate. The more of
+              each, the better: feedback drives a meaningful change, confirmed meals
+              prove it actually helps.
             </p>
             <div className="reset-dialog-actions">
               <button

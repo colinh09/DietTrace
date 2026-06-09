@@ -153,6 +153,18 @@ describe("LearningObservability", () => {
     await waitFor(() => expect(railBtn).toBeDisabled());
   });
 
+  it("keeps the retune button disabled with corrections but no dataset points", async () => {
+    // A retune needs held-out confirmed meals to test the change against, so
+    // feedback alone is not enough to enable it.
+    vi.mocked(api.getPreferences).mockResolvedValue({
+      block: null, corrections: 2, new_corrections: 2, confirmations: 0,
+      confirmed: [], min_corrections: 1,
+    });
+    render(<LearningObservability reloadSignal={0} />);
+    const railBtn = await screen.findByRole("button", { name: /retune now/i });
+    await waitFor(() => expect(railBtn).toBeDisabled());
+  });
+
   it("shows the user's context (the corrector's standing profile) and lets them edit it", async () => {
     vi.mocked(api.getProfile).mockResolvedValue({
       profile_text: "Marathon training, mostly plant-based",
