@@ -107,6 +107,27 @@ def test_demo_seed_returns_ok(tmp_path) -> None:
     assert body["goals_set"] is True
 
 
+def test_demo_seed_records_trust_for_visible_meals(tmp_path) -> None:
+    """The recap's 'how it's doing on your meals' reads /trust, so the seed must
+    record each visible meal's captured eval — otherwise it shows 0 meals / 0%
+    confidence despite a fully loaded day."""
+    client, _, _ = _client(tmp_path)
+    client.post("/demo/seed", headers=_H)
+    trust = client.get("/trust", headers=_H).json()
+    assert trust["count"] == len(DEMO_MEALS)
+    assert trust["mean_confidence"] > 0
+
+
+def test_demo_seed_reseed_does_not_stack_trust(tmp_path) -> None:
+    """Re-running the seed replaces the trust rows (clear_user), never appends —
+    so the recap count stays accurate after a judge re-clicks."""
+    client, _, _ = _client(tmp_path)
+    client.post("/demo/seed", headers=_H)
+    client.post("/demo/seed", headers=_H)
+    trust = client.get("/trust", headers=_H).json()
+    assert trust["count"] == len(DEMO_MEALS)
+
+
 def test_demo_seed_visible_today_dataset_yesterday(tmp_path) -> None:
     """The visible playground meals land on TODAY; the confirmed dataset is
     mirrored as badged rows on the PREVIOUS day (nothing hidden — the

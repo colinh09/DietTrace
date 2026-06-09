@@ -1327,6 +1327,7 @@ def create_app(
         # Idempotent: clear this user's meals first so re-running "see it in
         # action" replaces the canned set rather than appending duplicates.
         log_store.clear_user(user)
+        trust.clear_user(user)
 
         # The client's local "today" (so we're relative to the day the user sees,
         # not the server's UTC day at the boundary). The visible playground meals
@@ -1347,6 +1348,18 @@ def create_app(
                 detail=meal["detail"],
             )
             meal_ids.append(entry_id)
+            # Record each visible meal's captured eval in the /trust rollup, so the
+            # recap's "how it's doing" reflects the loaded meals (count + mean
+            # confidence) instead of an empty 0% / 0 meals.
+            d = meal["detail"]
+            trust.record(
+                confidence=float(d.get("confidence", 0.0)),
+                needs_review=bool(d.get("needs_review", False)),
+                sources=sources_of(d.get("per_item", [])),
+                user_id=user,
+                text=meal["text"],
+                review_reason=d.get("review_reason"),
+            )
 
         goals_set = False
         if goals_db is not None:
