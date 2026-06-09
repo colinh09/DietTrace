@@ -515,9 +515,16 @@ body {
 
 /* responsive — tighten the page to ~full-width and stack the band on narrow
    screens. */
+/* Stack the macro band cleanly before it flex-wraps the glance awkwardly. The band
+   is flex (not grid), so the old grid-template-columns rule was a no-op. */
+@media (max-width: 760px) {
+  .daymacros { flex-direction: column; align-items: stretch; gap: 20px; }
+  .dm-ring { align-self: center; }
+  .dm-glance { width: 100%; align-self: auto; border-left: none;
+    border-top: 1px solid var(--line); padding-left: 0; padding-top: 18px; }
+}
 @media (max-width: 640px) {
   .page { padding: 36px 16px 96px; }
-  .daymacros { grid-template-columns: 1fr; gap: 20px; }
   .dm-macros { gap: 14px; }
 }
 
