@@ -628,6 +628,9 @@ export interface SeededPersona {
   hook_note: string;
   learns: string;
   meal_texts: string[];
+  // All real logged meals across the seeded days = today's visible meals plus
+  // the previous day's non-dataset-point meals (dataset points are confirmations).
+  meals_logged: number;
   confirmation_texts: string[];
   correction_texts: string[];
 }

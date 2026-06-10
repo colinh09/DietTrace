@@ -71,8 +71,8 @@ export function SeededModal({
           </div>
           <div className="dl-stats">
             <div className="dl-stat">
-              <div className="dl-stat-lab">On today</div>
-              <div className="dl-stat-num">{p.meal_texts.length}</div>
+              <div className="dl-stat-lab">Logged</div>
+              <div className="dl-stat-num">{p.meals_logged}</div>
               <div className="dl-stat-sub">meals</div>
             </div>
             <div className="dl-stat">

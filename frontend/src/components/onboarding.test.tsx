@@ -64,6 +64,7 @@ describe("Onboarding (conversational)", () => {
         hook_note: "The spaghetti logged low.",
         learns: "her pre-run carbs run high",
         meal_texts: ["a big plate of spaghetti"],
+        meals_logged: 8,
         confirmation_texts: ["oatmeal before a run"],
         correction_texts: ["I carb up more before runs"],
       },

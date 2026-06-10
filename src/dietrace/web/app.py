@@ -1502,6 +1502,13 @@ def create_app(
                 "hook_note": persona.hook_note,
                 "learns": persona.learns,
                 "meal_texts": [m["text"] for m in persona.meals],
+                # All real logged meals = today's visible meals + the previous
+                # day's non-dataset-point meals (dataset points are counted
+                # separately as confirmations). meal_texts stays the visible day.
+                "meals_logged": (
+                    len(persona.meals)
+                    + sum(1 for m in persona.previous_day if not m.get("dataset_point"))
+                ),
                 "confirmation_texts": [c["meal_text"] for c in persona.confirmations],
                 "correction_texts": [f["feedback_text"] for f in persona.feedback],
             },

@@ -23,6 +23,7 @@ const result: SeedDemoResult = {
       "oatmeal before my run",
       "a big plate of spaghetti the night before",
     ],
+    meals_logged: 8,
     confirmation_texts: ["oatmeal before the gym"],
     correction_texts: [
       "before workouts I eat way more carbs",
@@ -52,6 +53,11 @@ describe("SeededModal", () => {
     );
     // "Your Dataset" framing is kept in the what's-loaded stats.
     expect(screen.getByText(/in Your Dataset/i)).toBeInTheDocument();
+    // The "Logged" stat counts ALL real logged meals (today + previous-day
+    // non-dataset-point meals), not just the visible playground meals.
+    const loggedLab = screen.getByText("Logged");
+    const loggedStat = loggedLab.closest(".dl-stat");
+    expect(loggedStat?.querySelector(".dl-stat-num")).toHaveTextContent("8");
   });
 
   it("re-seeds the other persona via the loader", () => {

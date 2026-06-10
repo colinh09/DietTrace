@@ -177,6 +177,9 @@ def test_demo_seed_is_the_runner_day_with_consistent_confidence(tmp_path) -> Non
     assert any("spaghetti" in m["text"].lower() for m in meals), (
         "the under-counted spaghetti meal should be seeded"
     )
+    # meals_logged counts ALL real logged meals = visible day (4) + the previous
+    # day's non-dataset-point meals (4), distinct from the held-out confirmations.
+    assert resp["persona"]["meals_logged"] == 8
     for m in meals:
         axes = m.get("axes") or []
         if axes:
@@ -401,6 +404,10 @@ def test_demo_seed_creator_persona(tmp_path) -> None:
 
     # The on-screen under-count he corrected is one of the visible meals.
     assert any(persona["hook_meal"] in t for t in persona["meal_texts"])
+
+    # meals_logged is all 7 real logged meals; his previous day is dataset points
+    # only, so nothing is added beyond the visible meals (stays 7, not undercounted).
+    assert persona["meals_logged"] == 7
 
     # His own real targets replaced the runner defaults.
     assert goal_store.get(_USER)["208"] == 2635.0
