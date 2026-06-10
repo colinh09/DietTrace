@@ -1249,12 +1249,13 @@ body {
 .dm-persona.on .dm-persona-name .tick { opacity: 1; }
 .dm-persona-sub { display: block; font-size: 12px; color: var(--muted-ink); line-height: 1.45; margin-top: 6px; }
 
-/* what's loaded — stat tiles floating on a faint tint */
-.dm-stats { background: var(--rail-bg); padding: 14px; border-radius: var(--radius); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.dm-stat { background: var(--surface); border-radius: 12px; padding: 14px 16px 13px; box-shadow: 0 1px 2px rgba(27,26,22,0.04), 0 8px 22px -16px rgba(27,26,22,0.22); }
-.dm-stat-lab { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
-.dm-stat-num { font-family: var(--serif); font-weight: 600; font-size: 34px; line-height: 1; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 8px; }
-.dm-stat-sub { font-size: 12px; color: var(--muted-ink); margin-top: 4px; }
+/* what's loaded — stat tiles floating on a faint tint (dl- = loaded-demo; kept
+   distinct from the day-macros band's .dm-stat* to avoid a class collision) */
+.dl-stats { background: var(--rail-bg); padding: 14px; border-radius: var(--radius); display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.dl-stat { background: var(--surface); border-radius: 12px; padding: 14px 16px 13px; box-shadow: 0 1px 2px rgba(27,26,22,0.04), 0 8px 22px -16px rgba(27,26,22,0.22); }
+.dl-stat-lab { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.dl-stat-num { font-family: var(--serif); font-weight: 600; font-size: 34px; line-height: 1; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 8px; }
+.dl-stat-sub { font-size: 12px; color: var(--muted-ink); margin-top: 4px; }
 .dm-link { align-self: flex-start; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 2px 0; cursor: pointer; }
 .dm-link:hover { color: var(--accent-ink); text-decoration: underline; }
 

@@ -69,21 +69,21 @@ export function SeededModal({
             <span className="eyebrow">What&apos;s loaded</span>
             <hr />
           </div>
-          <div className="dm-stats">
-            <div className="dm-stat">
-              <div className="dm-stat-lab">On today</div>
-              <div className="dm-stat-num">{p.meal_texts.length}</div>
-              <div className="dm-stat-sub">meals</div>
+          <div className="dl-stats">
+            <div className="dl-stat">
+              <div className="dl-stat-lab">On today</div>
+              <div className="dl-stat-num">{p.meal_texts.length}</div>
+              <div className="dl-stat-sub">meals</div>
             </div>
-            <div className="dm-stat">
-              <div className="dm-stat-lab">Confirmed</div>
-              <div className="dm-stat-num">{result.confirmations}</div>
-              <div className="dm-stat-sub">in Your Dataset</div>
+            <div className="dl-stat">
+              <div className="dl-stat-lab">Confirmed</div>
+              <div className="dl-stat-num">{result.confirmations}</div>
+              <div className="dl-stat-sub">in Your Dataset</div>
             </div>
-            <div className="dm-stat">
-              <div className="dm-stat-lab">To learn</div>
-              <div className="dm-stat-num">{result.corrections}</div>
-              <div className="dm-stat-sub">under-counted</div>
+            <div className="dl-stat">
+              <div className="dl-stat-lab">To learn</div>
+              <div className="dl-stat-num">{result.corrections}</div>
+              <div className="dl-stat-sub">under-counted</div>
             </div>
           </div>
           {onViewDataset && (
