@@ -112,6 +112,12 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
             {report.experiments === 1 ? "" : "s"}
           </span>
         </div>
+        <p className="acc-caption">
+          Each experiment is an eval run in Arize Phoenix that scores DietTrace&apos;s
+          estimates against known USDA calories. We used these runs to tune it from a
+          raw first pass up to a solid baseline — the &ldquo;after&rdquo; you start
+          from, before it ever learns anything about you.
+        </p>
         <div className="acc-bars">
           {report.metrics.map((m) => (
             <div className="acc-bar-row" key={m.key}>
