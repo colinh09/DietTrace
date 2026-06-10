@@ -1,19 +1,27 @@
 "use client";
 
-// The dedicated sign-in screen — the app's entry gate when Firebase is wired.
-// Same design language as onboarding (serif display, sage accent, single card):
-// "Continue with Google" to keep a log across devices, or "Continue without an
-// account" to use DietTrace anonymously (everything works either way). When
-// Firebase isn't configured the Google option is hidden and the anonymous path
-// is the only one — so the screen never crashes and never dead-ends.
+// The dedicated sign-in screen — a full-page split (matches the design mock):
+// LEFT = a sage "stage" holding the brand, the hero copy, and a live agent-step
+// "trace" card (the product's observability made visible); RIGHT = the sign-in
+// card. "Continue with Google" to keep a log across devices, or "Continue without
+// an account" to use DietTrace anonymously. When Firebase isn't configured the
+// Google option is hidden and the anonymous path is the only one.
 import { useState } from "react";
+import {
+  Check,
+  Lock,
+  ScanLine,
+  SlidersHorizontal,
+  Utensils,
+  type LucideIcon,
+} from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { useAuth } from "@/lib/auth";
 
 // Google's "G" mark — inline so it needs no asset and inherits sizing.
 function GoogleMark() {
   return (
-    <svg width="17" height="17" viewBox="0 0 18 18" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
       <path
         fill="#4285F4"
         d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"
@@ -31,6 +39,71 @@ function GoogleMark() {
         d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"
       />
     </svg>
+  );
+}
+
+// The "how it reads a meal" trace — the agent's steps as a connected dotted
+// timeline, ending in an Arize Phoenix MCP score (the observability money shot).
+interface TraceStepDef {
+  Icon: LucideIcon;
+  label: string;
+  body?: string;
+  quote?: boolean;
+  phoenix?: boolean;
+}
+
+const TRACE_STEPS: TraceStepDef[] = [
+  {
+    Icon: Utensils,
+    label: "Reads your meal",
+    body: "“two eggs and avocado toast”",
+    quote: true,
+  },
+  { Icon: ScanLine, label: "Matches USDA foods", body: "egg · avocado · sourdough" },
+  {
+    Icon: SlidersHorizontal,
+    label: "Learns your portions",
+    body: "your toast runs bigger — noted",
+  },
+  { Icon: Check, label: "Scored against Your Dataset", phoenix: true },
+];
+
+function LiveTrace() {
+  return (
+    <div className="lt">
+      <div className="lt-head">
+        <span className="lt-eyebrow mono">How it reads a meal</span>
+        <span className="lt-live mono">
+          <span className="lt-pulse" aria-hidden="true" />
+          Live
+        </span>
+      </div>
+      <div className="lt-trace">
+        {TRACE_STEPS.map((s, i) => (
+          <div className="lt-node" key={s.label}>
+            <span
+              className={"lt-dot" + (i === TRACE_STEPS.length - 1 ? " fill" : "")}
+              aria-hidden="true"
+            />
+            <div className="lt-node-head">
+              <s.Icon size={14} className="lt-node-icon" aria-hidden="true" />
+              <span className="lt-node-key">{s.label}</span>
+            </div>
+            {s.body && (
+              <div className={"lt-node-body" + (s.quote ? " quote" : "")}>
+                {s.body}
+              </div>
+            )}
+            {s.phoenix && (
+              <span className="phoenix-tag">
+                <span className="pdot" aria-hidden="true" />
+                Arize Phoenix · MCP
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -54,34 +127,42 @@ export function SignIn({ onContinueAnon }: { onContinueAnon: () => void }) {
 
   return (
     <div className="si-page">
-      {/* Left: brand + hero value prop, with a faint apple-trace watermark */}
-      <section className="si-hero">
-        <div className="ob-brand">
-          <BrandMark size={34} />
+      {/* LEFT — sage stage: brand, hero copy, and the live trace visual */}
+      <div className="si-stage">
+        <div className="si-grain" aria-hidden="true" />
+        <div className="si-brand">
+          <BrandMark size={32} />
           <span className="brand-name">DietTrace</span>
         </div>
-        <h1 className="si-hero-title">
-          Know what you eat,
-          <br />
-          held to the gram.
-        </h1>
-        <p className="si-hero-sub">
-          An AI nutritionist that logs meals from plain English, shows its work on
-          every one, and is graded on accuracy — so you can trust the numbers.
-        </p>
-        <BrandMark size={320} className="si-hero-mark" />
-      </section>
+        <div className="si-cols">
+          <div className="si-textcol">
+            <span className="si-eyebrow mono">Welcome</span>
+            <h1 className="si-hero">Know what you eat, held to the gram.</h1>
+            <p className="si-sub">
+              An AI nutritionist — plain-English meals in, accurate macros out.
+            </p>
+          </div>
+          <div className="si-viscol">
+            <LiveTrace />
+          </div>
+        </div>
+      </div>
 
-      {/* Right: the sign-in card */}
-      <section className="si-panel">
+      {/* RIGHT — the sign-in card */}
+      <div className="si-right">
         <div className="si-card">
-          <div className="si-card-eyebrow mono">Get started</div>
-          <h2 className="si-card-title">Sign in</h2>
-          <div className="ob-actions">
+          <span className="si-card-eyebrow mono">Get started</span>
+          <h2 className="si-card-h">Pick up where you left off</h2>
+          <p className="si-card-sub">
+            Sign in to keep your food log across devices — or jump straight in. You
+            can always sign in later from the account menu.
+          </p>
+
+          <div className="si-actions">
             {configured && (
               <button
                 type="button"
-                className="si-google"
+                className="si-btn si-btn-google"
                 onClick={google}
                 disabled={busy}
               >
@@ -91,17 +172,21 @@ export function SignIn({ onContinueAnon }: { onContinueAnon: () => void }) {
             )}
             <button
               type="button"
-              className="ob-btn-secondary"
+              className="si-btn si-btn-anon"
               onClick={onContinueAnon}
             >
               Continue without an account
             </button>
           </div>
-          <p className="si-fine">
-            No email, no spam — your log stays on this device unless you sign in.
-          </p>
+
+          <div className="si-reassure">
+            <Lock size={14} aria-hidden="true" />
+            <span>
+              No email, no spam — your log stays on this device unless you sign in.
+            </span>
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

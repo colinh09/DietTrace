@@ -1251,23 +1251,79 @@ body {
 /* ── Onboarding (first-run welcome + 30-second profile) ─────────────────────
    Full-page calm card on the warm background. Reuses the tg-* form controls so
    it matches the macro editor; titles are serif, the eyebrow is mono. */
-/* Full-page sign-in split: brand/hero left, sign-in card right (stacks narrow) */
-.si-page { min-height: 100dvh; display: grid; grid-template-columns: 1.05fr 1fr; background: var(--bg); }
-.si-hero { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 9vh 6vw; background: linear-gradient(155deg, var(--accent-softer) 0%, var(--bg) 72%); overflow: hidden; }
-.si-hero .ob-brand { margin-bottom: 6px; }
-.si-hero-title { font-family: var(--serif); font-size: clamp(32px, 4vw, 46px); font-weight: 600; line-height: 1.07; letter-spacing: -0.015em; color: var(--ink); margin: 0; }
-.si-hero-sub { font-size: 15px; line-height: 1.6; color: var(--muted-ink); max-width: 40ch; margin: 0; }
-.si-hero-mark { position: absolute; right: -56px; bottom: -48px; opacity: .08; pointer-events: none; }
-.si-panel { display: flex; align-items: center; justify-content: center; padding: 6vh 6vw; }
-.si-card { width: 100%; max-width: 384px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 30px 30px 24px; box-shadow: 0 1px 2px rgba(27,26,22,.03), 0 12px 34px rgba(27,26,22,.06); }
-.si-card-eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 7px; }
-.si-card-title { font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--ink); margin: 0 0 18px; }
-@media (max-width: 860px) {
-  .si-page { grid-template-columns: 1fr; }
-  .si-hero { padding: 7vh 8vw 4vh; }
-  .si-hero-mark { display: none; }
-  .si-panel { padding: 0 8vw 8vh; align-items: flex-start; }
-  .si-card { max-width: none; }
+/* ============================================================
+   Full-page sign-in split (ported from the design mock):
+   left = sage stage (brand + hero + live agent-trace visual),
+   right = the sign-in card.
+   ============================================================ */
+.si-page { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); overflow: hidden; }
+
+/* LEFT — sage stage */
+.si-stage { position: relative; overflow: hidden; display: flex; flex-direction: column; padding: clamp(34px,4.5vh,52px) clamp(32px,3.4vw,56px);
+  background:
+    radial-gradient(110% 80% at 0% 0%, rgba(94,122,92,.17), rgba(94,122,92,0) 55%),
+    radial-gradient(90% 70% at 95% 100%, rgba(94,122,92,.11), rgba(94,122,92,0) 50%),
+    linear-gradient(158deg,#F2F5EC,#E6EBDD); }
+.si-grain { position: absolute; inset: 0; opacity: .5; pointer-events: none; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"); }
+.si-brand { display: flex; align-items: center; gap: 10px; flex: none; z-index: 3; }
+.si-cols { flex: 1; display: grid; grid-template-columns: minmax(0,.82fr) minmax(296px,1fr); gap: clamp(12px,1.4vw,24px); align-items: center; min-height: 0; padding: 20px 0; position: relative; z-index: 2; }
+.si-eyebrow { display: block; color: var(--accent-ink); opacity: .85; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.si-hero { font-family: var(--serif); font-weight: 600; font-size: clamp(34px,3vw,52px); line-height: 1.04; letter-spacing: -.025em; color: var(--ink); margin: 12px 0 0; text-wrap: balance; }
+.si-sub { font-size: clamp(13.5px,1vw,15px); color: var(--accent-ink); line-height: 1.5; margin-top: 14px; }
+.si-viscol { display: flex; justify-content: center; min-width: 0; }
+
+/* live agent-step trace card (the "visual") */
+.lt { position: relative; z-index: 2; width: 100%; max-width: 392px; background: rgba(255,255,255,.78); backdrop-filter: blur(9px); border: 1px solid rgba(255,255,255,.85); border-radius: 16px; box-shadow: 0 1px 2px rgba(27,26,22,.04), 0 26px 56px -30px rgba(27,26,22,.4); padding: 18px 20px 20px; }
+.lt-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; gap: 10px; }
+.lt-eyebrow { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.lt-live { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); }
+.lt-pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: ltPulse 2s ease-in-out infinite; }
+@keyframes ltPulse { 0% { box-shadow: 0 0 0 0 rgba(94,122,92,.4); } 70% { box-shadow: 0 0 0 7px rgba(94,122,92,0); } 100% { box-shadow: 0 0 0 0 rgba(94,122,92,0); } }
+.lt-trace { padding-left: 6px; }
+.lt-node { position: relative; padding: 8px 0 8px 24px; animation: ltIn .55s cubic-bezier(.2,.8,.3,1) both; }
+.lt-node::before { content: ""; position: absolute; left: 4px; top: 19px; bottom: -8px; border-left: 1.5px dotted var(--accent); opacity: .5; }
+.lt-node:last-child::before { display: none; }
+.lt-dot { position: absolute; left: 0; top: 12px; width: 9px; height: 9px; border-radius: 50%; background: var(--card); border: 1.8px solid var(--accent); }
+.lt-dot.fill { background: var(--accent); }
+.lt-node-head { display: flex; align-items: center; gap: 7px; }
+.lt-node-icon { color: var(--accent-ink); flex: none; }
+.lt-node-key { font-size: 13px; white-space: nowrap; color: var(--ink); }
+.lt-node-body { font-size: 12px; margin-top: 4px; color: var(--muted); }
+.lt-node-body.quote { font-family: var(--serif); font-style: italic; color: var(--ink); font-size: 13px; }
+.lt .phoenix-tag { margin-top: 6px; }
+@keyframes ltIn { from { transform: translateY(10px) scale(.99); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .lt-node { animation: none; } .lt-pulse { animation: none; } }
+
+/* RIGHT — sign-in card */
+.si-right { display: flex; align-items: center; justify-content: center; padding: 48px clamp(40px,5vw,80px); background: var(--bg); }
+.si-card { width: 100%; max-width: 404px; }
+.si-card-eyebrow { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+.si-card-h { font-family: var(--serif); font-weight: 600; font-size: 30px; letter-spacing: -.015em; line-height: 1.14; color: var(--ink); margin: 0; }
+.si-card-sub { font-size: 14.5px; color: var(--muted); line-height: 1.55; margin-top: 12px; max-width: 40ch; }
+.si-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
+.si-btn { display: flex; align-items: center; justify-content: center; gap: 11px; width: 100%; padding: 16px 18px; border-radius: 13px; font-size: 15px; font-weight: 500; font-family: var(--ui-font); cursor: pointer; transition: transform .14s cubic-bezier(.2,.8,.3,1), box-shadow .16s, border-color .16s, background .16s; }
+.si-btn:active { transform: translateY(1px); }
+.si-btn-google { background: var(--card); border: 1px solid var(--line-strong); color: var(--ink); }
+.si-btn-google:hover:not(:disabled) { border-color: var(--accent); box-shadow: 0 1px 2px rgba(27,26,22,.04), 0 18px 40px -24px rgba(27,26,22,.4); transform: translateY(-2px); }
+.si-btn-anon { background: var(--accent); color: #fff; border: none; box-shadow: 0 1px 2px rgba(70,96,63,.3); }
+.si-btn-anon:hover { background: var(--accent-ink); transform: translateY(-2px); }
+.si-btn:disabled { opacity: .6; cursor: default; }
+.si-reassure { display: flex; align-items: flex-start; gap: 9px; margin-top: 20px; font-size: 12.5px; color: var(--faint); line-height: 1.55; }
+.si-reassure svg { flex: none; margin-top: 1px; color: var(--accent); }
+
+@media (max-width: 1080px) {
+  .si-page { grid-template-columns: 1.15fr 1fr; }
+  .si-cols { grid-template-columns: 1fr; gap: clamp(18px,3vh,30px); align-content: center; }
+  .si-viscol { justify-content: flex-start; }
+}
+@media (max-width: 760px) {
+  .si-page { position: absolute; inset: auto; min-height: 100%; width: 100%; grid-template-columns: 1fr; grid-template-rows: auto auto; }
+  .si-stage { padding: 40px 28px 48px; }
+  .si-cols { grid-template-columns: 1fr; gap: 28px; }
+  .si-viscol { justify-content: flex-start; }
+  .si-right { padding: 40px 28px 56px; }
+  .si-card { margin: 0 auto; }
 }
 .ob-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 18px; background: var(--bg); }
 /* The reused onboarding chat as a dismissible overlay (Macros "recalculate"). */
