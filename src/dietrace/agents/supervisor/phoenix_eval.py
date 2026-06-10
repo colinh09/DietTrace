@@ -90,9 +90,15 @@ def _run_experiment(
 
     ex_block = [{"preference_block": block}] if block else []
 
-    def task(example: Any) -> dict[str, Any]:
+    def _score_one(example: Any) -> dict[str, Any]:
         totals = logger_fn(_example_text(example), examples=ex_block).get("totals", [])
         return {"calories": calories_of(totals)}
+
+    async def task(example: Any) -> dict[str, Any]:
+        # Coroutine so Phoenix's run_experiment(concurrency=…) actually parallelizes:
+        # offload the SYNC agent call (Gemini + food-DB query) to a thread so the
+        # whole dataset's cases score concurrently within a single experiment.
+        return await asyncio.to_thread(_score_one, example)
 
     def calorie_accuracy(output: Any, expected: Any) -> float:
         return accuracy(
@@ -106,6 +112,7 @@ def _run_experiment(
         experiment_name=name,
         print_summary=False,
         timeout=180,
+        concurrency=15,
     )
     return (
         ran.get("experiment_id")

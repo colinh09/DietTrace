@@ -152,6 +152,12 @@ function ScorePanel({
   rows: LiveRow[];
 }) {
   const asPct = (v: number) => `${Math.round(v * 100)}%`;
+  // The USDA set is 29 meals — long enough to bury the rest of the report. Clip to
+  // a handful and let the reader expand the full list inline.
+  const CLIP = 8;
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? rows : rows.slice(0, CLIP);
+  const hidden = rows.length - shown.length;
   return (
     <div className="rt-panel">
       <div className="rt-panel-title">
@@ -163,7 +169,7 @@ function ScorePanel({
         <span className="rt-colhead">Meal</span>
         <span className="rt-colhead">Base</span>
         <span className="rt-colhead">Tuned</span>
-        {rows.map((r, i) => {
+        {shown.map((r, i) => {
           const scored = r.before != null && r.after != null;
           const up = scored && (r.after as number) > (r.before as number);
           const down = scored && (r.after as number) < (r.before as number);
@@ -187,6 +193,16 @@ function ScorePanel({
           );
         })}
       </div>
+      {(hidden > 0 || expanded) && rows.length > CLIP && (
+        <button
+          type="button"
+          className="rt-more"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((s) => !s)}
+        >
+          {expanded ? "Show fewer" : `Show all (${rows.length})`}
+        </button>
+      )}
     </div>
   );
 }

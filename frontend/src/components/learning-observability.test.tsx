@@ -168,6 +168,38 @@ describe("LearningObservability", () => {
     await waitFor(() => expect(railBtn).toBeDisabled());
   });
 
+  it("clips a long per-meal results list and reveals the rest via Show all", async () => {
+    // The USDA set is 29 meals — the panel shows the first 8 and hides the rest
+    // behind a "Show all (N)" toggle so the report doesn't run on forever.
+    const usdaRows = Array.from({ length: 12 }, (_, i) => ({
+      set: "usda" as const,
+      text: `usda meal ${i + 1}`,
+      before: 0.8,
+      after: 0.82,
+      expected: 200,
+    }));
+    const retuneEvent = {
+      id: "r1",
+      op: "retune" as const,
+      reason: "fit improved",
+      shipped: true,
+      experiment: { rows: usdaRows, experimentUrl: "" },
+    };
+    render(
+      <LearningObservability reloadSignal={0} agentEvents={[retuneEvent]} />,
+    );
+
+    // The collapsible results open by default — only the first 8 rows render.
+    expect(await screen.findByText("usda meal 8")).toBeInTheDocument();
+    expect(screen.queryByText("usda meal 9")).not.toBeInTheDocument();
+
+    // "Show all (12)" reveals the remainder; toggling back clips it again.
+    fireEvent.click(screen.getByRole("button", { name: /show all \(12\)/i }));
+    expect(screen.getByText("usda meal 12")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /show fewer/i }));
+    expect(screen.queryByText("usda meal 12")).not.toBeInTheDocument();
+  });
+
   it("shows the user's context (the corrector's standing profile) and lets them edit it", async () => {
     vi.mocked(api.getProfile).mockResolvedValue({
       profile_text: "Marathon training, mostly plant-based",

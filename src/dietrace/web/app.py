@@ -1719,8 +1719,9 @@ def create_app(
         emits a phase event as the corrector proposes a rule, then one event per
         meal as it's re-scored — with the rule vs without — across the held-out
         confirmations (fit) and the USDA standard set (objective), then the final
-        verdict. ``full=False`` (a quick tune) checks a representative sample of
-        standard foods so the retune is fast; ``full=True`` checks the entire set.
+        verdict. The full USDA set is always scored (the per-case scoring runs in
+        parallel, so the honest floor is fast); ``full`` is accepted for backward
+        compatibility but no longer changes coverage.
         Same scoring + ship rule as POST /learning/retune."""
         new_corrections = fblog.list_unprocessed(user)
 
@@ -1753,8 +1754,10 @@ def create_app(
 
             fit_cases = confirmations_to_cases(confirms.list(user))
             usda_cases = usda_case_loader()
-            if not full:
-                usda_cases = _quick_usda_sample(usda_cases)
+            # Score the FULL USDA set every retune: the per-case scoring now runs in
+            # parallel (Phoenix run_experiment concurrency, local ThreadPoolExecutor
+            # fallback), so the honest 29-case floor is fast enough that the old
+            # quick-sample shortcut is no longer worth the loss of coverage.
             if _RETUNE_USDA_SAMPLE > 0:
                 usda_cases = usda_cases[:_RETUNE_USDA_SAMPLE]
 
@@ -1804,8 +1807,6 @@ def create_app(
             shared: dict[str, Any] = {"scored_via": "local", "experiment_url": ""}
             usda_label = (
                 "Re-checking the full standard set — everyday foods should stay accurate"
-                if full
-                else "Re-checking a sample of standard foods — everyday foods should stay accurate"
             )
 
             # Both panels fill CONCURRENTLY: each set scores in its own thread and
