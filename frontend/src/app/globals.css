@@ -1896,9 +1896,12 @@ body {
 .rt-badge { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono);
   font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 600; }
 .rt-headline { margin-top: 8px; font-size: 12.5px; color: var(--muted-ink); line-height: 1.5; }
-.rt-rule { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; padding: 10px 12px;
+.rt-rule { display: flex; flex-direction: column; gap: 7px; margin: 12px 0; padding: 10px 12px;
   border-radius: 10px; background: var(--surface); font-size: 12.5px; color: var(--muted-ink); line-height: 1.5; }
 .rt-rule b { color: var(--ink); font-weight: 600; }
+.rt-rule-head { color: var(--ink); font-weight: 600; }
+.rt-rule-list { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 5px; }
+.rt-rule-list li { line-height: 1.45; }
 .rt-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .rt-panel { background: var(--surface); border-radius: 12px; padding: 13px 14px;
   box-shadow: 0 1px 2px rgba(27, 26, 22, .04); min-width: 0; }

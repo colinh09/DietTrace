@@ -126,10 +126,12 @@ function RetuneLive({
       <div className="rt-headline">{phase}</div>
       {rules.length > 0 && (
         <div className="rt-rule">
-          <span>
-            <b>New rule DietTrace learned — </b>
-            {rules[0].rule}
-          </span>
+          <div className="rt-rule-head">This is what DietTrace learned</div>
+          <ul className="rt-rule-list">
+            {rules.map((r, i) => (
+              <li key={i}>{r.rule}</li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
