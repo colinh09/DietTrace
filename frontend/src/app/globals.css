@@ -329,7 +329,10 @@ body {
    small pencil affordance (the native clock indicator is hidden). */
 .meal-time-edit { display: inline-flex; align-items: center; gap: 2px; }
 .meal-time-input { font-family: var(--mono); font-size: 15px; color: var(--muted-ink); background: none; border: none; padding: 0; width: max-content; }
-.meal-time-input:focus { outline: none; color: var(--accent-ink); }
+.meal-time-input:focus { outline: none; color: var(--accent-ink); box-shadow: inset 0 -1.5px 0 var(--accent); }
+.meal-time-input::-webkit-datetime-edit-ampm-field:focus,
+.meal-time-input::-webkit-datetime-edit-hour-field:focus,
+.meal-time-input::-webkit-datetime-edit-minute-field:focus { background: var(--accent-softer); border-radius: 3px; color: var(--accent-ink); }
 .meal-time-input::-webkit-calendar-picker-indicator { display: none; }
 .meal-time-pencil { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: none; background: none; color: var(--faint); border-radius: 5px; cursor: pointer; transition: color .12s, background .12s; }
 .meal-time-pencil:hover { color: var(--accent-ink); background: var(--accent-softer); }

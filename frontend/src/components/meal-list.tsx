@@ -90,9 +90,9 @@ function MealTime({ meal, onChanged }: { meal: Meal; onChanged?: () => void }) {
         className="meal-time-pencil"
         aria-label="edit time"
         onClick={() => {
-          const el = ref.current;
-          if (el?.showPicker) el.showPicker();
-          else el?.focus();
+          // Edit inline in the field's own HH:MM AM/PM segments (which enforce
+          // valid bounds) — NOT the browser's clunky time-picker dropdown.
+          ref.current?.focus();
         }}
       >
         <Pencil size={12} aria-hidden="true" />
