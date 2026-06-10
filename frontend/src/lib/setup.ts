@@ -85,23 +85,25 @@ export const PERSONA_INPUTS: Record<string, ProfileInputs> = {
     goal: "bulk",
     preference: "keep protein very high for muscle gain",
   },
-  everyday: {
-    age: 38,
-    sex: "male",
-    height_cm: 178,
-    weight_kg: 84,
-    activity: "light",
-    goal: "cut",
-    preference: "eats out a few times a week; trying to lose a little weight",
-  },
-  creator: {
-    age: 28,
-    sex: "male",
-    height_cm: 178,
-    weight_kg: 79,
-    activity: "very_active",
-    goal: "cut",
-    preference:
-      "lifts in the morning, walks a lot; small deficit with carbs high enough for training",
-  },
+  // Archived personas — kept here (commented out) so they can be restored
+  // alongside the backend ARCHIVED_PERSONAS:
+  // everyday: {
+  //   age: 38,
+  //   sex: "male",
+  //   height_cm: 178,
+  //   weight_kg: 84,
+  //   activity: "light",
+  //   goal: "cut",
+  //   preference: "eats out a few times a week; trying to lose a little weight",
+  // },
+  // creator: {
+  //   age: 28,
+  //   sex: "male",
+  //   height_cm: 178,
+  //   weight_kg: 79,
+  //   activity: "very_active",
+  //   goal: "cut",
+  //   preference:
+  //     "lifts in the morning, walks a lot; small deficit with carbs high enough for training",
+  // },
 };

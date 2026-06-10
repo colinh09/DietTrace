@@ -1398,7 +1398,11 @@ def create_app(
             tz=datetime.UTC
         ).date().isoformat()
         today_date = datetime.date.fromisoformat(today)
-        dataset_date = (today_date - datetime.timedelta(days=1)).isoformat()
+        # Today (offset 0) stays EMPTY — the judge logs their own first meal there.
+        # The persona's visible meals are spread across yesterday (day 1) and
+        # two-days-ago (day 2); the held-out dataset rows live on the older day, so
+        # dataset_date is today − 2.
+        dataset_date = (today_date - datetime.timedelta(days=2)).isoformat()
         meal_ids: list[int] = []
         for meal in persona.meals:
             # A meal may pin itself to a day relative to the seed's local today
@@ -1452,14 +1456,20 @@ def create_app(
         # The seeded agent-activity feed (dated to the previous day): the persona's
         # prior decisions — meals added to the held-out dataset + corrections banked.
         seeded_decisions: list[dict[str, Any]] = []
-        # Log the full simulated previous day (real agent output, full detail) on
-        # the previous day; dataset-point meals are also added to the gate set.
+        # Log the full simulated prior day (real agent output, full detail) on the
+        # older day; dataset-point meals are also added to the gate set. Each item
+        # may pin its own ``day`` offset (default 2 = the older day, where the
+        # held-out dataset rows live), matching the visible-meal placement above.
         for m in persona.previous_day:
             detail = dict(m.get("detail", {}))
             is_dp = bool(m.get("dataset_point"))
             detail["dataset_point"] = is_dp
+            prev_day_offset = int(m.get("day", 2))
+            prev_date = (
+                today_date - datetime.timedelta(days=prev_day_offset)
+            ).isoformat()
             log_store.add(
-                m["text"], m["totals"], date=dataset_date, user_id=user, detail=detail
+                m["text"], m["totals"], date=prev_date, user_id=user, detail=detail
             )
             if is_dp:
                 confirms.add(

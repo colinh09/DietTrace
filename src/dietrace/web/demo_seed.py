@@ -7,13 +7,13 @@ JSON file. Nothing here is hand-authored — the confidence is the genuine mean 
 the four eval axes, so the "why this confidence" breakdown adds up. Loading the
 canned data keeps /demo/seed deterministic and offline (no Gemini call, no spend).
 
-Three selectable personas (the persona loader, ): an **endurance runner** who
-under-logs her training carbs, a **bodybuilder** who under-logs his post-lift
-protein portions, and a generalist **busy professional** whose eaten-out portions
-run bigger than he logs (so a non-athlete judge sees themselves). Each ships a
-visible day + the learning-loop seed (confirmed meals as the held-out gate set + a
-couple of corrections) so a judge can hit "retune" immediately and watch the gate
-ship a persona-specific rule.
+Two selectable personas (the persona loader, ): an **endurance runner** who
+under-logs her training carbs, and a **bodybuilder** who under-logs his post-lift
+protein portions. (Two more — a generalist **busy professional** and the creator's
+own dogfooded log — are kept defined but archived in ``ARCHIVED_PERSONAS`` so they
+can be restored.) Each ships a couple of visible days + the learning-loop seed
+(confirmed meals as the held-out gate set + a couple of corrections) so a judge can
+hit "retune" immediately and watch the gate ship a persona-specific rule.
 """
 
 from __future__ import annotations
@@ -313,8 +313,16 @@ CREATOR = Persona(
 )
 
 
+# Only the two athlete personas are selectable right now. EVERYDAY and CREATOR
+# are archived (their Persona definitions + demo_seed_everyday.json /
+# demo_seed_creator.json stay in place) so they can be restored by moving them
+# back into PERSONAS — nothing is deleted.
+ARCHIVED_PERSONAS: dict[str, Persona] = {
+    p.key: p for p in (EVERYDAY, CREATOR)
+}
+
 PERSONAS: dict[str, Persona] = {
-    p.key: p for p in (RUNNER, BODYBUILDER, EVERYDAY, CREATOR)
+    p.key: p for p in (RUNNER, BODYBUILDER)
 }
 DEFAULT_PERSONA = RUNNER.key
 

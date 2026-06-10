@@ -128,29 +128,37 @@ def test_demo_seed_reseed_does_not_stack_trust(tmp_path) -> None:
     assert trust["count"] == len(DEMO_MEALS)
 
 
-def test_demo_seed_visible_today_dataset_yesterday(tmp_path) -> None:
-    """The visible playground meals land on TODAY; the confirmed dataset is
-    mirrored as badged rows on the PREVIOUS day (nothing hidden — the
-    observability-everywhere rule)."""
+def test_demo_seed_today_empty_meals_spread_dataset_on_older_day(tmp_path) -> None:
+    """Today (offset 0) is EMPTY — the judge logs their own first meal there. The
+    persona's visible meals are spread across yesterday (day 1) AND two-days-ago
+    (day 2), roughly half each (not crammed onto one day). The held-out dataset
+    rows live on the older day (day 2), badged but never hidden."""
     client, _, _ = _client(tmp_path)
-    resp = client.post("/demo/seed", headers=_H, json={"date": "2026-06-06"}).json()
-    assert resp["meal_date"] == "2026-06-06"  # playground meals = today
-    assert resp["dataset_date"] == "2026-06-05"  # dataset rows = previous day
+    resp = client.post("/demo/seed", headers=_H, json={"date": "2026-06-07"}).json()
+    assert resp["meal_date"] == "2026-06-07"  # today — left clean
+    assert resp["dataset_date"] == "2026-06-05"  # older day (today − 2)
 
-    today = client.get("/history?date=2026-06-06", headers=_H).json()["meals"]
-    texts = {m["text"] for m in today}
-    assert len(today) == len(DEMO_MEALS)
-    for meal in DEMO_MEALS:
-        assert meal["text"] in texts, f"'{meal['text']}' missing from today"
-    assert all(not m.get("dataset_point") for m in today)
+    # Today is empty.
+    today = client.get("/history?date=2026-06-07", headers=_H).json()["meals"]
+    assert today == []
 
-    # The previous day is a full simulated day (more meals than the dataset),
-    # and exactly the dataset-point rows are flagged + match the held-out set.
-    prev = client.get("/history?date=2026-06-05", headers=_H).json()["meals"]
-    dataset_rows = [m for m in prev if m.get("dataset_point")]
-    assert len(prev) > resp["confirmations"], "prev day should be a fuller day"
+    day1 = client.get("/history?date=2026-06-06", headers=_H).json()["meals"]
+    day2 = client.get("/history?date=2026-06-05", headers=_H).json()["meals"]
+
+    # The persona's visible playground meals are spread across BOTH prior days —
+    # each day carries some of them, so neither is crammed and neither is empty.
+    want = {m["text"] for m in DEMO_MEALS}
+    day1_persona = {m["text"] for m in day1 if not m.get("dataset_point")} & want
+    day2_persona = {m["text"] for m in day2 if not m.get("dataset_point")} & want
+    assert day1_persona, "day 1 should carry some of the persona's visible meals"
+    assert day2_persona, "day 2 should carry some of the persona's visible meals"
+    assert day1_persona | day2_persona == want  # all accounted for across the two days
+
+    # The dataset-point rows all sit on the older day (day 2), flagged + matching
+    # the held-out set, and carry full per-item detail (not a bare badge).
+    assert not any(m.get("dataset_point") for m in day1)
+    dataset_rows = [m for m in day2 if m.get("dataset_point")]
     assert len(dataset_rows) == resp["confirmations"]
-    # Dataset-point rows carry full per-item detail (not a bare badge).
     assert all(m.get("per_item") for m in dataset_rows)
 
 
@@ -171,15 +179,18 @@ def test_demo_seed_is_the_runner_day_with_consistent_confidence(tmp_path) -> Non
     under-counted carb meal (the 'big plate of spaghetti'), and every meal's
     confidence is the genuine mean of its eval axes (it adds up)."""
     client, _, _ = _client(tmp_path)
-    resp = client.post("/demo/seed", headers=_H).json()
-    meals = client.get(f"/history?date={resp['meal_date']}", headers=_H).json()["meals"]
+    resp = client.post("/demo/seed", headers=_H, json={"date": "2026-06-07"}).json()
+    # The visible meals are spread across the two prior days (today is empty).
+    day1 = client.get("/history?date=2026-06-06", headers=_H).json()["meals"]
+    day2 = client.get("/history?date=2026-06-05", headers=_H).json()["meals"]
+    meals = day1 + day2
 
     assert any("spaghetti" in m["text"].lower() for m in meals), (
         "the under-counted spaghetti meal should be seeded"
     )
-    # meals_logged counts ALL real logged meals = visible day (4) + the previous
+    # meals_logged counts ALL real logged meals = the visible days (6) + the prior
     # day's non-dataset-point meals (4), distinct from the held-out confirmations.
-    assert resp["persona"]["meals_logged"] == 8
+    assert resp["persona"]["meals_logged"] == 10
     for m in meals:
         axes = m.get("axes") or []
         if axes:
@@ -229,12 +240,20 @@ def test_demo_seed_persona_loader(tmp_path) -> None:
     assert "bodybuilder" in profile.lower()
 
     # Re-seeding the runner replaces it cleanly (idempotent across personas).
-    again = client.post("/demo/seed", headers=_H, json={"persona": "runner"}).json()
+    again = client.post(
+        "/demo/seed", headers=_H, json={"persona": "runner", "date": "2026-06-07"}
+    ).json()
     assert again["persona"]["key"] == "runner"
-    day = again["meal_date"]
-    texts = {m["text"] for m in client.get(f"/history?date={day}", headers=_H).json()["meals"]}
+    # Today is empty; the runner's meals are on the two prior days.
+    assert client.get("/history?date=2026-06-07", headers=_H).json()["meals"] == []
+    texts = {
+        m["text"]
+        for d in ("2026-06-06", "2026-06-05")
+        for m in client.get(f"/history?date={d}", headers=_H).json()["meals"]
+    }
     assert any("spaghetti" in t.lower() for t in texts)
-    assert not any("turkey" in t.lower() for t in texts)  # no bodybuilder meals linger
+    # No bodybuilder-only meals linger ("whey"/"sausage" appear only in his seed).
+    assert not any("whey" in t.lower() or "sausage" in t.lower() for t in texts)
 
 
 def test_demo_seed_is_idempotent(tmp_path) -> None:
@@ -245,13 +264,17 @@ def test_demo_seed_is_idempotent(tmp_path) -> None:
     """
     client, _, _ = _client(tmp_path)
 
-    client.post("/demo/seed", headers=_H, json={"date": "2026-06-06"})
-    resp = client.post("/demo/seed", headers=_H, json={"date": "2026-06-06"}).json()
+    client.post("/demo/seed", headers=_H, json={"date": "2026-06-07"})
+    client.post("/demo/seed", headers=_H, json={"date": "2026-06-07"})
 
-    hist = client.get(f"/history?date={resp['meal_date']}", headers=_H).json()
-    all_texts = [m["text"] for m in hist["meals"]]
-    assert len(all_texts) == len(DEMO_MEALS)
-    counts = Counter(all_texts)
+    # Across the two prior days each visible persona meal appears exactly once
+    # (re-seeding replaces the day, never stacks duplicates).
+    counts = Counter(
+        m["text"]
+        for d in ("2026-06-06", "2026-06-05")
+        for m in client.get(f"/history?date={d}", headers=_H).json()["meals"]
+        if not m.get("dataset_point")
+    )
     for meal in DEMO_MEALS:
         assert counts[meal["text"]] == 1, f"'{meal['text']}' should appear exactly once"
 
@@ -272,26 +295,39 @@ def test_demo_seed_per_user_isolation(tmp_path) -> None:
     )
     client = TestClient(app)
 
-    a = client.post("/demo/seed", headers={"X-DietTrace-User": "alice"}).json()
-    b = client.post("/demo/seed", headers={"X-DietTrace-User": "bob"}).json()
+    client.post(
+        "/demo/seed", headers={"X-DietTrace-User": "alice"}, json={"date": "2026-06-07"}
+    )
+    client.post(
+        "/demo/seed", headers={"X-DietTrace-User": "bob"}, json={"date": "2026-06-07"}
+    )
 
-    alice = client.get(
-        f"/history?date={a['meal_date']}", headers={"X-DietTrace-User": "alice"}
-    ).json()
-    bob = client.get(
-        f"/history?date={b['meal_date']}", headers={"X-DietTrace-User": "bob"}
-    ).json()
-    assert len(alice["meals"]) == len(DEMO_MEALS)
-    assert len(bob["meals"]) == len(DEMO_MEALS)
+    def visible_texts(uid: str) -> set:
+        return {
+            m["text"]
+            for d in ("2026-06-06", "2026-06-05")
+            for m in client.get(
+                f"/history?date={d}", headers={"X-DietTrace-User": uid}
+            ).json()["meals"]
+            if not m.get("dataset_point")
+        }
+
+    want = {m["text"] for m in DEMO_MEALS}
+    assert want <= visible_texts("alice")
+    assert want <= visible_texts("bob")
 
 
 def test_demo_seed_trace_persisted_in_history(tmp_path) -> None:
     """Every seeded meal in /history carries its trace (parse_meal → log_entry)."""
     client, _, _ = _client(tmp_path)
-    resp = client.post("/demo/seed", headers=_H).json()
+    client.post("/demo/seed", headers=_H, json={"date": "2026-06-07"}).json()
 
-    hist = client.get(f"/history?date={resp['meal_date']}", headers=_H).json()
-    for meal in hist["meals"]:
+    meals = [
+        m
+        for d in ("2026-06-06", "2026-06-05")
+        for m in client.get(f"/history?date={d}", headers=_H).json()["meals"]
+    ]
+    for meal in meals:
         trace = meal.get("trace")
         assert trace, f"meal '{meal['text']}' has no trace"
         steps = [s["step"] for s in trace]
@@ -322,104 +358,71 @@ def test_demo_seed_goals_not_set_without_goal_store(tmp_path) -> None:
     assert body["meals"] == len(DEMO_MEALS)
 
 
-def test_demo_seed_everyday_persona(tmp_path) -> None:
-    """The third (generalist) persona — a busy average person eating a bit healthier
-    and losing a little weight — loads its own visible day, per-user balanced (not
-    athletic) goals, and a learning seed, so a non-athlete judge sees themselves."""
-    client, _, goal_store = _client(tmp_path)
-    resp = client.post("/demo/seed", headers=_H, json={"persona": "everyday"}).json()
+def test_only_two_athletes_selectable_everyday_creator_archived() -> None:
+    """Only the runner + bodybuilder are selectable; the everyday + creator personas
+    are archived — kept defined (so they can be restored) but out of PERSONAS, hence
+    out of the picker (the frontend DEMO_PERSONAS) and the SeededModal switcher."""
+    from dietrace.web.demo_seed import (
+        ARCHIVED_PERSONAS,
+        BODYBUILDER,
+        CREATOR,
+        EVERYDAY,
+        PERSONAS,
+        RUNNER,
+    )
 
-    persona = resp["persona"]
-    assert persona["key"] == "everyday"
-
-    # The visible playground meals landed on TODAY.
-    day = resp["meal_date"]
-    meals = client.get(f"/history?date={day}", headers=_H).json()["meals"]
-    assert len(meals) == len(persona["meal_texts"]) > 0
-    # The on-screen under-count (an eaten-out portion-creep meal) is one of them.
-    assert any(persona["hook_meal"] in t for t in persona["meal_texts"])
-
-    # Per-user goals are the balanced maintenance-minus-small-deficit targets
-    # (NOT an athlete's split): a gentle deficit with even macros.
-    goals = goal_store.get(_USER)
-    assert goals["208"] == 2000.0  # moderate activity, a gentle deficit (recomp)
-    assert goals["203"] == 150.0   # enough protein for muscle, not an athlete's split
-
-    # The learning loop is pre-seeded and corrections stay DISJOINT from the
-    # held-out confirmations (asserted exhaustively below).
-    assert resp["confirmations"] >= 3
-    assert resp["corrections"] >= 1
-    assert len(persona["correction_texts"]) == resp["corrections"]
+    assert set(PERSONAS) == {"runner", "bodybuilder"}
+    assert PERSONAS["runner"] is RUNNER
+    assert PERSONAS["bodybuilder"] is BODYBUILDER
+    # The archived personas are still DEFINED and retained (not deleted).
+    assert "everyday" not in PERSONAS and "creator" not in PERSONAS
+    assert ARCHIVED_PERSONAS == {"everyday": EVERYDAY, "creator": CREATOR}
 
 
-def test_everyday_persona_registered_for_picker() -> None:
-    """The generalist persona is registered in PERSONAS so the picker (the frontend
-    DEMO_PERSONAS) and the SeededModal switcher list it alongside the two athletes."""
-    from dietrace.web.demo_seed import EVERYDAY, PERSONAS
+def test_archived_persona_definitions_and_files_retained() -> None:
+    """The archived personas keep their Persona definitions AND their JSON files, so
+    they can be restored by moving them back into PERSONAS — nothing was deleted."""
+    from pathlib import Path
 
-    assert "everyday" in PERSONAS
-    assert PERSONAS["everyday"] is EVERYDAY
-    # Four distinct selectable personas: runner + bodybuilder + everyday generalist
-    # + the creator's real dogfooded log.
-    assert {"runner", "bodybuilder", "everyday", "creator"} <= set(PERSONAS)
+    import dietrace.web.demo_seed as ds
+
+    assert ds.EVERYDAY.meals and ds.EVERYDAY.confirmations and ds.EVERYDAY.feedback
+    assert ds.CREATOR.meals and ds.CREATOR.confirmations and ds.CREATOR.feedback
+    seed_dir = Path(ds.__file__).parent
+    assert (seed_dir / "demo_seed_everyday.json").exists()
+    assert (seed_dir / "demo_seed_creator.json").exists()
 
 
-def test_demo_seed_creator_persona(tmp_path) -> None:
-    """The creator's-log persona replays a real exported account: every logged meal
-    is the visible day, the confirmed meals are the held-out gate set, and the real
-    corrections are banked — all deterministic and offline (no Gemini)."""
-    from dietrace.web.demo_seed import CREATOR
+@pytest.mark.parametrize("persona_key", ["runner", "bodybuilder"])
+def test_feedback_meals_are_visible_and_badged(tmp_path, persona_key) -> None:
+    """Each banked correction's meal is ALSO logged as a visible meal (using the
+    same feedback meal_text), spread across the two prior days. /history badges it
+    has_feedback by TEXT-MATCH against the banked feedback, so it renders the
+    feedback review state with no frontend change."""
+    from dietrace.web.demo_seed import PERSONAS
 
-    client, _, goal_store = _client(tmp_path)
-    resp = client.post("/demo/seed", headers=_H, json={"persona": "creator"}).json()
+    client, _, _ = _client(tmp_path)
+    client.post(
+        "/demo/seed", headers=_H, json={"persona": persona_key, "date": "2026-06-07"}
+    )
 
-    persona = resp["persona"]
-    assert persona["key"] == "creator"
-    assert persona["label"] == "The creator's log"
+    visible = [
+        m
+        for d in ("2026-06-06", "2026-06-05")
+        for m in client.get(f"/history?date={d}", headers=_H).json()["meals"]
+        if not m.get("dataset_point")
+    ]
+    by_text = {m["text"]: m for m in visible}
 
-    # The creator's visible day is spread across two days: the first + last meal
-    # (his preworkout dates + post-workout whey) land on TODAY, the other five on
-    # the PRIOR day, so his log reads like a real two-day window rather than seven
-    # meals stacked on one day.
-    assert len(CREATOR.meals) == 7
-    today = resp["meal_date"]
-    prev = resp["dataset_date"]
-    today_meals = client.get(f"/history?date={today}", headers=_H).json()["meals"]
-    prev_meals = client.get(f"/history?date={prev}", headers=_H).json()["meals"]
-
-    today_texts = {m["text"] for m in today_meals}
-    # Exactly the two pinned-to-today meals (index 0 + 6) are on today.
-    assert today_texts == {CREATOR.meals[0]["text"], CREATOR.meals[6]["text"]}
-    # The other five visible meals are on the prior day (alongside, but distinct
-    # from, the two badged held-out dataset-point rows).
-    prev_visible = [m for m in prev_meals if not m.get("dataset_point")]
-    assert {m["text"] for m in prev_visible} == {
-        CREATOR.meals[i]["text"] for i in (1, 2, 3, 4, 5)
-    }
-
-    # All seven visible meals are accounted for across the two days.
-    assert today_texts | {m["text"] for m in prev_visible} == {
-        m["text"] for m in CREATOR.meals
-    }
-
-    # The on-screen under-count he corrected is one of the visible meals.
-    assert any(persona["hook_meal"] in t for t in persona["meal_texts"])
-
-    # meals_logged is all 7 real logged meals; his previous day is dataset points
-    # only, so nothing is added beyond the visible meals (stays 7, not undercounted).
-    assert persona["meals_logged"] == 7
-
-    # His own real targets replaced the runner defaults.
-    assert goal_store.get(_USER)["208"] == 2635.0
-    assert goal_store.get(_USER)["203"] == 230.6
-
-    # His confirmed meals are the held-out gate set; his real corrections banked.
-    assert resp["confirmations"] == len(CREATOR.confirmations) >= 2
-    assert resp["corrections"] == len(persona["correction_texts"]) >= 4
-
-    # His freeform profile is seeded as standing corrector context.
-    profile = client.get("/profile", headers=_H).json()["profile_text"]
-    assert "lean physique" in profile.lower()
+    feedback_texts = [f["meal_text"] for f in PERSONAS[persona_key].feedback]
+    assert feedback_texts, "persona should have banked feedback"
+    for ft in feedback_texts:
+        assert ft in by_text, f"feedback meal '{ft}' is not a visible logged meal"
+        meal = by_text[ft]
+        assert meal.get("has_feedback") is True, f"'{ft}' should be badged has_feedback"
+        # The under-count is real agent output carried into the seed (per-item + trace).
+        assert meal.get("per_item"), f"'{ft}' should carry its captured per-item panel"
+        assert meal.get("trace"), f"'{ft}' should carry its captured trace"
 
 
 def test_persona_corrections_are_disjoint_from_dataset_points() -> None:
@@ -427,9 +430,9 @@ def test_persona_corrections_are_disjoint_from_dataset_points() -> None:
     corrector learns from a meal it's then graded on (training on the test set), which
     skews the gate and the retune-trigger counts. Keep corrections and dataset points
     disjoint, for every persona."""
-    from dietrace.web.demo_seed import PERSONAS
+    from dietrace.web.demo_seed import ARCHIVED_PERSONAS, PERSONAS
 
-    for persona in PERSONAS.values():
+    for persona in (*PERSONAS.values(), *ARCHIVED_PERSONAS.values()):
         dataset_meals = {c["meal_text"] for c in persona.confirmations}
         correction_meals = {f["meal_text"] for f in persona.feedback}
         overlap = dataset_meals & correction_meals

@@ -62,8 +62,9 @@ _H = {"X-DietTrace-User": _USER}
 def test_reset_wipes_seeded_meals_and_goals(tmp_path) -> None:
     client, _, goal_store, _ = _client(tmp_path)
     seeded = client.post("/demo/seed", headers=_H).json()
-    # Visible meals land on the previous day; today stays clean.
-    day = seeded["meal_date"]
+    # Today stays clean; the visible meals are spread across the two prior days,
+    # with the held-out dataset rows on the older day (dataset_date).
+    day = seeded["dataset_date"]
     assert client.get(f"/history?date={day}", headers=_H).json()["meals"]  # non-empty
     assert goal_store.get(_USER) is not None  # demo targets saved
 
@@ -105,7 +106,7 @@ def test_reset_is_scoped_to_caller(tmp_path) -> None:
     other = {"X-DietTrace-User": "someone-else"}
     client.post("/demo/seed", headers=_H)
     seeded_other = client.post("/demo/seed", headers=other).json()
-    day = seeded_other["meal_date"]
+    day = seeded_other["dataset_date"]  # the older day carries seeded meals
 
     client.post("/session/reset", headers=_H)
 

@@ -661,6 +661,9 @@ export interface SeededDecision {
 }
 
 // The selectable demo personas (the persona loader). Keys match the backend.
+// The "everyday" and "creator" personas are archived on the backend (kept defined
+// but not selectable); their picker entries are retained below, commented out, so
+// they can be restored alongside the backend ARCHIVED_PERSONAS.
 export const DEMO_PERSONAS = [
   {
     key: "runner",
@@ -672,16 +675,17 @@ export const DEMO_PERSONAS = [
     label: "Bodybuilder",
     blurb: "Under-logs his post-lift protein.",
   },
-  {
-    key: "everyday",
-    label: "Busy professional",
-    blurb: "Eats out a lot — those portions run big.",
-  },
-  {
-    key: "creator",
-    label: "The creator's log",
-    blurb: "Meals the creator of this app logs.",
-  },
+  // Archived — restore alongside the backend ARCHIVED_PERSONAS:
+  // {
+  //   key: "everyday",
+  //   label: "Busy professional",
+  //   blurb: "Eats out a lot — those portions run big.",
+  // },
+  // {
+  //   key: "creator",
+  //   label: "The creator's log",
+  //   blurb: "Meals the creator of this app logs.",
+  // },
 ] as const;
 
 export async function seedDemo(

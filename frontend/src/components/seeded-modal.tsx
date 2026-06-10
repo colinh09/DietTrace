@@ -100,15 +100,16 @@ export function SeededModal({
           )}
         </section>
 
-        {/* on today — your playground */}
+        {/* the last two days — your playground; today starts clean */}
         <section>
           <div className="dm-sec-head">
-            <span className="eyebrow">On today · your playground</span>
+            <span className="eyebrow">The last two days · your playground</span>
             <hr />
           </div>
           <p className="dm-cap">
-            Edit a portion, log a meal, or fix an under-count — then watch it
-            re-tune.
+            These meals are logged across the past two days — today starts clean
+            for you to log your own. Edit a portion or fix an under-count, then
+            watch it re-tune.
           </p>
           <div className="dm-meals">
             {p.meal_texts.map((text, i) => {
