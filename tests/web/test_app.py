@@ -87,6 +87,25 @@ def test_set_meal_time_rejects_a_bad_timestamp(tmp_path) -> None:
     assert resp.status_code == 422
 
 
+def test_set_meal_items_rewrites_totals_without_a_dataset_point(tmp_path) -> None:
+    client, _ = _client(tmp_path)
+    meal_id = client.post("/log", json={"text": "1 banana"}).json()["id"]
+
+    totals = [{"code": "208", "amount": 250.0}, {"code": "203", "amount": 5.0}]
+    items = [{"name": "banana", "grams": 200.0, "nutrients": totals}]
+    resp = client.post(
+        f"/meals/{meal_id}/items", json={"per_item": items, "totals": totals}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["updated"] is True
+
+    meal = client.get("/history").json()["meals"][0]
+    by_code = {n["code"]: n["amount"] for n in meal["totals"]}
+    assert by_code["208"] == 250.0
+    # A manual edit must NOT turn the meal into a confirmed dataset point.
+    assert meal.get("dataset_point") is not True
+
+
 def test_history_returns_logged_meals(tmp_path) -> None:
     client, _ = _client(tmp_path)
     client.post("/log", json={"text": "1 banana"})

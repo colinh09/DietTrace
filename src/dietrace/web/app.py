@@ -193,6 +193,15 @@ class MealTimeRequest(BaseModel):
     created_at: str
 
 
+class MealItemsRequest(BaseModel):
+    """Edit a logged meal's numbers in place — its per-item rows (grams + nutrients)
+    and the recomputed totals. A plain manual fix to the log, NOT a confirmation or
+    dataset point (so it teaches the agent nothing)."""
+
+    per_item: list[dict[str, Any]]
+    totals: list[dict[str, Any]]
+
+
 class FeedbackEditRequest(BaseModel):
     """Edit a banked correction's text and/or its emphasis weight (Input B)."""
 
@@ -872,6 +881,17 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="invalid created_at") from exc
         return {"id": meal_id, "updated": log_store.set_time(meal_id, when, user_id=user)}
+
+    @app.post("/meals/{meal_id}/items")
+    def set_meal_items(
+        meal_id: int, req: MealItemsRequest, user: str = Depends(current_user)
+    ) -> dict[str, Any]:
+        """Rewrite a meal's items + totals in place (a manual edit of the numbers).
+        Does NOT bank feedback or create a dataset point — it just fixes the log."""
+        updated = log_store.update(
+            meal_id, req.per_item, req.totals, user_id=user
+        )
+        return {"id": meal_id, "updated": updated}
 
     @app.get("/history")
     def history(
