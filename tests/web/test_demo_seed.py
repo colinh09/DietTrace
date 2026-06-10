@@ -374,10 +374,31 @@ def test_demo_seed_creator_persona(tmp_path) -> None:
     assert persona["key"] == "creator"
     assert persona["label"] == "The creator's log"
 
-    # Every real logged meal is on the visible (today) day.
-    day = resp["meal_date"]
-    meals = client.get(f"/history?date={day}", headers=_H).json()["meals"]
-    assert len(meals) == len(persona["meal_texts"]) == len(CREATOR.meals) > 0
+    # The creator's visible day is spread across two days: the first + last meal
+    # (his preworkout dates + post-workout whey) land on TODAY, the other five on
+    # the PRIOR day, so his log reads like a real two-day window rather than seven
+    # meals stacked on one day.
+    assert len(CREATOR.meals) == 7
+    today = resp["meal_date"]
+    prev = resp["dataset_date"]
+    today_meals = client.get(f"/history?date={today}", headers=_H).json()["meals"]
+    prev_meals = client.get(f"/history?date={prev}", headers=_H).json()["meals"]
+
+    today_texts = {m["text"] for m in today_meals}
+    # Exactly the two pinned-to-today meals (index 0 + 6) are on today.
+    assert today_texts == {CREATOR.meals[0]["text"], CREATOR.meals[6]["text"]}
+    # The other five visible meals are on the prior day (alongside, but distinct
+    # from, the two badged held-out dataset-point rows).
+    prev_visible = [m for m in prev_meals if not m.get("dataset_point")]
+    assert {m["text"] for m in prev_visible} == {
+        CREATOR.meals[i]["text"] for i in (1, 2, 3, 4, 5)
+    }
+
+    # All seven visible meals are accounted for across the two days.
+    assert today_texts | {m["text"] for m in prev_visible} == {
+        m["text"] for m in CREATOR.meals
+    }
+
     # The on-screen under-count he corrected is one of the visible meals.
     assert any(persona["hook_meal"] in t for t in persona["meal_texts"])
 

@@ -558,6 +558,27 @@ def _maybe_decision_client() -> Any | None:
         return None
 
 
+def _seed_created_at(
+    meal_date: str, time_str: str | None
+) -> datetime.datetime | None:
+    """The ``created_at`` instant for a seeded meal pinned to *meal_date* at a
+    clean *time_str* ("HH:MM"), in UTC. Returns None when no time is given, so the
+    store falls back to "now" — only the personas that spread meals across days
+    (and want a tidy, chronological time-of-day) carry a ``time``.
+    """
+    if not time_str:
+        return None
+    try:
+        hour, minute = (int(part) for part in time_str.split(":", 1))
+    except (ValueError, AttributeError):
+        return None
+    return datetime.datetime.combine(
+        datetime.date.fromisoformat(meal_date),
+        datetime.time(hour=hour, minute=minute),
+        tzinfo=datetime.UTC,
+    )
+
+
 def create_app(
     *,
     meal_logger: MealLogger | None = None,
@@ -1376,15 +1397,26 @@ def create_app(
         today = (req.date if req and req.date else None) or datetime.datetime.now(
             tz=datetime.UTC
         ).date().isoformat()
-        dataset_date = (
-            datetime.date.fromisoformat(today) - datetime.timedelta(days=1)
-        ).isoformat()
+        today_date = datetime.date.fromisoformat(today)
+        dataset_date = (today_date - datetime.timedelta(days=1)).isoformat()
         meal_ids: list[int] = []
         for meal in persona.meals:
+            # A meal may pin itself to a day relative to the seed's local today
+            # (``day``: 0 = today, 1 = yesterday, …) and a clean ``time``
+            # ("HH:MM"). Absent both, it lands on today with no fixed time (the
+            # default for personas that don't spread across days). When present,
+            # both the calendar ``date`` and the ``created_at`` instant are set so
+            # the day view reads chronologically and the row sits on the right day.
+            day_offset = int(meal.get("day", 0))
+            meal_date = (
+                today_date - datetime.timedelta(days=day_offset)
+            ).isoformat()
+            created_at = _seed_created_at(meal_date, meal.get("time"))
             entry_id = log_store.add(
                 meal["text"],
                 meal["totals"],
-                date=today,
+                created_at=created_at,
+                date=meal_date,
                 user_id=user,
                 detail=meal["detail"],
             )
