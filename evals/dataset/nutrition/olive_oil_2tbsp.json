@@ -1,0 +1,10 @@
+{
+  "input": { "text": "two tablespoons of olive oil" },
+  "expected": { "calories": 238.7, "protein_g": 0.0, "fat_g": 27.0, "carb_g": 0.0, "grams": 27.0 },
+  "metadata": {
+    "nutrient_tier": "label",
+    "fdc_id": 171413,
+    "source": "USDA SR Legacy — Oil, olive, salad or cooking",
+    "notes": "Calorie-dense + unit conversion: 1 tbsp ~13.5 g, so 2 tbsp ~27 g."
+  }
+}

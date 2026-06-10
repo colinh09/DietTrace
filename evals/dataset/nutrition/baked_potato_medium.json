@@ -1,0 +1,10 @@
+{
+  "input": { "text": "a medium baked potato with the skin" },
+  "expected": { "calories": 160.9, "protein_g": 4.33, "fat_g": 0.22, "carb_g": 36.50, "grams": 173.0 },
+  "metadata": {
+    "nutrient_tier": "label",
+    "fdc_id": 170093,
+    "source": "USDA SR Legacy — Potatoes, baked, flesh and skin, without salt",
+    "notes": "Whole-item portion: 1 medium ~173 g."
+  }
+}

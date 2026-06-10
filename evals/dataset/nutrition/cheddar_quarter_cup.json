@@ -1,0 +1,10 @@
+{
+  "input": { "text": "a quarter cup of shredded cheddar cheese" },
+  "expected": { "calories": 112.8, "protein_g": 6.41, "fat_g": 9.33, "carb_g": 0.94, "grams": 28.0 },
+  "metadata": {
+    "nutrient_tier": "label",
+    "fdc_id": 1009,
+    "source": "USDA SR Legacy — Cheese, cheddar",
+    "notes": "Calorie-dense; 1/4 cup shredded ~28 g."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "input": { "text": "three slices of cooked bacon" },
+  "expected": { "calories": 129.8, "protein_g": 8.88, "fat_g": 10.08, "carb_g": 0.34, "grams": 24.0 },
+  "metadata": {
+    "nutrient_tier": "label",
+    "fdc_id": 168277,
+    "source": "USDA SR Legacy — Pork, cured, bacon, cooked, pan-fried",
+    "notes": "Calorie-dense + count to grams: 3 pan-fried slices ~24 g."
+  }
+}

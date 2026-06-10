@@ -1,0 +1,10 @@
+{
+  "input": { "text": "one cup of cooked spaghetti" },
+  "expected": { "calories": 221.2, "protein_g": 8.12, "fat_g": 1.30, "carb_g": 43.26, "grams": 140.0 },
+  "metadata": {
+    "nutrient_tier": "label",
+    "fdc_id": 168927,
+    "source": "USDA SR Legacy — Spaghetti, cooked, unenriched",
+    "notes": "Cooked portion the agent must size: 1 cup ~140 g."
+  }
+}
