@@ -289,6 +289,40 @@ export async function getGoals(): Promise<GoalsResponse> {
   return request<GoalsResponse>("/goals");
 }
 
+// One day's consumed calories in the trend window.
+export interface CaloriePoint {
+  date: string;
+  calories: number;
+}
+
+// The last `days` calendar days of consumed calories, oldest → newest, ending on
+// `endDate` (default today, local). There's no range endpoint, so this fans out
+// one `/analysis` read per day — each already aggregates that day's intake — and
+// pulls the energy (code "208") consumed figure. A failed day reads as 0 rather
+// than failing the whole window. Powers the day-band's 7-day calorie sparkline.
+export async function getCalorieTrend(
+  endDate: Date = new Date(),
+  days = 7,
+): Promise<CaloriePoint[]> {
+  const isoDates: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(endDate);
+    d.setDate(d.getDate() - i);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    isoDates.push(`${yyyy}-${mm}-${dd}`);
+  }
+  const results = await Promise.allSettled(
+    isoDates.map((date) => getAnalysis(date)),
+  );
+  return results.map((r, i) => {
+    if (r.status !== "fulfilled") return { date: isoDates[i], calories: 0 };
+    const energy = r.value.goals.find((g) => g.code === "208");
+    return { date: isoDates[i], calories: energy?.consumed ?? 0 };
+  });
+}
+
 // One scored accuracy dimension, baseline vs current (0–1, higher is better).
 export interface AccuracyMetric {
   key: string;

@@ -12,7 +12,6 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Pencil, Play, Send, X } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { TraceMotif } from "@/components/trace-motif";
-import { DayGhost } from "@/components/day-ghost";
 import { TargetsPanel } from "@/components/targets-panel";
 import {
   postMacrosPlan,
@@ -43,7 +42,7 @@ interface Step {
 const STEPS: Step[] = [
   {
     key: "gender",
-    q: "Hey — I'm Sage, your nutritionist. First up: what's your gender? It helps me size your daily targets.",
+    q: "Hey — I'm your DietTrace agent. First up: what's your gender? It helps me size your daily targets.",
     kind: "chips",
     options: [
       { value: "male", label: "Male" },
@@ -82,6 +81,11 @@ const STEPS: Step[] = [
 
 type Answers = Record<string, string | number>;
 type Msg = { role: "agent" | "user"; text: string };
+
+// Keep stored body metrics inside human ranges so a fat-fingered entry can't blow
+// up the live targets (e.g. height "5' 623131212312" → millions of calories).
+const clamp = (n: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, n));
 
 export function Onboarding({
   onDone,
@@ -200,29 +204,41 @@ export function Onboarding({
   };
 
   const submitNumber = (step: Step) => {
-    // Weight: store kg (convert from lbs if chosen). Display the entered unit.
+    // Weight: store kg (convert from lbs if chosen), clamped to 25–400 kg.
     if (step.key === "weight") {
       const v = parseInt(numDraft, 10);
-      if (numDraft.trim()) {
-        const kg = weightUnit === "lbs" ? Math.round(v * 0.453592) : v;
+      if (numDraft.trim() && !Number.isNaN(v)) {
+        const rawKg = weightUnit === "lbs" ? Math.round(v * 0.453592) : v;
+        const kg = clamp(rawKg, 25, 400);
         advance({ weight: kg }, `${v} ${weightUnit}`);
       } else advance({}, "Skip");
       return;
     }
-    // Height: store cm (convert from ft + in if chosen).
+    // Height: store cm (convert from ft + in if chosen), clamped to 90–250 cm.
     if (step.key === "height") {
       if (heightUnit === "ft") {
-        const ft = parseInt(numDraft, 10) || 0;
-        const inch = parseInt(inDraft, 10) || 0;
-        if (ft || inch) {
-          const cm = Math.round((ft * 12 + inch) * 2.54);
+        const ft = clamp(parseInt(numDraft, 10) || 0, 1, 8);
+        const inch = clamp(parseInt(inDraft, 10) || 0, 0, 11);
+        if (numDraft.trim() || inDraft.trim()) {
+          const cm = clamp(Math.round((ft * 12 + inch) * 2.54), 90, 250);
           advance({ height: cm }, `${ft}′ ${inch}″`);
         } else advance({}, "Skip");
       } else {
-        const v = numDraft.trim();
-        if (v) advance({ height: parseInt(v, 10) }, `${v} cm`);
-        else advance({}, "Skip");
+        const v = parseInt(numDraft, 10);
+        if (numDraft.trim() && !Number.isNaN(v)) {
+          const cm = clamp(v, 90, 250);
+          advance({ height: cm }, `${cm} cm`);
+        } else advance({}, "Skip");
       }
+      return;
+    }
+    // Age: clamp to 13–100.
+    if (step.key === "age") {
+      const v = parseInt(numDraft, 10);
+      if (numDraft.trim() && !Number.isNaN(v)) {
+        const age = clamp(v, 13, 100);
+        advance({ age }, `${age} ${step.unit}`);
+      } else advance({}, "Skip");
       return;
     }
     const v = numDraft.trim();
@@ -291,9 +307,6 @@ export function Onboarding({
     return (
       <div className="ob-page">
         <div className="ob-grain" aria-hidden="true" />
-        <div className="ob-ghost-wrap" aria-hidden="true">
-          <DayGhost />
-        </div>
         <div
           className="ob-card ob-card-welcome"
           role="dialog"
@@ -403,7 +416,7 @@ export function Onboarding({
           </span>
           <span className="ob-id">
             <span className="ob-name">
-              Sage<span className="ob-name-dot" />
+              Your DietTrace agent<span className="ob-name-dot" />
             </span>
             <span className="ob-sub">Building your daily targets</span>
           </span>
@@ -484,6 +497,7 @@ export function Onboarding({
                     <input
                       value={numDraft}
                       inputMode="numeric"
+                      maxLength={1}
                       autoFocus
                       aria-label="feet"
                       placeholder="5"
@@ -498,6 +512,7 @@ export function Onboarding({
                     <input
                       value={inDraft}
                       inputMode="numeric"
+                      maxLength={2}
                       aria-label="inches"
                       placeholder="10"
                       onChange={(e) =>
@@ -514,6 +529,13 @@ export function Onboarding({
                     <input
                       value={numDraft}
                       inputMode="numeric"
+                      maxLength={
+                        step.key === "weight"
+                          ? 4
+                          : step.key === "age"
+                            ? 3
+                            : 3
+                      }
                       autoFocus
                       aria-label={step.q}
                       placeholder="—"

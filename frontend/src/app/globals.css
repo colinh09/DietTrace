@@ -256,12 +256,12 @@ body {
 .dm-remain-num { font-size: 24px; font-weight: 600; line-height: 1.1;
   letter-spacing: -0.01em; color: var(--macro-cal); }
 .dm-remain-lab { font-size: 14px; color: var(--muted-ink); }
-.dm-stats { display: inline-flex; flex-direction: column; gap: 9px; margin: 0 auto;
-  padding-top: 9px; border-top: 1px solid var(--line); }
-.dm-stat { display: flex; align-items: baseline; gap: 9px; }
-.dm-stat-num { font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--accent-ink);
-  min-width: 17px; text-align: right; font-variant-numeric: tabular-nums; }
-.dm-stat-lab { font-size: 13px; color: var(--muted-ink); }
+/* 7-day calorie sparkline: eyebrow + avg over the line (mock summary zone 3). */
+.dm-spark { width: 100%; display: flex; flex-direction: column; gap: 6px;
+  padding-top: 10px; border-top: 1px solid var(--line); }
+.dm-spark-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.dm-spark-avg { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.dm-spark-svg { display: block; width: 100%; height: 38px; }
 
 /* a progress ring with center content */
 .ring-wrap { position: relative; display: inline-flex; }
@@ -1411,20 +1411,6 @@ body {
 .ob-card-welcome { max-width: 452px; border-color: var(--line-strong); }
 /* Chat phase: a full split panel — chat column + live targets rail. */
 .ob-card-chat { max-width: min(760px, 100%); height: min(86vh, 704px); display: flex; flex-direction: column; padding: 0; overflow: hidden; border-color: var(--line-strong); }
-
-/* Blurred day-view ghost behind the welcome card. */
-.ob-ghost-wrap { position: absolute; z-index: 1; bottom: -64px; left: 50%; transform: translateX(-50%) scale(1.02); filter: blur(7px) saturate(.9); opacity: .34; pointer-events: none; }
-.ob-ghost-card { width: 520px; max-width: 90vw; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 26px; box-shadow: 0 1px 2px rgba(27,26,22,.03), 0 12px 34px rgba(27,26,22,.06); }
-.ob-ghost-row { display: flex; gap: 26px; align-items: center; }
-.ob-ghost-ring { width: 132px; height: 132px; flex: none; border-radius: 50%; border: 10px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.ob-ghost-cal { font-family: var(--serif); font-size: 38px; font-weight: 600; color: var(--ink); }
-.ob-ghost-callab { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; color: var(--faint); }
-.ob-ghost-macros { flex: 1; }
-.ob-ghost-macro { margin-bottom: 16px; }
-.ob-ghost-macro:last-child { margin-bottom: 0; }
-.ob-ghost-macro-name { font-family: var(--serif); font-size: 15px; font-weight: 600; }
-.ob-ghost-macro-bar { height: 6px; border-radius: 100px; background: var(--line); margin-top: 6px; }
-.ob-ghost-macro-fill { height: 100%; border-radius: 100px; }
 
 /* Welcome head: brand lockup + animated trace motif. */
 .ob-welcome-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
