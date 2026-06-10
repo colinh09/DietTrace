@@ -1780,11 +1780,11 @@ body {
 /* items table */
 .items { width: 100%; border-collapse: collapse; }
 .items th { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--faint); font-weight: 500; padding: 0 0 9px; text-align: right; }
-.items th:first-child { text-align: left; }
-.items td { padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; text-align: right;
+  color: var(--faint); font-weight: 500; padding: 0 0 9px 16px; text-align: right; }
+.items th:first-child { text-align: left; padding-left: 0; }
+.items td { padding: 9px 0 9px 16px; border-top: 1px solid var(--line); font-size: 13px; text-align: right;
   font-variant-numeric: tabular-nums; color: var(--muted-ink); }
-.items td:first-child { text-align: left; color: var(--ink); }
+.items td:first-child { text-align: left; color: var(--ink); padding-left: 0; }
 .items td .food { font-weight: 500; }
 .items td .kcal { color: var(--ink); font-weight: 600; }
 
