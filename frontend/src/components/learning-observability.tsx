@@ -376,6 +376,9 @@ export function LearningObservability({
   // Link to the Phoenix experiment when the fit set is scored in Arize over MCP.
   const [experimentUrl, setExperimentUrl] = useState("");
   const [showData, setShowData] = useState(false);
+  // "What it's learned" collapses by default so the modal isn't a wall of
+  // corrections; the empty-state line stays visible regardless.
+  const [showLearned, setShowLearned] = useState(false);
   // The agent-state modal (the deep dive behind the icon).
   const [stateOpen, setStateOpen] = useState(false);
   // The "Retune now" confirm modal — manual override of the auto-retune threshold.
@@ -818,9 +821,23 @@ export function LearningObservability({
             {/* 2 · what it's learned */}
             <section>
               <div className="as-sec-head">
-                <span className="eyebrow">
-                  What it&apos;s learned · {feedback.length}
-                </span>
+                {feedback.length > 0 ? (
+                  <button
+                    type="button"
+                    className={"as-ds-toggle" + (showLearned ? " open" : "")}
+                    aria-expanded={showLearned}
+                    onClick={() => setShowLearned((s) => !s)}
+                  >
+                    <ChevronRight size={18} className="chev" aria-hidden="true" />
+                    <span className="eyebrow">
+                      What it&apos;s learned · {feedback.length}
+                    </span>
+                  </button>
+                ) : (
+                  <span className="eyebrow">
+                    What it&apos;s learned · {feedback.length}
+                  </span>
+                )}
                 <hr />
               </div>
               {feedback.length === 0 ? (
@@ -829,6 +846,7 @@ export function LearningObservability({
                   fixes land here.
                 </p>
               ) : (
+                showLearned && (
                 <div className="as-corr">
                   {feedback.map((f) => (
                     <div className="as-corr-row" key={f.id}>
@@ -853,6 +871,7 @@ export function LearningObservability({
                     </div>
                   ))}
                 </div>
+                )
               )}
             </section>
 

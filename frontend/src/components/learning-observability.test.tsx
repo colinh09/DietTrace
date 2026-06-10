@@ -49,8 +49,10 @@ async function openState() {
 describe("LearningObservability", () => {
   it("shows corrections as meal + what you said (persisted, not a bare count)", async () => {
     await openState();
-    // The "What it's learned" section lists each correction inline (meal name +
-    // the words you said) — no collapse, with a "Learned" tag per row.
+    // "What it's learned" collapses by default so the modal isn't a wall of
+    // corrections — expand it, then each correction lists inline (meal name +
+    // the words you said) with a "Learned" tag per row.
+    fireEvent.click(await screen.findByRole("button", { name: /what it.s learned/i }));
     expect(await screen.findByText("a big plate of spaghetti")).toBeInTheDocument();
     expect(
       screen.getByText(/before a run I carb up way more/i),
