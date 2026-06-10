@@ -127,15 +127,14 @@ export function SeededModal({
         <section className="sm-section sm-try">
           <div className="sm-sub mono">Try it</div>
           <ol className="sm-steps">
+            <li>Correct the under-counted meal in plain words, then log a meal.</li>
             <li>
-              Correct the under-counted meal on today (tell it in plain words),
-              then log a meal — DietTrace updates itself automatically once
-              you&apos;ve corrected enough meals. It should learn: <i>{p.learns}</i>
+              Once you&apos;ve corrected enough, DietTrace re-tunes itself — it should
+              learn: <i>{p.learns}</i>
             </li>
             <li>
-              Watch the <b>agent activity</b> feed on the right, and open{" "}
-              <b>State</b> (top of the feed) to see what it was tested on, the
-              result, and what it learned.
+              Watch the <b>agent activity</b> feed and open <b>State</b> to see what it
+              was tested on and what it learned.
             </li>
           </ol>
         </section>
