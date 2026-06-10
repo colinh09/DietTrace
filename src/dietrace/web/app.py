@@ -562,9 +562,11 @@ def _seed_created_at(
     meal_date: str, time_str: str | None
 ) -> datetime.datetime | None:
     """The ``created_at`` instant for a seeded meal pinned to *meal_date* at a
-    clean *time_str* ("HH:MM"), in UTC. Returns None when no time is given, so the
-    store falls back to "now" — only the personas that spread meals across days
-    (and want a tidy, chronological time-of-day) carry a ``time``.
+    clean *time_str* ("HH:MM"). The time is a *local wall-clock* time ("07:30" =
+    "ate at 7:30am their time"), so we interpret it in the server's local zone and
+    store the matching UTC instant — the store's convention — so the meal renders at
+    the intended time of day in the browser instead of shifted by the UTC offset.
+    Returns None when no time is given, so the store falls back to "now".
     """
     if not time_str:
         return None
@@ -575,8 +577,7 @@ def _seed_created_at(
     return datetime.datetime.combine(
         datetime.date.fromisoformat(meal_date),
         datetime.time(hour=hour, minute=minute),
-        tzinfo=datetime.UTC,
-    )
+    ).astimezone(datetime.UTC)
 
 
 def create_app(
@@ -1387,9 +1388,15 @@ def create_app(
         persona = get_persona(req.persona if req else None)
 
         # Idempotent: clear this user's meals first so re-running "see it in
-        # action" replaces the canned set rather than appending duplicates.
+        # action" replaces the canned set rather than appending duplicates. The
+        # learning-loop stores are cleared here too (before any rows are seeded)
+        # so the dataset points added during insertion below survive the reset.
         log_store.clear_user(user)
         trust.clear_user(user)
+        confirms.clear_user(user)
+        fblog.clear_user(user)
+        prefs.clear_user(user)
+        profiles.set(user, persona.profile)
 
         # The client's local "today" (so we're relative to the day the user sees,
         # not the server's UTC day at the boundary). The visible playground meals
@@ -1399,44 +1406,85 @@ def create_app(
         ).date().isoformat()
         today_date = datetime.date.fromisoformat(today)
         # Today (offset 0) stays EMPTY — the judge logs their own first meal there.
-        # The persona's visible meals are spread across yesterday (day 1) and
-        # two-days-ago (day 2); the held-out dataset rows live on the older day, so
-        # dataset_date is today − 2.
+        # The persona's meals are spread across yesterday (day 1) and two-days-ago
+        # (day 2), and so are the held-out dataset rows. dataset_date is the older
+        # day (today − 2) — the "view dataset" link jumps there.
         dataset_date = (today_date - datetime.timedelta(days=2)).isoformat()
-        meal_ids: list[int] = []
+        # Build the full insertion plan up front so rows go in oldest-first within
+        # each calendar day. /history orders by insert id (newest first), and the
+        # frontend renders that order verbatim — so to make each prior day read
+        # chronologically the visible meals and the prior-day rows (which can share
+        # a date) must be inserted together, sorted by (date, time), not in two
+        # separate visible-then-previous passes. Each meal pins itself to a day
+        # relative to the seed's local today (``day``: 0 = today, 1 = yesterday, …)
+        # and a clean ``time`` ("HH:MM"); absent both it lands on today with no
+        # fixed time (the default for personas that don't spread across days).
+        def _meal_date(offset: int) -> str:
+            return (today_date - datetime.timedelta(days=offset)).isoformat()
+
+        plan: list[tuple[str, str, dict[str, Any]]] = []
         for meal in persona.meals:
-            # A meal may pin itself to a day relative to the seed's local today
-            # (``day``: 0 = today, 1 = yesterday, …) and a clean ``time``
-            # ("HH:MM"). Absent both, it lands on today with no fixed time (the
-            # default for personas that don't spread across days). When present,
-            # both the calendar ``date`` and the ``created_at`` instant are set so
-            # the day view reads chronologically and the row sits on the right day.
-            day_offset = int(meal.get("day", 0))
-            meal_date = (
-                today_date - datetime.timedelta(days=day_offset)
-            ).isoformat()
+            plan.append(("visible", _meal_date(int(meal.get("day", 0))), meal))
+        for m in persona.previous_day:
+            plan.append(("previous", _meal_date(int(m.get("day", 2))), m))
+        # Sort by (date, time); rows without a time sort last within their day, so
+        # explicitly-timed rows keep their chronological slots.
+        plan.sort(key=lambda r: (r[1], r[2].get("time") or "99:99"))
+
+        meal_ids: list[int] = []
+        seeded_decisions: list[dict[str, Any]] = []
+        for kind, meal_date, meal in plan:
             created_at = _seed_created_at(meal_date, meal.get("time"))
-            entry_id = log_store.add(
-                meal["text"],
-                meal["totals"],
-                created_at=created_at,
-                date=meal_date,
-                user_id=user,
-                detail=meal["detail"],
-            )
-            meal_ids.append(entry_id)
-            # Record each visible meal's captured eval in the /trust rollup, so the
-            # recap's "how it's doing" reflects the loaded meals (count + mean
-            # confidence) instead of an empty 0% / 0 meals.
-            d = meal["detail"]
-            trust.record(
-                confidence=float(d.get("confidence", 0.0)),
-                needs_review=bool(d.get("needs_review", False)),
-                sources=sources_of(d.get("per_item", [])),
-                user_id=user,
-                text=meal["text"],
-                review_reason=d.get("review_reason"),
-            )
+            if kind == "visible":
+                entry_id = log_store.add(
+                    meal["text"],
+                    meal["totals"],
+                    created_at=created_at,
+                    date=meal_date,
+                    user_id=user,
+                    detail=meal["detail"],
+                )
+                meal_ids.append(entry_id)
+                # Record each visible meal's captured eval in the /trust rollup, so
+                # the recap's "how it's doing" reflects the loaded meals (count +
+                # mean confidence) instead of an empty 0% / 0 meals.
+                d = meal["detail"]
+                trust.record(
+                    confidence=float(d.get("confidence", 0.0)),
+                    needs_review=bool(d.get("needs_review", False)),
+                    sources=sources_of(d.get("per_item", [])),
+                    user_id=user,
+                    text=meal["text"],
+                    review_reason=d.get("review_reason"),
+                )
+            else:
+                # The full simulated prior day (real agent output, full detail);
+                # dataset-point rows are also added to the held-out gate set.
+                detail = dict(meal.get("detail", {}))
+                is_dp = bool(meal.get("dataset_point"))
+                detail["dataset_point"] = is_dp
+                log_store.add(
+                    meal["text"],
+                    meal["totals"],
+                    created_at=created_at,
+                    date=meal_date,
+                    user_id=user,
+                    detail=detail,
+                )
+                if is_dp:
+                    confirms.add(
+                        user,
+                        meal["text"],
+                        detail.get("per_item", []),
+                        meal["totals"],
+                        source="seed",
+                    )
+                    seeded_decisions.append({
+                        "op": "add_dataset_point",
+                        # No reason line — "Added to your dataset" already says it.
+                        "reason": "",
+                        "meal_text": meal["text"],
+                    })
 
         goals_set = False
         if goals_db is not None:
@@ -1445,42 +1493,11 @@ def create_app(
             )
             goals_set = True
 
-        # Seed the learning-loop state so a judge can hit "retune" immediately
-        #: confirmed meals carrying the persona's real
-        # pattern (the held-out gate set) + a couple of corrections to generalize.
-        # A fresh preference block, so the retune starts from zero and ships.
-        confirms.clear_user(user)
-        fblog.clear_user(user)
-        prefs.clear_user(user)
-        profiles.set(user, persona.profile)
-        # The seeded agent-activity feed (dated to the previous day): the persona's
-        # prior decisions — meals added to the held-out dataset + corrections banked.
-        seeded_decisions: list[dict[str, Any]] = []
-        # Log the full simulated prior day (real agent output, full detail) on the
-        # older day; dataset-point meals are also added to the gate set. Each item
-        # may pin its own ``day`` offset (default 2 = the older day, where the
-        # held-out dataset rows live), matching the visible-meal placement above.
-        for m in persona.previous_day:
-            detail = dict(m.get("detail", {}))
-            is_dp = bool(m.get("dataset_point"))
-            detail["dataset_point"] = is_dp
-            prev_day_offset = int(m.get("day", 2))
-            prev_date = (
-                today_date - datetime.timedelta(days=prev_day_offset)
-            ).isoformat()
-            log_store.add(
-                m["text"], m["totals"], date=prev_date, user_id=user, detail=detail
-            )
-            if is_dp:
-                confirms.add(
-                    user, m["text"], detail.get("per_item", []), m["totals"], source="seed"
-                )
-                seeded_decisions.append({
-                    "op": "add_dataset_point",
-                    # No reason line — the "Added to your dataset" label already says it.
-                    "reason": "",
-                    "meal_text": m["text"],
-                })
+        # Seed the rest of the learning-loop state so a judge can hit "retune"
+        # immediately: the dataset points (the held-out
+        # gate set) were added during insertion above; now bank a couple of
+        # corrections to generalize. The stores were cleared up front so the retune
+        # starts from a fresh preference block and ships.
         for f in persona.feedback:
             fblog.add(
                 user, f["feedback_text"], None, f.get("meal_text"), f.get("weight", 1.0)

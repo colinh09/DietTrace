@@ -2250,7 +2250,7 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 2,
+      "day": 1,
       "time": "06:30"
     },
     {
@@ -4574,8 +4574,8 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 2,
-      "time": "07:15"
+      "day": 1,
+      "time": "19:30"
     },
     {
       "text": "a big bowl of ground beef chili after my long run",
@@ -4775,8 +4775,8 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 2,
-      "time": "12:30"
+      "day": 1,
+      "time": "13:00"
     },
     {
       "text": "two eggs and avocado toast for breakfast",
@@ -8615,8 +8615,8 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 1,
-      "time": "13:00"
+      "day": 2,
+      "time": "10:30"
     },
     {
       "text": "greek yogurt with berries as a snack",
@@ -10471,7 +10471,7 @@
         "review_reason": null
       },
       "day": 1,
-      "time": "16:00"
+      "time": "15:30"
     }
   ],
   "previous_day": [
@@ -14007,8 +14007,8 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 1,
-      "time": "07:30"
+      "day": 2,
+      "time": "08:00"
     },
     {
       "text": "a bagel with peanut butter before my morning run",
@@ -16373,8 +16373,8 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 1,
-      "time": "12:00"
+      "day": 2,
+      "time": "06:15"
     },
     {
       "text": "white rice with grilled chicken after my morning run",
@@ -19159,8 +19159,8 @@
         "review_reason": null
       },
       "dataset_point": true,
-      "day": 2,
-      "time": "08:00"
+      "day": 1,
+      "time": "11:00"
     },
     {
       "text": "a turkey and cheese sandwich for lunch",
@@ -22675,7 +22675,7 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 1,
+      "day": 2,
       "time": "15:30"
     },
     {
@@ -25793,8 +25793,8 @@
         "review_reason": null
       },
       "dataset_point": true,
-      "day": 2,
-      "time": "16:00"
+      "day": 1,
+      "time": "16:30"
     },
     {
       "text": "grilled salmon with white rice and roasted vegetables after my evening run",
@@ -27169,7 +27169,7 @@
       },
       "dataset_point": true,
       "day": 2,
-      "time": "20:00"
+      "time": "19:00"
     },
     {
       "text": "cottage cheese with berries and granola before bed",
@@ -29185,8 +29185,8 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 1,
-      "time": "19:30"
+      "day": 2,
+      "time": "21:30"
     }
   ]
 }

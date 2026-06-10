@@ -2981,8 +2981,8 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 2,
-      "time": "07:00"
+      "day": 1,
+      "time": "08:00"
     },
     {
       "text": "a post-lift chicken and rice bowl",
@@ -4227,8 +4227,8 @@
         "needs_review": true,
         "review_reason": "1 of 2 food(s) named were not resolved (1 logged)"
       },
-      "day": 2,
-      "time": "13:00"
+      "day": 1,
+      "time": "12:30"
     },
     {
       "text": "a large sirloin steak with a baked sweet potato for dinner",
@@ -6953,7 +6953,7 @@
         "review_reason": null
       },
       "day": 2,
-      "time": "19:00"
+      "time": "19:30"
     },
     {
       "text": "a protein shake after lifting",
@@ -8196,8 +8196,8 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 1,
-      "time": "10:30"
+      "day": 2,
+      "time": "11:00"
     },
     {
       "text": "a big serving of ground turkey with rice after lifting",
@@ -10988,7 +10988,7 @@
         "review_reason": null
       },
       "day": 1,
-      "time": "13:30"
+      "time": "10:30"
     },
     {
       "text": "a protein shake with two scoops of whey",
@@ -13041,7 +13041,7 @@
         "review_reason": null
       },
       "day": 1,
-      "time": "16:00"
+      "time": "18:30"
     }
   ],
   "previous_day": [
@@ -16170,8 +16170,8 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 1,
-      "time": "07:30"
+      "day": 2,
+      "time": "07:00"
     },
     {
       "text": "a banana with a scoop of whey before lifting",
@@ -18723,7 +18723,7 @@
       },
       "dataset_point": false,
       "day": 1,
-      "time": "12:00"
+      "time": "06:15"
     },
     {
       "text": "a big serving of ground turkey with rice and peppers after lifting",
@@ -22024,7 +22024,7 @@
       },
       "dataset_point": true,
       "day": 2,
-      "time": "08:00"
+      "time": "09:00"
     },
     {
       "text": "a turkey sandwich for lunch",
@@ -25124,7 +25124,7 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 1,
+      "day": 2,
       "time": "15:30"
     },
     {
@@ -27430,8 +27430,8 @@
         "review_reason": null
       },
       "dataset_point": true,
-      "day": 2,
-      "time": "16:00"
+      "day": 1,
+      "time": "19:30"
     },
     {
       "text": "baked chicken thighs with sweet potato post-workout",
@@ -30006,8 +30006,8 @@
         "review_reason": null
       },
       "dataset_point": true,
-      "day": 2,
-      "time": "20:00"
+      "day": 1,
+      "time": "16:00"
     },
     {
       "text": "cottage cheese with berries and granola before bed",
@@ -32023,8 +32023,8 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 1,
-      "time": "19:30"
+      "day": 2,
+      "time": "21:30"
     }
   ]
 }
