@@ -1034,6 +1034,8 @@ body {
 .reset-dialog-actions button:disabled { opacity: .55; cursor: default; }
 /* Retune confirm — same dialog shell as Reset, but accent (not danger) */
 .retune-dialog-eyebrow { color: var(--accent-ink); }
+.retune-warn { font-size: 13px; line-height: 1.5; color: var(--amber-ink); background: var(--amber-soft); border-radius: 9px; padding: 9px 12px; margin-bottom: 14px; }
+.reset-dialog-body + .reset-dialog-body { margin-top: -12px; }
 .reset-dialog-actions .btn-accent { background: var(--accent); color: var(--on-accent); border: none; border-radius: 100px; padding: 9px 18px; font-family: var(--ui-font); font-size: 13px; font-weight: 600; cursor: pointer; transition: filter .15s; }
 .reset-dialog-actions .btn-accent:hover:not(:disabled) { filter: brightness(.94); }
 

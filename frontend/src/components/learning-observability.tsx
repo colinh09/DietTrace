@@ -656,14 +656,24 @@ export function LearningObservability({
             <h2 id="retune-confirm-title" className="reset-dialog-title">
               Retune DietTrace now?
             </h2>
+            {/* Suggested guideline = the backend retune defaults (3 + 3):
+                DEFAULT_MIN_NEW_FEEDBACK / DEFAULT_MIN_NEW_DATASET_POINTS. */}
+            {(corrections < 3 || confirmations < 3) && (
+              <p className="retune-warn">
+                You&apos;ve banked {corrections} correction
+                {corrections === 1 ? "" : "s"} and {confirmations} confirmed meal
+                {confirmations === 1 ? "" : "s"}, which is below our suggested guideline
+                of 3 corrections and 3 confirmed meals.
+              </p>
+            )}
             <p className="reset-dialog-body">
-              You&apos;ve banked {corrections} correction
-              {corrections === 1 ? "" : "s"} and {confirmations} confirmed meal
-              {confirmations === 1 ? "" : "s"}. Retuning folds your corrections into a
-              rule, then tests it against your confirmed meals — kept separate, never
-              learned from — and only keeps it if you get more accurate. The more of
-              each, the better: feedback drives a meaningful change, confirmed meals
-              prove it actually helps.
+              Retuning folds your corrections into a rule, then tests it against your
+              confirmed meals — kept separate, never learned from — and only keeps it if
+              you get more accurate.
+            </p>
+            <p className="reset-dialog-body">
+              The more dataset points and feedback you give, the better the agent learns
+              from your meals — try to keep a healthy balance of both.
             </p>
             <div className="reset-dialog-actions">
               <button
@@ -891,7 +901,6 @@ export function LearningObservability({
                       {confirmations === 1 ? "" : "s"}
                     </span>
                   </button>
-                  <hr />
                 </div>
                 {showData && (
                   <div>
