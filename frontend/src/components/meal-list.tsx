@@ -200,6 +200,15 @@ function MealRow({
               </span>
             </Tooltip>
           )}
+          {/* A meal you confirmed today — now a held-out dataset point. */}
+          {meal.has_confirmation && !isDataset && (
+            <Tooltip label="You confirmed this meal as right. DietTrace keeps it aside in your dataset — it checks itself against it afterward but never learns from it.">
+              <span className="dataset-badge">
+                <span className="dataset-badge-dot" aria-hidden="true" />
+                confirmed meal
+              </span>
+            </Tooltip>
+          )}
           {/* A meal you've corrected — its feedback feeds the next update. */}
           {meal.has_feedback && (
             <Tooltip label="You gave feedback on this meal. DietTrace folds it into its rules the next time it updates.">
@@ -274,6 +283,7 @@ function MealRow({
               onAgentEvent={onAgentEvent}
               readOnly={isDataset}
               hasFeedback={meal.has_feedback}
+              hasConfirmation={meal.has_confirmation}
             />
           ) : (
             !isDataset && (

@@ -20,6 +20,7 @@ export function MealReview({
   perItem,
   totals,
   hasFeedback = false,
+  hasConfirmation = false,
   onCorrected,
   onAgentEvent,
 }: {
@@ -30,6 +31,9 @@ export function MealReview({
   // The meal already has a saved correction (persisted) — show the saved state,
   // not the "does this look right?" prompt (XOR with the confirmed/dataset path).
   hasFeedback?: boolean;
+  // The user already confirmed this meal (it's a held-out dataset point) — show the
+  // confirmed state instead of re-asking.
+  hasConfirmation?: boolean;
   onCorrected?: () => void;
   onAgentEvent?: AgentActivity;
 }) {
@@ -94,6 +98,22 @@ export function MealReview({
           <p>
             DietTrace will check its future updates against this meal, but never
             peeks at it while learning.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Persisted confirmation: the user already confirmed this meal into their dataset,
+  // so show the confirmed state instead of re-asking (XOR with feedback).
+  if (hasConfirmation && mode === "ask") {
+    return (
+      <div className="review-confirmed">
+        <Check size={14} aria-hidden="true" />
+        <div className="review-confirmed-body">
+          <p>Confirmed — saved to your dataset.</p>
+          <p>
+            DietTrace checks its updates against this meal, but never learns from it.
           </p>
         </div>
       </div>

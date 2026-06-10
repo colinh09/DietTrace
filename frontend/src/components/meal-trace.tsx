@@ -92,6 +92,7 @@ export function MealTrace({
   onAgentEvent,
   readOnly = false,
   hasFeedback = false,
+  hasConfirmation = false,
 }: {
   trace: TraceStep[];
   perItem: LoggedItem[];
@@ -113,6 +114,8 @@ export function MealTrace({
   readOnly?: boolean;
   // The meal already has a saved correction — show the saved review state.
   hasFeedback?: boolean;
+  // The meal was already confirmed into the dataset — show the confirmed state.
+  hasConfirmation?: boolean;
 }) {
   const confAxes = axes ?? [];
   const mean =
@@ -313,6 +316,7 @@ export function MealTrace({
               perItem={perItem}
               totals={totals ?? []}
               hasFeedback={hasFeedback}
+              hasConfirmation={hasConfirmation}
               onCorrected={onCorrected}
               onAgentEvent={onAgentEvent}
             />

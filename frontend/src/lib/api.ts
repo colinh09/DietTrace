@@ -140,6 +140,9 @@ export interface Meal {
   // True when the user has given feedback on this meal (badged in the log, mutually
   // exclusive with dataset_point by the XOR rule).
   has_feedback?: boolean;
+  // True when the user confirmed this logged meal (it's now a held-out dataset
+  // point) — badged + the review resolves to the confirmed state, not the prompt.
+  has_confirmation?: boolean;
 }
 
 // `GET /history?date=` — one calendar day's meals (default: today).
