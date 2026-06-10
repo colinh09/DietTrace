@@ -22,9 +22,9 @@ import { Onboarding } from "@/components/onboarding";
 import {
   deleteMeal,
   getAnalysis,
-  getCalorieTrend,
   getGoals,
   getHistory,
+  getPreferences,
   getProfile,
   logMealStream,
   userId,
@@ -60,10 +60,29 @@ export default function Home() {
   // corrections persist across day navigation instead of disappearing).
   const [reloadSignal, setReloadSignal] = useState(0);
   const bumpLearning = useCallback(() => setReloadSignal((n) => n + 1), []);
-  // The last 7 days of consumed calories for the day-band's glance-zone sparkline,
-  // oldest → newest. Refetched on date navigation and after meals change so the
-  // trend stays current (no range endpoint — getCalorieTrend fans out per-day).
-  const [calorieTrend, setCalorieTrend] = useState<number[]>([]);
+  // Learning-loop counts for the day-summary glance zone — refreshed whenever the
+  // learning state changes (a correction, confirmation, seed, or shipped re-tune).
+  const [learnStats, setLearnStats] = useState<{
+    corrections: number;
+    confirmations: number;
+    version: number;
+  } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getPreferences()
+      .then((p) => {
+        if (alive)
+          setLearnStats({
+            corrections: p.corrections,
+            confirmations: p.confirmations,
+            version: p.block?.version ?? 0,
+          });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [reloadSignal]);
   // The safety guardrail result from the most recent log, or null when clear —
   // surfaces a calm supportive notice above the meals.
   const [safety, setSafety] = useState<Safety | null>(null);
@@ -176,19 +195,10 @@ export default function Home() {
       .catch(() => {});
   }, [date]);
 
-  // Refetch the 7-day calorie trend ending on the viewed day. Fans out per-day
-  // reads, so it's kept separate from loadAnalysis and refreshed on the same beats.
-  const loadTrend = useCallback(() => {
-    getCalorieTrend(date)
-      .then((points) => setCalorieTrend(points.map((p) => p.calories)))
-      .catch(() => {});
-  }, [date]);
-
   useEffect(() => {
     loadHistory();
     loadAnalysis();
-    loadTrend();
-  }, [loadHistory, loadAnalysis, loadTrend]);
+  }, [loadHistory, loadAnalysis]);
 
   // Remove a logged meal: drop it optimistically, then reconcile both reads.
   const handleDelete = useCallback(
@@ -198,11 +208,10 @@ export default function Home() {
         .then(() => {
           loadHistory();
           loadAnalysis();
-          loadTrend();
         })
         .catch(() => {});
     },
-    [loadHistory, loadAnalysis, loadTrend],
+    [loadHistory, loadAnalysis],
   );
 
   // Stream a new meal: show the working entry immediately, append each agent
@@ -268,18 +277,16 @@ export default function Home() {
         setLive(null);
         loadHistory();
         loadAnalysis();
-        loadTrend();
       }).catch(() => setLive(null));
     },
-    [date, loadHistory, loadAnalysis, loadTrend],
+    [date, loadHistory, loadAnalysis],
   );
 
   const handleCorrected = useCallback(() => {
     bumpLearning();
     loadHistory();
     loadAnalysis();
-    loadTrend();
-  }, [bumpLearning, loadHistory, loadAnalysis, loadTrend]);
+  }, [bumpLearning, loadHistory, loadAnalysis]);
 
   // Push a supervisor action into the activity feed live — every correction the
   // user gives and every meal they confirm shows up the moment it happens. A
@@ -437,7 +444,7 @@ export default function Home() {
                 onPickDate={setDate}
                 onReset={handleAfterReset}
               />
-              <DayMacros goals={goals} trend={calorieTrend} />
+              <DayMacros goals={goals} stats={learnStats} />
             </section>
 
             {/* The log card — input + the day's meals, a separate panel below. */}

@@ -106,26 +106,26 @@ describe("DayMacros", () => {
     expect(within(zone).getByText(/kcal over/i)).toBeInTheDocument();
   });
 
-  it("draws the 7-day calorie sparkline with its trend eyebrow and average", () => {
+  it("shows the learning-loop counts in the glance zone", () => {
     const { container } = render(
       <DayMacros
         goals={goals}
-        trend={[1800, 1950, 2100, 1700, 2000, 1850, 1000]}
+        stats={{ corrections: 3, confirmations: 6, version: 2 }}
       />,
     );
     const zone = glance(container);
-    expect(within(zone).getByText(/7-day trend/i)).toBeInTheDocument();
-    // avg of the seven points = 1771 → "avg 1,771".
-    expect(within(zone).getByText(/avg 1,771/)).toBeInTheDocument();
-    expect(
-      within(zone).getByRole("img", { name: /7-day/i }),
-    ).toBeInTheDocument();
+    const stats = within(zone).getByLabelText(/learning progress/i);
+    expect(within(stats).getByText("3")).toBeInTheDocument();
+    expect(within(stats).getByText(/^corrections$/i)).toBeInTheDocument();
+    expect(within(stats).getByText("2")).toBeInTheDocument();
+    expect(within(stats).getByText(/^updates$/i)).toBeInTheDocument();
+    expect(within(stats).getByText("6")).toBeInTheDocument();
+    expect(within(stats).getByText(/confirmed meals/i)).toBeInTheDocument();
   });
 
-  it("omits the sparkline until there are at least two days of data", () => {
-    const { container } = render(<DayMacros goals={goals} trend={[2000]} />);
-    const zone = glance(container);
-    expect(within(zone).queryByText(/7-day trend/i)).toBeNull();
-    expect(within(zone).queryByRole("img", { name: /7-day/i })).toBeNull();
+  it("falls back to zero counts before the stats have loaded", () => {
+    const { container } = render(<DayMacros goals={goals} />);
+    const stats = within(glance(container)).getByLabelText(/learning progress/i);
+    expect(within(stats).getAllByText("0")).toHaveLength(3);
   });
 });

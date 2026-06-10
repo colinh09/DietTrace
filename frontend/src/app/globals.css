@@ -256,12 +256,12 @@ body {
 .dm-remain-num { font-size: 24px; font-weight: 600; line-height: 1.1;
   letter-spacing: -0.01em; color: var(--macro-cal); }
 .dm-remain-lab { font-size: 14px; color: var(--muted-ink); }
-/* 7-day calorie sparkline: eyebrow + avg over the line (mock summary zone 3). */
-.dm-spark { width: 100%; display: flex; flex-direction: column; gap: 6px;
-  padding-top: 10px; border-top: 1px solid var(--line); }
-.dm-spark-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.dm-spark-avg { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
-.dm-spark-svg { display: block; width: 100%; height: 38px; }
+.dm-stats { display: inline-flex; flex-direction: column; gap: 9px; margin: 0 auto;
+  padding-top: 9px; border-top: 1px solid var(--line); }
+.dm-stat { display: flex; align-items: baseline; gap: 9px; }
+.dm-stat-num { font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--accent-ink);
+  min-width: 17px; text-align: right; font-variant-numeric: tabular-nums; }
+.dm-stat-lab { font-size: 13px; color: var(--muted-ink); }
 
 /* a progress ring with center content */
 .ring-wrap { position: relative; display: inline-flex; }

@@ -3,7 +3,6 @@
 // /analysis (consumed + target) with /goals as the initial-target fallback
 //.
 import type { GoalProgress } from "@/lib/api";
-import { Sparkline } from "@/components/sparkline";
 
 // USDA number codes for the four tracked macros.
 // Each ring carries its own colour so the four are distinguishable at a glance —
@@ -88,12 +87,16 @@ function Ring({
 
 export function DayMacros({
   goals,
-  trend,
+  stats,
 }: {
   goals: GoalProgress[];
-  // The last ~7 days of consumed calories, oldest → newest, for the glance-zone
-  // sparkline. Undefined/short until fetched (the sparkline self-hides then).
-  trend?: number[];
+  // The learning-loop counts shown in the glance zone — feedbacks banked, re-tunes
+  // shipped (the block version), and held-out dataset points. Null until fetched.
+  stats?: {
+    corrections: number;
+    confirmations: number;
+    version: number;
+  } | null;
 }) {
   const byCode = new Map(goals.map((g) => [g.code, g]));
   const cal = byCode.get(CALORIES);
@@ -103,14 +106,6 @@ export function DayMacros({
   // Past target reads as "over" (the magnitude, never a negative number).
   const remaining = calTarget - calConsumed;
   const over = remaining < 0;
-
-  // The 7-day calorie trend: only meaningful with at least two days of data. The
-  // average is over the actual points shown (the mock's "avg 1,866" eyebrow).
-  const week = trend ?? [];
-  const hasTrend = week.length >= 2;
-  const avg = hasTrend
-    ? Math.round(week.reduce((sum, c) => sum + c, 0) / week.length)
-    : 0;
 
   return (
     // dm-wrap is a container so the band can stack on its OWN width (it sits in the
@@ -164,15 +159,20 @@ export function DayMacros({
             kcal {over ? "over" : "remaining"} today
           </span>
         </div>
-        {hasTrend && (
-          <div className="dm-spark" aria-label="7-day calorie trend">
-            <div className="dm-spark-head">
-              <span className="eyebrow">7-day trend</span>
-              <span className="dm-spark-avg tnum">avg {fmt.format(avg)}</span>
-            </div>
-            <Sparkline data={week} target={calTarget} />
+        <div className="dm-stats" aria-label="Learning progress">
+          <div className="dm-stat">
+            <span className="dm-stat-num tnum">{stats?.corrections ?? 0}</span>
+            <span className="dm-stat-lab">corrections</span>
           </div>
-        )}
+          <div className="dm-stat">
+            <span className="dm-stat-num tnum">{stats?.version ?? 0}</span>
+            <span className="dm-stat-lab">updates</span>
+          </div>
+          <div className="dm-stat">
+            <span className="dm-stat-num tnum">{stats?.confirmations ?? 0}</span>
+            <span className="dm-stat-lab">confirmed meals</span>
+          </div>
+        </div>
       </div>
       </section>
     </div>
