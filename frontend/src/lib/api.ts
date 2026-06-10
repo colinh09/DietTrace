@@ -231,6 +231,19 @@ export async function setMealTime(id: number, createdAt: string): Promise<void> 
   });
 }
 
+// Edit a meal's numbers in place (per-item rows + recomputed totals). A plain
+// manual fix to the log — NOT a confirmation or dataset point.
+export async function updateMealItems(
+  id: number,
+  perItem: LoggedItem[],
+  totals: Nutrient[],
+): Promise<void> {
+  await request(`/meals/${id}/items`, {
+    method: "POST",
+    body: JSON.stringify({ per_item: perItem, totals }),
+  });
+}
+
 // One kept item of a corrected meal sent to POST /correct (removed items are
 // simply omitted). The backend rescales the panel from original to corrected grams.
 export interface CorrectionItemInput {

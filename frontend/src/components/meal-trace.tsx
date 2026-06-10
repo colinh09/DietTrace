@@ -4,11 +4,46 @@
 // tinted drawer of floating white tiles — Items (what was logged) → Why these
 // portions → [Agent's work | Review] side by side → Why this confidence. The one
 // way to correct is the conversational review (plain language, no gram editing).
-import { Globe, History } from "lucide-react";
+import { useState } from "react";
+import { Check, Globe, History, Pencil, X } from "lucide-react";
 import type { ConfidenceAxis, LoggedItem, Nutrient, TraceStep } from "@/lib/api";
+import { updateMealItems } from "@/lib/api";
 import { MealReview } from "@/components/meal-review";
 import type { AgentActivity } from "@/components/agent-decision";
 import { macrosOf } from "@/lib/meal";
+
+// The four macro nutrient codes shown (and made editable) in the items table.
+const MACRO_CODES = { kcal: "208", protein: "203", carb: "205", fat: "204" } as const;
+type MacroVals = { kcal: number; protein: number; carb: number; fat: number };
+type EditRow = MacroVals & { grams: number };
+
+// Write a row's edited macro values back onto its item's nutrient list (updating
+// the existing code, or appending it if the item lacked one).
+function applyEdits(orig: Nutrient[], vals: MacroVals): Nutrient[] {
+  const next = orig.map((n) => ({ ...n }));
+  (Object.entries(MACRO_CODES) as [keyof MacroVals, string][]).forEach(
+    ([key, code]) => {
+      const idx = next.findIndex((n) => n.code === code);
+      if (idx >= 0) next[idx] = { ...next[idx], amount: vals[key] };
+      else next.push({ code, amount: vals[key] } as Nutrient);
+    },
+  );
+  return next;
+}
+
+// Meal totals are the per-item nutrients summed by code.
+function recomputeTotals(items: LoggedItem[]): Nutrient[] {
+  const byCode = new Map<string, Nutrient>();
+  items.forEach((it) =>
+    it.nutrients.forEach((n) => {
+      const ex = byCode.get(n.code);
+      byCode.set(n.code, ex ? { ...ex, amount: ex.amount + n.amount } : { ...n });
+    }),
+  );
+  return [...byCode.values()];
+}
+
+const intOf = (v: string) => parseInt(v.replace(/[^0-9]/g, "") || "0", 10);
 
 // Each step's rail glyph: a globe for the web fallback, a history mark for a
 // recall from memory, and a quiet dot for the ordinary deterministic steps.
@@ -86,6 +121,51 @@ export function MealTrace({
   const showReview = Boolean(mealText) && !readOnly;
   const cell = (v: number) => fmt.format(Math.round(v));
 
+  // ── Inline item editing — a manual fix to the numbers (grams + macros) that
+  // rewrites the log in place. NOT a confirmation/dataset point: it teaches the
+  // agent nothing, it just corrects what was recorded. ──
+  const canEdit = Boolean(mealId) && !readOnly;
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<EditRow[]>([]);
+
+  const startEdit = () => {
+    setDraft(
+      perItem.map((it) => {
+        const m = macrosOf(it.nutrients);
+        return {
+          grams: Math.round(it.grams),
+          kcal: Math.round(m.kcal),
+          protein: Math.round(m.protein),
+          carb: Math.round(m.carb),
+          fat: Math.round(m.fat),
+        };
+      }),
+    );
+    setEditing(true);
+  };
+
+  const setField = (i: number, field: keyof EditRow, value: number) =>
+    setDraft((d) => d.map((r, j) => (j === i ? { ...r, [field]: value } : r)));
+
+  const saveEdits = async () => {
+    if (!mealId || saving) return;
+    setSaving(true);
+    const items: LoggedItem[] = perItem.map((it, i) => {
+      const row = draft[i];
+      return { ...it, grams: row.grams, nutrients: applyEdits(it.nutrients, row) };
+    });
+    try {
+      await updateMealItems(mealId, items, recomputeTotals(items));
+      setEditing(false);
+      onCorrected?.();
+    } catch {
+      /* leave the editor open so the user can retry */
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // The agent's ordered work, as the dotted-timeline motif.
   const work = (
     <div className="tile">
@@ -107,9 +187,44 @@ export function MealTrace({
 
   return (
     <div className="drawer">
-      {/* What was logged — the items table. */}
+      {/* What was logged — the items table, editable in place (a manual fix,
+          not a dataset point). */}
       <div className="tile">
-        <span className="tile-eyebrow">Items</span>
+        <div className="tile-head">
+          <span className="tile-eyebrow">Items</span>
+          {canEdit && !editing && (
+            <button
+              type="button"
+              className="items-edit"
+              onClick={startEdit}
+              aria-label="edit items"
+            >
+              <Pencil size={13} aria-hidden="true" />
+            </button>
+          )}
+          {editing && (
+            <span className="items-edit-actions">
+              <button
+                type="button"
+                className="items-cancel"
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                aria-label="cancel editing"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="items-save"
+                onClick={saveEdits}
+                disabled={saving}
+              >
+                <Check size={13} aria-hidden="true" />
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </span>
+          )}
+        </div>
         <table className="items">
           <thead>
             <tr>
@@ -124,6 +239,30 @@ export function MealTrace({
           <tbody>
             {perItem.map((item, i) => {
               const m = macrosOf(item.nutrients);
+              const row = draft[i];
+              if (editing && row) {
+                const inp = (field: keyof EditRow, label: string) => (
+                  <input
+                    className="item-edit"
+                    inputMode="numeric"
+                    value={row[field]}
+                    aria-label={label}
+                    onChange={(e) => setField(i, field, intOf(e.target.value))}
+                  />
+                );
+                return (
+                  <tr key={`${item.fdc_id}-${i}`}>
+                    <td>
+                      <span className="food">{item.description}</span>
+                    </td>
+                    <td className="tnum">{inp("grams", "grams")} g</td>
+                    <td className="tnum">{inp("kcal", "kcal")}</td>
+                    <td className="tnum">{inp("protein", "protein")}</td>
+                    <td className="tnum">{inp("carb", "carbs")}</td>
+                    <td className="tnum">{inp("fat", "fat")}</td>
+                  </tr>
+                );
+              }
               return (
                 <tr key={`${item.fdc_id}-${i}`}>
                   <td>

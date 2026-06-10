@@ -1,10 +1,15 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MealTrace } from "@/components/meal-trace";
+import { updateMealItems } from "@/lib/api";
 import type { ConfidenceAxis, LoggedItem, TraceStep } from "@/lib/api";
 
-// FreeformFeedback (rendered when mealText is present) imports this.
-vi.mock("@/lib/api", () => ({ submitFreeformFeedback: vi.fn() }));
+// FreeformFeedback imports submitFreeformFeedback; the items editor imports
+// updateMealItems.
+vi.mock("@/lib/api", () => ({
+  submitFreeformFeedback: vi.fn(),
+  updateMealItems: vi.fn(),
+}));
 
 const perItem: LoggedItem[] = [
   {
@@ -108,5 +113,28 @@ describe("MealTrace", () => {
   it("renders no 'why these portions' card when portion_basis is absent", () => {
     render(<MealTrace trace={trace} perItem={perItem} />);
     expect(screen.queryByText(/why these portions/i)).not.toBeInTheDocument();
+  });
+
+  it("edits item numbers in place and saves without a dataset point (#138)", async () => {
+    vi.mocked(updateMealItems).mockResolvedValue(undefined);
+    render(
+      <MealTrace
+        trace={trace}
+        perItem={perItem}
+        mealId={5}
+        totals={perItem[0].nutrients}
+      />,
+    );
+    // Read-only until you press edit — no inputs yet.
+    expect(screen.queryByLabelText("grams")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /edit items/i }));
+
+    const grams = screen.getAllByLabelText("grams")[0];
+    fireEvent.change(grams, { target: { value: "250" } });
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(updateMealItems).toHaveBeenCalled());
+    const items = vi.mocked(updateMealItems).mock.calls[0][1];
+    expect(items[0].grams).toBe(250);
   });
 });
