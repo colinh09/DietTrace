@@ -130,10 +130,9 @@ def test_demo_seed_reseed_does_not_stack_trust(tmp_path) -> None:
 
 def test_demo_seed_today_empty_meals_spread_dataset_on_older_day(tmp_path) -> None:
     """Today (offset 0) is EMPTY — the judge logs their own first meal there. The
-    persona's visible meals are spread across yesterday (day 1) AND two-days-ago
-    (day 2) so each prior day reads as a believable eating day (≤7 meals, in
-    chronological order). The held-out dataset rows are spread across both days,
-    badged but never hidden."""
+    persona's meals are spread across the three prior days so each reads as a
+    believable eating day (≤6 meals, in chronological order). The held-out dataset
+    rows are spread across the prior days, badged but never hidden."""
     client, _, _ = _client(tmp_path)
     resp = client.post("/demo/seed", headers=_H, json={"date": "2026-06-07"}).json()
     assert resp["meal_date"] == "2026-06-07"  # today — left clean
@@ -145,33 +144,29 @@ def test_demo_seed_today_empty_meals_spread_dataset_on_older_day(tmp_path) -> No
 
     day1 = client.get("/history?date=2026-06-06", headers=_H).json()["meals"]
     day2 = client.get("/history?date=2026-06-05", headers=_H).json()["meals"]
+    day3 = client.get("/history?date=2026-06-04", headers=_H).json()["meals"]
 
-    # Each prior day reads as a real day: at least one meal, capped at seven, never
-    # a crammed pile.
-    assert 1 <= len(day1) <= 7
-    assert 1 <= len(day2) <= 7
-
-    # Each day is in chronological order (/history is newest-first) and every
-    # meal carries a distinct, sensible time — not all stamped "now".
-    for day in (day1, day2):
+    # Each prior day reads as a real day: a handful of meals, never a crammed pile,
+    # in chronological order (/history is newest-first) with distinct sensible times.
+    for day in (day1, day2, day3):
+        assert 1 <= len(day) <= 6
         times = [m["created_at"] for m in day]
         assert times == sorted(times, reverse=True)
         assert len(set(times)) == len(times)  # no two meals share a timestamp
 
-    # The persona's visible playground meals are spread across BOTH prior days —
-    # each day carries some of them, so neither is crammed and neither is empty.
+    # The persona's visible playground meals are spread across the prior days —
+    # every one lands on a day, none crammed onto a single one.
     want = {m["text"] for m in DEMO_MEALS}
-    day1_persona = {m["text"] for m in day1 if not m.get("dataset_point")} & want
-    day2_persona = {m["text"] for m in day2 if not m.get("dataset_point")} & want
-    assert day1_persona, "day 1 should carry some of the persona's visible meals"
-    assert day2_persona, "day 2 should carry some of the persona's visible meals"
-    assert day1_persona | day2_persona == want  # all accounted for across the two days
+    got = {m["text"] for m in day1 + day2 + day3 if not m.get("dataset_point")} & want
+    assert got == want
 
-    # The dataset-point rows are spread across both prior days (not clustered on
-    # one), flagged + matching the held-out set, and carry full per-item detail.
-    dataset_rows = [m for m in day1 + day2 if m.get("dataset_point")]
-    assert any(m.get("dataset_point") for m in day1), "a dataset row should sit on day 1"
-    assert any(m.get("dataset_point") for m in day2), "a dataset row should sit on day 2"
+    # The held-out dataset-point rows are spread across the prior days (on more than
+    # one, not clustered), flagged + matching the held-out set, with per-item detail.
+    dataset_rows = [m for m in day1 + day2 + day3 if m.get("dataset_point")]
+    days_with_dataset = sum(
+        1 for d in (day1, day2, day3) if any(m.get("dataset_point") for m in d)
+    )
+    assert days_with_dataset >= 2, "dataset rows should be spread across days"
     assert len(dataset_rows) == resp["confirmations"]
     assert all(m.get("per_item") for m in dataset_rows)
 

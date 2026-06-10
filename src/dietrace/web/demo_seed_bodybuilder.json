@@ -2981,7 +2981,7 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 1,
+      "day": 3,
       "time": "08:00"
     },
     {
@@ -13040,7 +13040,7 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 1,
+      "day": 3,
       "time": "18:30"
     }
   ],
@@ -25124,7 +25124,7 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 2,
+      "day": 3,
       "time": "15:30"
     },
     {
@@ -32023,7 +32023,7 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 2,
+      "day": 3,
       "time": "21:30"
     }
   ]

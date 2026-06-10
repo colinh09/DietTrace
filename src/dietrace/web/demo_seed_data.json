@@ -2250,7 +2250,7 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 1,
+      "day": 2,
       "time": "06:30"
     },
     {
@@ -4775,7 +4775,7 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 1,
+      "day": 2,
       "time": "13:00"
     },
     {
@@ -8615,7 +8615,7 @@
         "needs_review": false,
         "review_reason": null
       },
-      "day": 2,
+      "day": 1,
       "time": "10:30"
     },
     {
@@ -14007,7 +14007,7 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 2,
+      "day": 3,
       "time": "08:00"
     },
     {
@@ -16373,7 +16373,7 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 2,
+      "day": 3,
       "time": "06:15"
     },
     {
@@ -19159,7 +19159,7 @@
         "review_reason": null
       },
       "dataset_point": true,
-      "day": 1,
+      "day": 2,
       "time": "11:00"
     },
     {
@@ -20406,7 +20406,7 @@
         "review_reason": "1 of 2 food(s) named were not resolved (1 logged)"
       },
       "dataset_point": true,
-      "day": 2,
+      "day": 1,
       "time": "12:30"
     },
     {
@@ -22675,7 +22675,7 @@
         "review_reason": null
       },
       "dataset_point": false,
-      "day": 2,
+      "day": 3,
       "time": "15:30"
     },
     {
@@ -25793,7 +25793,7 @@
         "review_reason": null
       },
       "dataset_point": true,
-      "day": 1,
+      "day": 2,
       "time": "16:30"
     },
     {
@@ -27168,7 +27168,7 @@
         "review_reason": null
       },
       "dataset_point": true,
-      "day": 2,
+      "day": 3,
       "time": "19:00"
     },
     {
