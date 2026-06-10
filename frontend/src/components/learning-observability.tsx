@@ -97,7 +97,7 @@ function ScoreBar({
 
 // The live re-tune as the design's two parallel scoring panels: "Fit to you"
 // (your confirmed meals — should improve) and "USDA / everyday" (reference foods —
-// must not drop), each streaming base → tuned calorie accuracy per meal as the
+// should hold), each streaming base → tuned calorie accuracy per meal as the
 // Phoenix experiment scores them.
 function RetuneLive({
   phase,
