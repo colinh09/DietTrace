@@ -240,7 +240,82 @@ EVERYDAY = Persona(
 )
 
 
-PERSONAS: dict[str, Persona] = {p.key: p for p in (RUNNER, BODYBUILDER, EVERYDAY)}
+# ──────────────────────────────────────────────────────────────────────────────
+# Persona D — The creator's log (REAL dogfooded account). Not a story: these are
+# the creator's own meals, corrections, and confirmed dataset points, exported
+# from a live account and replayed verbatim. Calorie-dense, carb-forward days
+# around morning lifts; the corrections are his actual "that portion runs big"
+# notes (sourdough, honey, oats, post-workout carbs).
+# ──────────────────────────────────────────────────────────────────────────────
+
+CREATOR = Persona(
+    key="creator",
+    label="The creator's log",
+    blurb="A real dogfooded account — actual meals, corrections, and confirmed dataset points.",
+    goals={"208": 2635.0, "203": 230.6, "205": 230.6, "204": 87.8},
+    goal_rationale=(
+        "The creator's own targets, straight from his account: Mifflin–St Jeor "
+        "BMR 1650 kcal × 1.9 (very active) = TDEE 3135 kcal, with a 500 kcal "
+        "deficit → a 2635 kcal cut, carbs kept high enough for training and "
+        "plenty of protein. These meals are his real logs — correct one in plain "
+        "words, then re-tune to watch it learn his portions."
+    ),
+    hook_meal="overnight oats",
+    hook_note=(
+        "The overnight oats logged with more carbs than he actually eats — his "
+        "oats run closer to 50 g, not the bowl the default assumed. That's a real "
+        "on-screen under-count he corrected; pick it (or any visible meal) and re-tune."
+    ),
+    learns=(
+        "His real portions: sourdough and honey run smaller than the default, "
+        "his oats are about 50 g, and his post-workout carbs run higher."
+    ),
+    profile=(
+        "I'm mostly focused on building muscle and maintaining a lean physique. I "
+        "usually lift in the morning and walk a bunch throughout the day. I went on "
+        "two aggressive cuts in november and april. I just went on a solo trip to "
+        "europe and gained more fat than I would've liked (10lbs). I haven't been in "
+        "a muscle building phase in a while, but I also want to lose some fat from "
+        "the trip. So I'm aiming to do a small deficit while keeping carbs high "
+        "enough for adequate performance and recovery. And sufficient protein and fats."
+    ),
+    meals=_load_meals("demo_seed_creator.json"),
+    previous_day=_load_previous_day("demo_seed_creator.json"),
+    # Held-out test set: the meals the creator actually confirmed as dataset points
+    # (his preworkout dates + his ground-beef salad), carried verbatim from the
+    # account snapshot.
+    confirmations=_load_confirmations("demo_seed_creator.json"),
+    feedback=[
+        # The creator's real corrections, replayed verbatim. Each targets a visible
+        # meal that is NOT a held-out dataset point, so the corrector never learns
+        # from a meal it's then graded on (kept DISJOINT, like the other personas).
+        {"feedback_text": "I usually try to eat around 60-70 grams of carbs post meal, "
+                          "this is too little carbs. So when i say one sweet potato it "
+                          "usaully means more",
+         "meal_text": "post workout ninja creami ice cream that has a scoop of whey "
+                      "protein, ultra filtered 2% fat milk, a little greek yogurt, and "
+                      "10g of zero sugar pudding mix. Then on the side i had one sweet potato"},
+        {"feedback_text": "Way too much sourdough bread! One slice for me is usually "
+                          "around 40-50 grams! I would also rarely eat more than 100g of "
+                          "carbs in one meal",
+         "meal_text": "two pieces of sourdough bread with three medium sized eggs, 3 "
+                      "slices of turkey bacon, one serving of sugar free ketchup and "
+                      "around 100g of cottage cheese"},
+        {"feedback_text": "too many carbs in one meal. The outlier are the oats - i would "
+                          "normally eat around 50g",
+         "meal_text": "overnight oats with rolled oats, a banana, blueberries, greek "
+                      "yogurt and some pbfit"},
+        {"feedback_text": "way too much honey and sourdough bread. For a preworkout meal, "
+                          "I try to get around 30-50 grams of carbs",
+         "meal_text": "preworkout meal with a slice of sourdough bread, honey drizzled "
+                      "on top, and one date"},
+    ],
+)
+
+
+PERSONAS: dict[str, Persona] = {
+    p.key: p for p in (RUNNER, BODYBUILDER, EVERYDAY, CREATOR)
+}
 DEFAULT_PERSONA = RUNNER.key
 
 

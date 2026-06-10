@@ -356,8 +356,42 @@ def test_everyday_persona_registered_for_picker() -> None:
 
     assert "everyday" in PERSONAS
     assert PERSONAS["everyday"] is EVERYDAY
-    # Three distinct selectable personas: runner + bodybuilder + everyday generalist.
-    assert {"runner", "bodybuilder", "everyday"} <= set(PERSONAS)
+    # Four distinct selectable personas: runner + bodybuilder + everyday generalist
+    # + the creator's real dogfooded log.
+    assert {"runner", "bodybuilder", "everyday", "creator"} <= set(PERSONAS)
+
+
+def test_demo_seed_creator_persona(tmp_path) -> None:
+    """The creator's-log persona replays a real exported account: every logged meal
+    is the visible day, the confirmed meals are the held-out gate set, and the real
+    corrections are banked — all deterministic and offline (no Gemini)."""
+    from dietrace.web.demo_seed import CREATOR
+
+    client, _, goal_store = _client(tmp_path)
+    resp = client.post("/demo/seed", headers=_H, json={"persona": "creator"}).json()
+
+    persona = resp["persona"]
+    assert persona["key"] == "creator"
+    assert persona["label"] == "The creator's log"
+
+    # Every real logged meal is on the visible (today) day.
+    day = resp["meal_date"]
+    meals = client.get(f"/history?date={day}", headers=_H).json()["meals"]
+    assert len(meals) == len(persona["meal_texts"]) == len(CREATOR.meals) > 0
+    # The on-screen under-count he corrected is one of the visible meals.
+    assert any(persona["hook_meal"] in t for t in persona["meal_texts"])
+
+    # His own real targets replaced the runner defaults.
+    assert goal_store.get(_USER)["208"] == 2635.0
+    assert goal_store.get(_USER)["203"] == 230.6
+
+    # His confirmed meals are the held-out gate set; his real corrections banked.
+    assert resp["confirmations"] == len(CREATOR.confirmations) >= 2
+    assert resp["corrections"] == len(persona["correction_texts"]) >= 4
+
+    # His freeform profile is seeded as standing corrector context.
+    profile = client.get("/profile", headers=_H).json()["profile_text"]
+    assert "lean physique" in profile.lower()
 
 
 def test_persona_corrections_are_disjoint_from_dataset_points() -> None:

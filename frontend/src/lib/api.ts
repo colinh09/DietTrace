@@ -674,6 +674,12 @@ export const DEMO_PERSONAS = [
     label: "Busy professional",
     blurb: "Eats out a lot — those portions run big.",
   },
+  {
+    key: "creator",
+    label: "The creator's log",
+    blurb:
+      "A real dogfooded account — actual meals, corrections, and confirmed dataset points.",
+  },
 ] as const;
 
 export async function seedDemo(
