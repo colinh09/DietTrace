@@ -1247,7 +1247,7 @@ body {
 .dm-sec-head hr { flex: 1; height: 1px; background: var(--line); border: none; margin: 0; }
 
 /* persona switcher — three white tiles in one row, accent ring when on */
-.dm-personas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.dm-personas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .dm-persona { text-align: left; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; padding: 14px 15px; cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s; }
 .dm-persona:hover:not(:disabled) { border-color: var(--accent); }
 .dm-persona:disabled { cursor: default; }

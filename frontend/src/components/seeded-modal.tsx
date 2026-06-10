@@ -83,7 +83,7 @@ export function SeededModal({
             <div className="dl-stat">
               <div className="dl-stat-lab">To learn</div>
               <div className="dl-stat-num">{result.corrections}</div>
-              <div className="dl-stat-sub">under-counted</div>
+              <div className="dl-stat-sub">corrections</div>
             </div>
           </div>
           {onViewDataset && (
@@ -136,7 +136,7 @@ export function SeededModal({
           </div>
           <ol className="dm-steps">
             <li className="dm-step">
-              Correct an under-counted meal — tell it in plain words.
+              Correct a meal — tell it in plain words.
             </li>
             <li className="dm-step">
               Log a new meal the way you&apos;d actually say it.

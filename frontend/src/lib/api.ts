@@ -677,8 +677,7 @@ export const DEMO_PERSONAS = [
   {
     key: "creator",
     label: "The creator's log",
-    blurb:
-      "A real dogfooded account — actual meals, corrections, and confirmed dataset points.",
+    blurb: "Meals the creator of this app logs.",
   },
 ] as const;
 

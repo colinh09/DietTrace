@@ -251,7 +251,7 @@ EVERYDAY = Persona(
 CREATOR = Persona(
     key="creator",
     label="The creator's log",
-    blurb="A real dogfooded account — actual meals, corrections, and confirmed dataset points.",
+    blurb="Meals the creator of this app logs.",
     goals={"208": 2635.0, "203": 230.6, "205": 230.6, "204": 87.8},
     goal_rationale=(
         "The creator's own targets, straight from his account: Mifflin–St Jeor "
