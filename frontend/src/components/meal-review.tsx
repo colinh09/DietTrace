@@ -162,6 +162,7 @@ export function MealReview({
           mealId={mealId}
           mealText={mealText}
           perItem={perItem}
+          onBack={() => setMode("ask")}
           onFeedbackApplied={(res) => {
             onCorrected?.();
             onAgentEvent?.({

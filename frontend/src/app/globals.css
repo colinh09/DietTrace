@@ -1043,6 +1043,8 @@ body {
 .freeform-feedback { margin-top: 14px; }
 /* Hint stays out of the way until you actually engage a feedback box — no repeated
    instruction line on every meal card. Revealed on hover or focus-within. */
+.freeform-back { display: inline-flex; align-items: center; gap: 4px; background: none; border: none; color: var(--muted-ink); font-family: var(--ui-font); font-size: 12.5px; cursor: pointer; padding: 0; margin-bottom: 9px; transition: color .14s; }
+.freeform-back:hover:not(:disabled) { color: var(--ink); }
 .freeform-hint { font-size: 13px; color: var(--muted-ink); line-height: 1.5; margin-bottom: 8px; }
 .freeform-input-row { display: flex; gap: 8px; align-items: stretch; }
 .freeform-input { flex: 1; min-width: 0; border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 13px; background: var(--card); font-family: var(--ui-font); font-size: 14px; color: var(--ink); transition: border-color .16s, box-shadow .16s; }

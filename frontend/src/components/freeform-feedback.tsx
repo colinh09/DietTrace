@@ -15,6 +15,8 @@ interface Props {
   mealText?: string;
   perItem?: LoggedItem[];
   onFeedbackApplied?: (result: FreeformFeedbackResult) => void;
+  // Return to the "Looks right / Something's off" choice without saving anything.
+  onBack?: () => void;
 }
 
 function learnedLabel(result: FreeformFeedbackResult): string {
@@ -41,6 +43,7 @@ export function FreeformFeedback({
   mealText,
   perItem,
   onFeedbackApplied,
+  onBack,
 }: Props) {
   const [text, setText] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">(
@@ -77,6 +80,16 @@ export function FreeformFeedback({
     <div className="freeform-feedback">
       {status !== "done" && (
         <>
+          {onBack && (
+            <button
+              type="button"
+              className="freeform-back"
+              onClick={onBack}
+              disabled={status === "loading"}
+            >
+              ← Back
+            </button>
+          )}
           <div className="freeform-hint">
             Tell DietTrace what to fix in plain words — it corrects this meal and
             learns your style.
