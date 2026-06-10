@@ -314,7 +314,7 @@ describe("MealList", () => {
 
     // Badged as a dataset point AND keeping its confidence chip (the badge is an
     // extra tag, not a replacement), with real macros.
-    expect(within(row).getByText(/confirmed meal/i)).toBeInTheDocument();
+    expect(within(row).getByText(/dataset point/i)).toBeInTheDocument();
     expect(row.querySelector(".conf-chip")).not.toBeNull();
     expect(within(row).getByText(/418/)).toBeInTheDocument();
     expect(within(row).getByText(/P 8/)).toBeInTheDocument();

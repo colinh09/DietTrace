@@ -196,7 +196,7 @@ function MealRow({
             <Tooltip label="A meal you confirmed as right. DietTrace keeps it aside in your dataset — it can't peek at it while learning, only check itself against it afterward.">
               <span className="dataset-badge">
                 <span className="dataset-badge-dot" aria-hidden="true" />
-                confirmed meal
+                dataset point
               </span>
             </Tooltip>
           )}
@@ -205,7 +205,7 @@ function MealRow({
             <Tooltip label="You confirmed this meal as right. DietTrace keeps it aside in your dataset — it checks itself against it afterward but never learns from it.">
               <span className="dataset-badge">
                 <span className="dataset-badge-dot" aria-hidden="true" />
-                confirmed meal
+                dataset point
               </span>
             </Tooltip>
           )}
