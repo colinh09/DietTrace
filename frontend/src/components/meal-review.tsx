@@ -98,6 +98,15 @@ export function MealReview({
 
   return (
     <div className="review">
+      {mode === "reviewing" && (
+        <button
+          type="button"
+          className="freeform-back"
+          onClick={() => setMode("ask")}
+        >
+          ← Back
+        </button>
+      )}
       {(mode === "ask" || mode === "reviewing") && (
         <div className="review-head">
           <span className="review-q">
