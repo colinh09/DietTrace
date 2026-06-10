@@ -36,10 +36,11 @@ export default function AccuracyPage() {
         </header>
         <header className="ov-head">
           <span className="ov-eyebrow mono">Accuracy</span>
-          <h1 className="ov-title">An AI nutritionist graded on accuracy</h1>
+          <h1 className="ov-title">An AI nutritionist, graded on accuracy</h1>
           <p className="ov-sub">
-            DietTrace grades its own work on every meal against USDA data and learns
-            how <i>you</i> eat — tested so personalizing never makes it less accurate.
+            DietTrace reads plain-English meals against USDA data and learns how{" "}
+            <i>you</i> eat — and every change is scored against known calories before
+            it ships. Measured, not claimed.
           </p>
         </header>
         {report && <AccuracyView report={report} />}

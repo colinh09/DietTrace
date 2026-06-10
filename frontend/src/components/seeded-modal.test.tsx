@@ -46,13 +46,12 @@ describe("SeededModal", () => {
       screen.getByRole("heading", { name: "Endurance runner" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/big plate of spaghetti/i)).toBeInTheDocument();
-    // The hook meal carries the "under-counted" flag badge.
-    expect(document.querySelector(".sm-flag")).toHaveTextContent(/under-counted/i);
-    // The seeded learning state is described.
-    expect(screen.getByText(/kept aside in your dataset/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/before workouts I eat way more carbs/i),
-    ).toBeInTheDocument();
+    // The hook meal carries the "under-counted" amber chip.
+    expect(document.querySelector(".dm-meal .chip.amber")).toHaveTextContent(
+      /under-counted/i,
+    );
+    // "Your Dataset" framing is kept in the what's-loaded stats.
+    expect(screen.getByText(/in Your Dataset/i)).toBeInTheDocument();
   });
 
   it("re-seeds the other persona via the loader", () => {

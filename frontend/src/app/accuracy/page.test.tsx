@@ -26,7 +26,7 @@ const report: AccuracyReport = {
 };
 
 describe("AccuracyPage", () => {
-  it("renders the headline accuracy, the loop, and the live Arize source", async () => {
+  it("renders the headline accuracy and the Arize before→after source", async () => {
     vi.mocked(getAccuracy).mockResolvedValue(report);
 
     render(<AccuracyPage />);
@@ -35,13 +35,17 @@ describe("AccuracyPage", () => {
       expect(screen.getByText(/graded on accuracy/i)).toBeInTheDocument(),
     );
     expect(screen.getByText("60%")).toBeInTheDocument(); // calorie accuracy headline
-    expect(screen.getByText(/how DietTrace checks its own work/i)).toBeInTheDocument();
-    // The data is shown in-UI and labeled as live from Phoenix (no external link).
+    expect(screen.getByText(/Calorie accuracy/i)).toBeInTheDocument(); // a hero stat tile
+    // The before→after section carries the Arize Phoenix source tag (data in-UI).
     expect(
-      screen.getByText("Live from Phoenix · 3 experiments"),
+      screen.getByText(
+        (_, el) =>
+          el?.classList.contains("phoenix-tag") === true &&
+          /arize phoenix · 3 experiments/i.test(el.textContent ?? ""),
+      ),
     ).toBeInTheDocument();
     // The accuracy-over-time trend renders.
-    expect(screen.getByText(/accuracy over time · 3 experiments/i)).toBeInTheDocument();
+    expect(screen.getByText(/Accuracy over time/i)).toBeInTheDocument();
     expect(
       screen.getByRole("img", { name: /accuracy across experiments/i }),
     ).toBeInTheDocument();

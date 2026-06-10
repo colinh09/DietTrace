@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
+import { BrandMark } from "@/components/brand-mark";
 import {
   AgentFeed,
   type AgentEvent,
@@ -375,7 +376,6 @@ export function LearningObservability({
   // Link to the Phoenix experiment when the fit set is scored in Arize over MCP.
   const [experimentUrl, setExperimentUrl] = useState("");
   const [showData, setShowData] = useState(false);
-  const [showCorr, setShowCorr] = useState(false);
   // The agent-state modal (the deep dive behind the icon).
   const [stateOpen, setStateOpen] = useState(false);
   // The "Retune now" confirm modal — manual override of the auto-retune threshold.
@@ -537,8 +537,6 @@ export function LearningObservability({
   const newCorr = prefs?.new_corrections ?? 0;
   const confirmations = prefs?.confirmations ?? 0;
   const confirmed = prefs?.confirmed ?? [];
-  const custom = prefs?.confirmations_custom ?? 0;
-  const seeded = prefs?.confirmations_seeded ?? 0;
   // The feed: re-tune events the panel raised + the per-meal decisions from the page.
   const feedEvents = agentEvents;
   const latest = feedEvents[0];
@@ -687,206 +685,226 @@ export function LearningObservability({
         </Modal>
       )}
       {stateOpen && (
-        <Modal onClose={() => setStateOpen(false)} labelledBy="agent-state-title">
-          <h2 id="agent-state-title" className="agent-state-title">
-            Agent state
+        <Modal
+          onClose={() => setStateOpen(false)}
+          labelledBy="agent-state-title"
+          className="modal-state"
+        >
+          {/* header */}
+          <span className="eyebrow">Agent state</span>
+          <h2 id="agent-state-title" className="as-title">
+            What DietTrace knows about you
           </h2>
-          <div className="agent-state-grid">
-            <div className="agent-state-row">
-              <div className="agent-state-stat">
-                <span className="agent-state-num">{confirmations}</span>
-                <span className="agent-state-cap">meals in your dataset</span>
-                <span className="agent-state-sub mono">
-                  {custom} yours · {seeded} seeded
-                </span>
-              </div>
-              <div className="agent-state-stat">
-                <span className="agent-state-num">{corrections}</span>
-                <span className="agent-state-cap">
-                  correction{corrections === 1 ? "" : "s"} you&apos;ve made
-                </span>
-                <span className="agent-state-sub mono">{newCorr} new to learn</span>
-              </div>
-            </div>
-            <div className="agent-state-stat agent-state-decision">
-              <span className="agent-state-dec-lab mono">Latest decision</span>
-              <span className="agent-state-dec-text">
-                {latest ? (
-                  <>
-                    {latest.reason}
-                    {latest.detail ? ` (${latest.detail})` : ""}
-                  </>
-                ) : (
-                  "None yet — log or correct a meal and the agent's call shows here."
-                )}
-              </span>
-            </div>
+          <div className="as-note">
+            <span>Your Dataset stays synced over MCP</span>
+            <span className="phoenix-tag">
+              <span className="pdot" aria-hidden="true" />
+              Arize Phoenix
+            </span>
           </div>
-          <p className="agent-state-mcp">
-            Your dataset is synced to Phoenix over MCP.
-          </p>
 
-          <div className="lo">
+          <div className="as-body">
+            {/* dashboard band — tiles on tint */}
+            <div className="as-dash">
+              <div className="as-stats">
+                <div className="as-tile as-stat">
+                  <div className="as-stat-lab">Your Dataset</div>
+                  <div className="as-stat-num tnum">{confirmations}</div>
+                  <div className="as-stat-sub">meals</div>
+                </div>
+                <div className="as-tile as-stat">
+                  <div className="as-stat-lab">Corrections</div>
+                  <div className="as-stat-num tnum">{corrections}</div>
+                  <div className="as-stat-sub">you&apos;ve made</div>
+                </div>
+                <div className="as-tile as-stat">
+                  <div className="as-stat-lab">New to learn</div>
+                  <div className="as-stat-num tnum">{newCorr}</div>
+                  <div className="as-stat-sub">
+                    {newCorr === 0 ? "all applied" : "to learn"}
+                  </div>
+                </div>
+              </div>
+              <div className="as-tile as-decision">
+                <Gauge size={15} className="gear" aria-hidden="true" />
+                <div>
+                  <div className="as-decision-lab">Latest decision</div>
+                  <div className="as-decision-txt">
+                    {latest ? (
+                      <>
+                        {latest.reason}
+                        {latest.detail ? ` (${latest.detail})` : ""}
+                      </>
+                    ) : (
+                      "None yet — log or correct a meal and the agent's call shows here."
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-      {/* ── Your context: the freeform profile the corrector reads when tuning ─ */}
-      <section className="dash-card lo-context">
-        <div className="lo-context-head">
-          <span className="dash-card-head mono">your context</span>
-          {!editingProfile && (
+            {/* 1 · your context */}
+            <section>
+              <div className="as-sec-head">
+                <span className="eyebrow">Your context</span>
+                <hr />
+                {!editingProfile && (
+                  <button
+                    type="button"
+                    className="as-edit"
+                    onClick={startEditProfile}
+                  >
+                    <Pencil size={13} className="ic" aria-hidden="true" />
+                    {profileText ? "Edit" : "Add"}
+                  </button>
+                )}
+              </div>
+              {editingProfile ? (
+                <div className="lo-context-edit-box">
+                  <textarea
+                    className="lo-context-textarea"
+                    value={profileDraft}
+                    rows={3}
+                    autoFocus
+                    aria-label="your goals and eating style"
+                    placeholder="e.g. Marathon training, mostly plant-based — I like my carbs high on long-run days."
+                    onChange={(e) => setProfileDraft(e.target.value)}
+                  />
+                  <div className="lo-context-actions">
+                    <button
+                      type="button"
+                      className="lo-context-cancel"
+                      onClick={() => setEditingProfile(false)}
+                      disabled={savingProfile}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="lo-context-save"
+                      onClick={saveProfile}
+                      disabled={savingProfile}
+                    >
+                      {savingProfile ? "Saving…" : "Save"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="as-quote-wrap">
+                  <p className="as-quote-cap">
+                    Your goals and eating style, in your words — DietTrace reads
+                    this when it tunes.
+                  </p>
+                  {profileText ? (
+                    <div className="as-quote">
+                      <BrandMark
+                        size={18}
+                        echo={false}
+                        stroke="var(--accent)"
+                        className="leaf"
+                      />
+                      <span className="as-quote-txt">{profileText}</span>
+                    </div>
+                  ) : (
+                    <p className="lo-empty">
+                      No context yet. Add your goals &amp; eating style so
+                      DietTrace tunes to you, not a generic average.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* 2 · what it's learned */}
+            <section>
+              <div className="as-sec-head">
+                <span className="eyebrow">
+                  What it&apos;s learned · {feedback.length}
+                </span>
+                <hr />
+              </div>
+              {feedback.length === 0 ? (
+                <p className="lo-empty">
+                  None yet. Tell DietTrace what it got wrong on any meal — your
+                  fixes land here.
+                </p>
+              ) : (
+                <div className="as-corr">
+                  {feedback.map((f) => (
+                    <div className="as-corr-row" key={f.id}>
+                      <div className="as-corr-head">
+                        <span className="as-corr-name">
+                          {f.meal_text || "general note"}
+                        </span>
+                        <span className="as-tag">
+                          <Check size={11} className="check" aria-hidden="true" />
+                          Learned
+                        </span>
+                        <button
+                          type="button"
+                          className="as-corr-del"
+                          aria-label="delete correction"
+                          onClick={() => removeCorrection(f.id)}
+                        >
+                          <Trash2 size={12} aria-hidden="true" />
+                        </button>
+                      </div>
+                      <p className="as-corr-words">“{f.feedback_text}”</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* 3 · your dataset */}
+            {confirmations > 0 && (
+              <section>
+                <div className="as-sec-head">
+                  <button
+                    type="button"
+                    className={"as-ds-toggle" + (showData ? " open" : "")}
+                    aria-expanded={showData}
+                    onClick={() => setShowData((s) => !s)}
+                  >
+                    <ChevronRight size={18} className="chev" aria-hidden="true" />
+                    <span className="eyebrow">
+                      Your Dataset · {confirmations} meal
+                      {confirmations === 1 ? "" : "s"}
+                    </span>
+                  </button>
+                  <hr />
+                </div>
+                {showData && (
+                  <div>
+                    <p className="as-ds-intro">
+                      Meals you&apos;ve confirmed as right, synced to your Phoenix
+                      dataset over MCP. Every update is scored against these — it
+                      never learns from them, so the test stays honest.
+                    </p>
+                    <div className="as-ds-list">
+                      {confirmed.map((c) => (
+                        <div className="as-ds-row" key={c.id}>
+                          <span className="as-ds-name">{c.meal_text}</span>
+                          <span className="as-ds-kcal tnum">
+                            {Math.round(c.calories).toLocaleString()} kcal
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
+
+          <div className="as-foot">
             <button
               type="button"
-              className="lo-context-edit"
-              onClick={startEditProfile}
+              className="btn-accent"
+              onClick={() => setStateOpen(false)}
             >
-              <Pencil size={12} aria-hidden="true" />
-              {profileText ? "Edit" : "Add"}
+              Done
             </button>
-          )}
-        </div>
-        <p className="lo-hint">
-          Your goals &amp; eating style, in your words. DietTrace reads this
-          when it tunes — so what it learns fits who you are.
-        </p>
-        {editingProfile ? (
-          <div className="lo-context-edit-box">
-            <textarea
-              className="lo-context-textarea"
-              value={profileDraft}
-              rows={3}
-              autoFocus
-              aria-label="your goals and eating style"
-              placeholder="e.g. Marathon training, mostly plant-based — I like my carbs high on long-run days."
-              onChange={(e) => setProfileDraft(e.target.value)}
-            />
-            <div className="lo-context-actions">
-              <button
-                type="button"
-                className="lo-context-cancel"
-                onClick={() => setEditingProfile(false)}
-                disabled={savingProfile}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="lo-context-save"
-                onClick={saveProfile}
-                disabled={savingProfile}
-              >
-                {savingProfile ? "Saving…" : "Save"}
-              </button>
-            </div>
-          </div>
-        ) : profileText ? (
-          <blockquote className="lo-context-text">
-            <Sparkles size={13} className="lm-rule-icon" aria-hidden="true" />
-            <span>{profileText}</span>
-          </blockquote>
-        ) : (
-          <p className="lo-empty">
-            No context yet. Add your goals &amp; eating style so DietTrace tunes
-            to you, not a generic average.
-          </p>
-        )}
-      </section>
-
-      {/* ── Corrections you've taught (meal + what you said), persisted ───── */}
-      <section className="dash-card lo-corrs">
-        <button
-          type="button"
-          className="lo-dataset-head"
-          aria-expanded={showCorr}
-          onClick={() => setShowCorr((s) => !s)}
-        >
-          {showCorr ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <span className="dash-card-head mono">
-            your corrections · {feedback.length}
-          </span>
-        </button>
-        {showCorr &&
-          (feedback.length === 0 ? (
-            <p className="lo-empty">
-              None yet. Tell DietTrace what it got wrong on any meal — your fixes
-              land here.
-            </p>
-          ) : (
-            <>
-              {[
-                { lab: "Not used in an update yet", rows: feedback.filter((f) => !f.processed) },
-                { lab: "Already learned", rows: feedback.filter((f) => f.processed) },
-              ]
-                .filter((g) => g.rows.length > 0)
-                .map((g) => (
-                  <div className="lo-corr-group" key={g.lab}>
-                    <div className="lo-corr-grouplab mono">
-                      {g.lab} · {g.rows.length}
-                    </div>
-                    <ul className="lo-corr-list">
-                      {g.rows.map((f) => (
-                        <li
-                          className={"lo-corr" + (f.processed ? " done" : "")}
-                          key={f.id}
-                        >
-                          <div className="lo-corr-body">
-                            <div className="lo-corr-meal">
-                              {f.meal_text || "general note"}
-                            </div>
-                            <div className="lo-corr-text">“{f.feedback_text}”</div>
-                          </div>
-                          <div className="lo-corr-actions">
-                            <button
-                              type="button"
-                              className="lo-corr-del"
-                              aria-label="delete correction"
-                              onClick={() => removeCorrection(f.id)}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-            </>
-          ))}
-      </section>
-
-      {/* ── The test set the agent is checked against ─────────────────────── */}
-      {confirmations > 0 && (
-        <section className="dash-card lo-dataset">
-          <button
-            type="button"
-            className="lo-dataset-head"
-            aria-expanded={showData}
-            onClick={() => setShowData((s) => !s)}
-          >
-            {showData ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            <span className="dash-card-head mono">
-              your dataset · {confirmations} meal{confirmations === 1 ? "" : "s"}
-            </span>
-          </button>
-          {showData && (
-            <p className="lo-dataset-note">
-              Meals you&apos;ve confirmed as right, synced to your Phoenix dataset
-              over MCP. Every update is checked against these — but never learns from
-              them — so the test stays honest.
-            </p>
-          )}
-          {showData && (
-            <ul className="lo-data-list">
-              {confirmed.map((c) => (
-                <li className="lo-data-row" key={c.id}>
-                  <span className="lo-data-text">{c.meal_text}</span>
-                  <span className="lo-data-kcal mono tnum">
-                    {Math.round(c.calories)} kcal
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
           </div>
         </Modal>
       )}

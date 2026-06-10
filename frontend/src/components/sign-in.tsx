@@ -185,6 +185,11 @@ export function SignIn({ onContinueAnon }: { onContinueAnon: () => void }) {
               No email, no spam — your log stays on this device unless you sign in.
             </span>
           </div>
+
+          <p className="si-fineprint">
+            By continuing you agree to the <a href="#">Terms</a> and{" "}
+            <a href="#">Privacy Policy</a>.
+          </p>
         </div>
       </div>
     </div>

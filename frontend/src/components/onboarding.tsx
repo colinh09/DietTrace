@@ -11,6 +11,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Pencil, Play, Send, X } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { TraceMotif } from "@/components/trace-motif";
+import { DayGhost } from "@/components/day-ghost";
+import { TargetsPanel } from "@/components/targets-panel";
 import {
   postMacrosPlan,
   postMacrosSave,
@@ -40,7 +43,7 @@ interface Step {
 const STEPS: Step[] = [
   {
     key: "gender",
-    q: "Hey — I'm your nutritionist. First up: what's your gender? It helps me size your daily targets.",
+    q: "Hey — I'm Sage, your nutritionist. First up: what's your gender? It helps me size your daily targets.",
     kind: "chips",
     options: [
       { value: "male", label: "Male" },
@@ -108,14 +111,25 @@ export function Onboarding({
   const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
   const [heightUnit, setHeightUnit] = useState<"cm" | "ft">("cm");
   const [textDraft, setTextDraft] = useState("");
+  // While true, the agent shows a typing indicator before its next message lands.
+  const [typing, setTyping] = useState(false);
   // After a demo seed: the persona context preview shown before landing.
   const [seedResult, setSeedResult] = useState<SeedDemoResult | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep the latest message in view as the conversation grows.
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ block: "end" });
-  }, [transcript]);
+  }, [transcript, typing]);
+
+  // Clear any pending typing timer on unmount.
+  useEffect(
+    () => () => {
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+    },
+    [],
+  );
 
   // Launched straight into the chat (Macros "recalculate") — seed the first question.
   useEffect(() => {
@@ -160,21 +174,29 @@ export function Onboarding({
     setPhase("chat");
   };
 
+  // Reveal the next agent question after a short "typing" beat, so the chat feels
+  // like a live coach instead of a form that fills itself in. Gated to questions
+  // 2..N — the first question is seeded synchronously by startChat.
+  const askNext = (next: number) => {
+    setStepIndex(next);
+    if (next >= STEPS.length) return;
+    setTyping(true);
+    const delay = 280 + Math.min(STEPS[next].q.length * 4, 380);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      setTyping(false);
+      setTranscript((t) => [...t, { role: "agent", text: STEPS[next].q }]);
+    }, delay);
+  };
+
   // Record an answer (or a skip), echo it, and advance to the next question.
   const advance = (partial: Answers, userLabel: string) => {
     const merged = { ...answers, ...partial };
     setAnswers(merged);
-    const next = stepIndex + 1;
-    setTranscript((t) => [
-      ...t,
-      { role: "user", text: userLabel },
-      ...(next < STEPS.length
-        ? [{ role: "agent" as const, text: STEPS[next].q }]
-        : []),
-    ]);
+    setTranscript((t) => [...t, { role: "user", text: userLabel }]);
     setNumDraft("");
     setInDraft("");
-    setStepIndex(next);
+    askNext(stepIndex + 1);
   };
 
   const submitNumber = (step: Step) => {
@@ -261,10 +283,109 @@ export function Onboarding({
   };
 
   const step = STEPS[stepIndex];
+  // Show the input dock only once the current question's text has landed.
+  const dockReady = !busy && !typing;
+  const finished = stepIndex >= STEPS.length;
+
+  if (phase === "choose") {
+    return (
+      <div className="ob-page">
+        <div className="ob-grain" aria-hidden="true" />
+        <div className="ob-ghost-wrap" aria-hidden="true">
+          <DayGhost />
+        </div>
+        <div
+          className="ob-card ob-card-welcome"
+          role="dialog"
+          aria-label="Welcome to DietTrace"
+        >
+          {onCancel && (
+            <button
+              type="button"
+              className="ob-close"
+              aria-label="close"
+              onClick={onCancel}
+            >
+              <X size={18} />
+            </button>
+          )}
+          <div className="ob-welcome-head">
+            <div className="ob-brand">
+              <BrandMark size={30} />
+              <span className="brand-name">DietTrace</span>
+            </div>
+            <TraceMotif w={132} nodes={[0, 0.5, 1]} dur={1.8} />
+          </div>
+
+          <h1 className="ob-hero">Welcome</h1>
+          <p className="ob-vp">
+            Your AI nutritionist — it reads your meals in plain English and
+            learns how <i>you</i> actually eat.
+          </p>
+
+          <div className="ob-choices">
+            {/* See it in action → straight into the detailed persona chooser */}
+            <button
+              type="button"
+              className="ob-choice"
+              disabled={busy}
+              onClick={() => seed("runner")}
+            >
+              <span className="ob-choice-glyph">
+                <Play size={20} aria-hidden="true" />
+              </span>
+              <span className="ob-choice-body">
+                <span className="ob-choice-title">See it in action</span>
+                <span className="ob-choice-desc">
+                  {busy
+                    ? "Loading…"
+                    : "Load a demo and explore the sample profiles"}
+                </span>
+              </span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+
+            {/* Set up your own → the chat */}
+            <button
+              type="button"
+              className="ob-choice ob-choice-alt"
+              onClick={startChat}
+            >
+              <span className="ob-choice-glyph">
+                <Pencil size={20} aria-hidden="true" />
+              </span>
+              <span className="ob-choice-body">
+                <span className="ob-choice-title">Set up your own</span>
+                <span className="ob-choice-desc">
+                  Chat with your nutritionist — under a minute
+                </span>
+              </span>
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        {/* After a demo seed: preview what was loaded, then land on the app. */}
+        {seedResult && (
+          <SeededModal
+            result={seedResult}
+            busy={busy}
+            onReseed={(p) => seed(p)}
+            onClose={() => onDone(seedResult.decisions)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="ob-page">
-      <div className="ob-card" role="dialog" aria-label="Welcome to DietTrace">
+      <div className="ob-grain" aria-hidden="true" />
+      <div
+        className="ob-card ob-card-chat"
+        role="dialog"
+        aria-label="Welcome to DietTrace"
+      >
         {onCancel && (
           <button
             type="button"
@@ -275,75 +396,37 @@ export function Onboarding({
             <X size={18} />
           </button>
         )}
-        <div className="ob-brand">
-          <BrandMark size={24} />
-          <span className="brand-name">DietTrace</span>
+
+        <div className="ob-head">
+          <span className="ob-head-avatar" aria-hidden="true">
+            <BrandMark size={22} echo={false} stroke="var(--on-accent)" />
+          </span>
+          <span className="ob-id">
+            <span className="ob-name">
+              Sage<span className="ob-name-dot" />
+            </span>
+            <span className="ob-sub">Building your daily targets</span>
+          </span>
         </div>
 
-        {phase === "choose" ? (
-          <>
-            <h1 className="ob-title">Welcome</h1>
-            <p className="ob-sub">
-              Your AI nutritionist. Start from a ready-made demo, or set up your
-              own in under a minute.
-            </p>
+        <div
+          className="ob-progress"
+          role="progressbar"
+          aria-valuenow={Math.min(stepIndex + 1, STEPS.length)}
+          aria-valuemin={0}
+          aria-valuemax={STEPS.length}
+          aria-label="setup progress"
+        >
+          <span
+            className="ob-progress-fill"
+            style={{
+              width: `${(Math.min(stepIndex + 1, STEPS.length) / STEPS.length) * 100}%`,
+            }}
+          />
+        </div>
 
-            <div className="ob-choices">
-              {/* See it in action → straight into the detailed persona chooser */}
-              <button
-                type="button"
-                className="ob-choice ob-choice-own"
-                disabled={busy}
-                onClick={() => seed("runner")}
-              >
-                <span className="ob-choice-glyph">
-                  <Play size={16} aria-hidden="true" />
-                </span>
-                <span className="ob-choice-body">
-                  <span className="ob-choice-title">See it in action</span>
-                  <span className="ob-choice-desc">
-                    {busy ? "Loading…" : "Load a demo and explore the sample profiles"}
-                  </span>
-                </span>
-                <ArrowRight size={16} aria-hidden="true" />
-              </button>
-
-              {/* Set up your own → the chat */}
-              <button
-                type="button"
-                className="ob-choice ob-choice-own"
-                onClick={startChat}
-              >
-                <span className="ob-choice-glyph">
-                  <Pencil size={16} aria-hidden="true" />
-                </span>
-                <span className="ob-choice-body">
-                  <span className="ob-choice-title">Set up your own</span>
-                  <span className="ob-choice-desc">
-                    Chat with your nutritionist — under a minute
-                  </span>
-                </span>
-                <ArrowRight size={16} aria-hidden="true" />
-              </button>
-            </div>
-          </>
-        ) : (
+        <div className="ob-main">
           <div className="ob-chat">
-            <div
-              className="ob-progress"
-              role="progressbar"
-              aria-valuenow={Math.min(stepIndex + 1, STEPS.length)}
-              aria-valuemin={0}
-              aria-valuemax={STEPS.length}
-              aria-label="setup progress"
-            >
-              <span
-                className="ob-progress-fill"
-                style={{
-                  width: `${(Math.min(stepIndex + 1, STEPS.length) / STEPS.length) * 100}%`,
-                }}
-              />
-            </div>
             <div className="ob-msgs">
               {transcript.map((m, i) => (
                 <div className={"ob-msg " + m.role} key={i}>
@@ -355,11 +438,24 @@ export function Onboarding({
                   <span className="ob-bubble">{m.text}</span>
                 </div>
               ))}
+              {typing && (
+                <div className="ob-msg agent">
+                  <span className="ob-avatar" aria-hidden="true">
+                    <BrandMark size={15} echo={false} />
+                  </span>
+                  <span className="ob-bubble ob-typing" aria-label="typing">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                </div>
+              )}
               <div ref={bottomRef} />
             </div>
 
+            <div className="ob-dock">
             {/* The current question's input dock */}
-            {!busy && step?.kind === "chips" && (
+            {dockReady && !finished && step?.kind === "chips" && (
               <div className="ob-chips">
                 {step.options!.map((o) => (
                   <button
@@ -381,7 +477,7 @@ export function Onboarding({
               </div>
             )}
 
-            {!busy && step?.kind === "number" && (
+            {dockReady && !finished && step?.kind === "number" && (
               <div className="ob-num-row">
                 {step.key === "height" && heightUnit === "ft" ? (
                   <div className="ob-num-input ob-num-ft">
@@ -480,7 +576,7 @@ export function Onboarding({
               </div>
             )}
 
-            {step?.kind === "text" && (
+            {!typing && !finished && step?.kind === "text" && (
               <div className="ob-text-row">
                 <textarea
                   className="ob-textarea"
@@ -512,8 +608,11 @@ export function Onboarding({
                 </div>
               </div>
             )}
+            </div>
           </div>
-        )}
+
+          <TargetsPanel answers={answers} done={finished && !busy} />
+        </div>
       </div>
 
       {/* After a demo seed: preview what was loaded, then land on the app. */}

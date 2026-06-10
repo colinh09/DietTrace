@@ -49,12 +49,13 @@ async function openState() {
 describe("LearningObservability", () => {
   it("shows corrections as meal + what you said (persisted, not a bare count)", async () => {
     await openState();
-    // Corrections are collapsed by default — expand the section first.
-    fireEvent.click(await screen.findByRole("button", { name: /your corrections/i }));
+    // The "What it's learned" section lists each correction inline (meal name +
+    // the words you said) — no collapse, with a "Learned" tag per row.
     expect(await screen.findByText("a big plate of spaghetti")).toBeInTheDocument();
     expect(
       screen.getByText(/before a run I carb up way more/i),
     ).toBeInTheDocument();
+    expect(screen.getByText("Learned")).toBeInTheDocument();
   });
 
   it("refetches when the reload signal changes (corrections persist across nav)", async () => {
@@ -193,8 +194,10 @@ describe("LearningObservability", () => {
     const toggle = await screen.findByRole("button", { name: /your dataset/i });
     expect(screen.queryByText(/oatmeal before my long run/)).not.toBeInTheDocument();
     fireEvent.click(toggle);
-    const list = screen.getByText(/oatmeal before my long run/);
-    expect(list).toBeInTheDocument();
-    expect(within(list.closest("li") as HTMLElement).getByText(/520 kcal/)).toBeInTheDocument();
+    const row = screen.getByText(/oatmeal before my long run/);
+    expect(row).toBeInTheDocument();
+    expect(
+      within(row.closest(".as-ds-row") as HTMLElement).getByText(/520 kcal/),
+    ).toBeInTheDocument();
   });
 });

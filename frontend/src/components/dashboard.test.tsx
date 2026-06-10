@@ -52,6 +52,6 @@ describe("Dashboard", () => {
     render(<Dashboard reloadSignal={0} />);
     fireEvent.click(screen.getByRole("button", { name: /agent state/i }));
     await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
-    expect(screen.getByText(/meals in your dataset/i)).toBeInTheDocument();
+    expect(screen.getByText(/synced over MCP/i)).toBeInTheDocument();
   });
 });

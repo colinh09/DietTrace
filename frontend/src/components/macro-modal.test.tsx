@@ -21,8 +21,13 @@ describe("MacroModal", () => {
 
     expect(screen.getByText("Your daily targets")).toBeInTheDocument();
     // 150*4 + 200*4 + 60*9 = 1,940 vs a 2,000 target → 60 under.
-    expect(screen.getByText(/1,940 kcal/)).toBeInTheDocument();
-    expect(screen.getByText(/under your 2,000 kcal target/)).toBeInTheDocument();
+    const check = screen
+      .getByText(/Your macros add up to/)
+      .closest(".mt-check") as HTMLElement;
+    expect(check.className).toContain("off");
+    expect(check.textContent).toContain("1,940");
+    expect(check.textContent).toContain("2,000 kcal target");
+    expect(check.textContent).toMatch(/60\s*under\./);
 
     fireEvent.click(screen.getByRole("button", { name: /save targets/i }));
     await waitFor(() =>

@@ -1,9 +1,9 @@
 "use client";
 
-// The accuracy report body (no page chrome): the headline stats, the measured
-// before→after bars, the accuracy-over-time trend, and the self-supervision loop.
-// Rendered both by the /accuracy route and inside the observability modal.
-import { Sparkle } from "lucide-react";
+// The accuracy report body (no page chrome): the headline hero stats, the
+// measured before→after bars (with the Arize Phoenix source tag), and the
+// accuracy-over-time trend in its own tile. Rendered both by the /accuracy
+// route and inside the observability modal.
 import type { AccuracyReport } from "@/lib/api";
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
@@ -17,14 +17,17 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+// Macro-coloured lines for the accuracy-over-time trend.
 const _LINES = [
-  { key: "calorie", label: "calorie", color: "var(--accent-ink)" },
-  { key: "macro", label: "macro", color: "var(--accent)" },
-  { key: "within_tolerance", label: "within 15%", color: "var(--muted-ink)" },
-  { key: "portion", label: "portion", color: "var(--faint)" },
+  { key: "calorie", label: "calorie", color: "var(--macro-cal)" },
+  { key: "macro", label: "macro", color: "var(--macro-protein)" },
+  { key: "within_tolerance", label: "within 15%", color: "var(--macro-carb)" },
+  { key: "portion", label: "portion", color: "var(--macro-fat)" },
 ] as const;
 
-// Generic trend chart for any series of score points.
+// Generic trend chart for any series of score points. A single dotted baseline
+// at the bottom is the "trace" motif; each line carries hollow interior dots and
+// a larger filled emphasis dot on its final (newest) point.
 function TrendChartGeneric<T extends Record<string, number>>({
   trend,
   lines,
@@ -43,30 +46,36 @@ function TrendChartGeneric<T extends Record<string, number>>({
   const x = (i: number) => px + (i * (W - 2 * px)) / (n - 1);
   const y = (v: number) => py + (1 - v) * (H - 2 * py);
   return (
-    <div className="acc-trend">
+    <div className="acc-chart-tile">
       <svg viewBox={`0 0 ${W} ${H}`} className="acc-trend-svg" role="img"
            aria-label={ariaLabel}>
-        {[0, 0.5, 1].map((g) => (
-          <line key={g} className="acc-trend-grid" x1={px} x2={W - px} y1={y(g)} y2={y(g)} />
-        ))}
+        {/* dotted baseline — the trace motif */}
+        <line className="acc-trend-baseline" x1={px} x2={W - px} y1={y(0)} y2={y(0)} />
         {lines.map((l) => (
           <polyline key={l.key} className="acc-trend-line" style={{ stroke: l.color }}
                     points={trend.map((t, i) => `${x(i)},${y(t[l.key] as number)}`).join(" ")} />
         ))}
         {lines.flatMap((l) =>
-          trend.map((t, i) => (
-            <circle key={`${l.key}-${i}`} cx={x(i)} cy={y(t[l.key] as number)} r={2.4}
-                    style={{ fill: l.color }} />
-          )),
+          trend.map((t, i) =>
+            i === n - 1 ? (
+              <circle key={`${l.key}-${i}`} cx={x(i)} cy={y(t[l.key] as number)} r={3.4}
+                      style={{ fill: l.color, stroke: "var(--card)" }} strokeWidth={1.6} />
+            ) : (
+              <circle key={`${l.key}-${i}`} cx={x(i)} cy={y(t[l.key] as number)} r={2.4}
+                      style={{ fill: "var(--card)", stroke: l.color }} strokeWidth={1.6} />
+            ),
+          ),
         )}
       </svg>
-      <div className="acc-trend-legend">
-        {lines.map((l) => (
-          <span key={l.key} className="acc-trend-key">
-            <span className="acc-trend-dot" style={{ background: l.color }} />
-            {l.label}
-          </span>
-        ))}
+      <div className="acc-chart-foot">
+        <div className="acc-trend-legend">
+          {lines.map((l) => (
+            <span key={l.key} className="acc-trend-key">
+              <span className="acc-trend-dot" style={{ background: l.color }} />
+              {l.label}
+            </span>
+          ))}
+        </div>
         <span className="acc-trend-x mono">experiment 1 → {n}</span>
       </div>
     </div>
@@ -87,36 +96,38 @@ function TrendChart({ trend }: { trend: AccuracyReport["trend"] }) {
 export function AccuracyView({ report }: { report: AccuracyReport }) {
   return (
     <>
-      <section className="acc-stats">
+      <section className="acc-hero">
         <Stat label="Calorie accuracy" value={pct(report.headline.calorie_accuracy)} />
         <Stat label="Macro accuracy" value={pct(report.headline.macro_accuracy)} />
         <Stat label="Within 15% of actual" value={pct(report.headline.within_tolerance)} />
       </section>
 
       <section className="acc-block">
-        <div className="acc-block-head mono">
-          {report.source === "live"
-            ? `live from arize phoenix · ${report.experiments} experiment${
-                report.experiments === 1 ? "" : "s"
-              }`
-            : "measured improvement"}
+        <div className="acc-source-row">
+          <span className="acc-eyebrow mono">Before → after tuning</span>
+          <hr className="acc-hairline" />
+          <span className="phoenix-tag">
+            <span className="pdot" />
+            Arize Phoenix · {report.experiments ?? 0} experiment
+            {report.experiments === 1 ? "" : "s"}
+          </span>
         </div>
-        <p className="acc-block-sub">
-          Each bar is <b>before → after</b>: how accurate DietTrace was on its untuned
-          baseline vs after its prompts were tuned. Every estimate is scored against
-          known USDA calories as a Phoenix experiment, and the tuning is held to those
-          scores — a change only ships if accuracy actually improves.
-        </p>
         <div className="acc-bars">
           {report.metrics.map((m) => (
             <div className="acc-bar-row" key={m.key}>
               <span className="acc-bar-label">{m.label}</span>
-              <span className="acc-bar-track">
-                <span className="acc-bar-base" style={{ width: pct(m.baseline) }} />
-                <span className="acc-bar-cur" style={{ width: pct(m.current) }} />
+              <span className="acc-bar-stack">
+                <span className="acc-bar-track">
+                  <span className="acc-bar-fill before" style={{ width: pct(m.baseline) }} />
+                </span>
+                <span className="acc-bar-track">
+                  <span className="acc-bar-fill after" style={{ width: pct(m.current) }} />
+                </span>
               </span>
               <span className="acc-bar-nums mono tnum">
-                {pct(m.baseline)} → <b>{pct(m.current)}</b>
+                <span className="b4">{pct(m.baseline)}</span>
+                <span className="arr">→</span>
+                <span className="af">{pct(m.current)}</span>
               </span>
             </div>
           ))}
@@ -125,51 +136,13 @@ export function AccuracyView({ report }: { report: AccuracyReport }) {
 
       {report.trend.length >= 2 && (
         <section className="acc-block">
-          <div className="acc-block-head mono">
-            accuracy over time · {report.trend.length} experiment
-            {report.trend.length === 1 ? "" : "s"}
+          <div className="acc-source-row">
+            <span className="acc-eyebrow mono">Accuracy over time</span>
+            <hr className="acc-hairline" />
           </div>
           <TrendChart trend={report.trend} />
         </section>
       )}
-
-      <section className="acc-block">
-        <div className="acc-block-head mono">how DietTrace checks its own work</div>
-        <p className="acc-note">
-          How DietTrace keeps itself honest — each step runs in Phoenix:
-        </p>
-        <ol className="trace-list acc-loop">
-          {report.loop.map((s, i) => (
-            <li className="tstep" key={s.step}>
-              <div className="tstep-rail">
-                <span className="tstep-glyph">
-                  <Sparkle size={11} fill="var(--accent)" color="var(--accent)" />
-                </span>
-                {i < report.loop.length - 1 && <span className="tstep-line" />}
-              </div>
-              <div className="tstep-body">
-                <div className="tstep-line-btn">
-                  <span className="tstep-fn mono">{s.step}</span>
-                  <span className="tstep-arrow">{s.label}</span>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="acc-foot">
-        <span>
-          Checked against {report.dataset.cases} test meals from {report.dataset.source}.
-        </span>
-        <span className="acc-link">
-          {report.source === "live"
-            ? `Live from Phoenix · ${report.experiments} experiment${
-                report.experiments === 1 ? "" : "s"
-              }`
-            : "Measured on Phoenix"}
-        </span>
-      </section>
     </>
   );
 }
