@@ -273,6 +273,7 @@ function MealRow({
               onCorrected={onCorrected}
               onAgentEvent={onAgentEvent}
               readOnly={isDataset}
+              hasFeedback={meal.has_feedback}
             />
           ) : (
             !isDataset && (
