@@ -4,7 +4,7 @@
 
 DietTrace is an AI nutrition agent. You type what you ate ("two eggs, half an avocado, slice of toast") and the agent plans and acts across multiple tools — parse the meal, look up nutrition facts, estimate portions, compute macros, and check the result against your goals. Accuracy is the headline, and it's held to account by a continuous evaluation suite running on [Arize Phoenix](https://phoenix.arize.com/).
 
-Built for the [Google Cloud Rapid Agent Hackathon](https://rapid-agent.devpost.com/) — Arize track.
+**[Live demo](https://diettrace-web-635037570837.us-central1.run.app)** · Built for the [Google Cloud Rapid Agent Hackathon](https://rapid-agent.devpost.com/) — Arize track.
 
 ## What makes it an agent, not a chatbot
 
@@ -114,11 +114,11 @@ Score accuracy by running the evaluation suite:
 python -m dietrace.evals.runner
 ```
 
-Let the supervisor inspect the latest experiments and open a fix PR if a case regressed:
-
-```bash
-python -m dietrace.agents.supervisor.run
-```
+The supervisor then runs automatically as you log meals in the web app — each meal
+appears in the right-rail feed, and once there's enough signal it retunes: the
+corrector proposes a new preference block, the gate re-scores it against both your
+confirmed meals and the USDA floor, and the change ships only if it holds the floor
+and improves your own data. `POST /learning/retune` triggers a retune on demand.
 
 Verify the build — the test suite is fully offline (all externals mocked, no network):
 
