@@ -2,7 +2,7 @@
 
 These hold the agent's macro/calorie accuracy to account against USDA ground
 truth. Each returns an :class:`EvalResult` — the ``{score, label, explanation}``
-shape ported from axon — extended with a ``metadata`` dict that carries the raw
+shape extended with a ``metadata`` dict that carries the raw
 error magnitudes so the supervisor reads true error while Phoenix charts the
 normalized score (: "Normalize scores to [0,1] for Phoenix charts; carry
 raw magnitudes in metadata").
@@ -227,8 +227,8 @@ def _tolerance(metadata: dict[str, Any] | None) -> float:
 def _not_applicable(explanation: str) -> EvalResult:
     """An evaluator that does not apply to this case (e.g. micros on a label tier).
 
-    Follows axon's convention: a non-penalizing ``n/a`` label kept out of the
-    accuracy aggregation by filtering on label, not score.
+    A non-penalizing ``n/a`` label kept out of the accuracy aggregation by
+    filtering on label, not score.
     """
     return EvalResult(score=1.0, label="n/a", explanation=explanation)
 

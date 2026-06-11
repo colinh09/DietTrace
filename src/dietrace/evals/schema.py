@@ -1,7 +1,7 @@
 """The EvalCase JSON contract for the nutrition eval suite.
 
 Every dataset case under ``evals/dataset/nutrition/`` is an
-``{input, expected, metadata}`` object, the shape ported from axon. ``input`` is
+``{input, expected, metadata}`` object. ``input`` is
 the free-text meal the agent logs; ``expected`` carries the USDA-grounded
 ground-truth macros (and, for whole foods, the micro panel) the numeric
 evaluators score against; ``metadata`` selects the **two-tier scoring** path via

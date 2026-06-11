@@ -3,8 +3,8 @@
 wires the five deterministic/generative tools — ``parse_meal`` →
 ``search_nutrition`` → ``estimate_portion`` → ``log_entry`` →
 ``check_against_goals`` — into an ADK ``Agent`` named
-``dietrace_nutrition`` plus a ``Runner`` over an ``InMemorySessionService``,
-mirroring axon's worker construction. The done criterion is that the assembly
+``dietrace_nutrition`` plus a ``Runner`` over an ``InMemorySessionService``.
+The done criterion is that the assembly
 *constructs and exposes the five tools*, so these tests pin the agent's name,
 the registry (five tools, in pipeline order), the runner wiring, and that each
 exposed tool delegates to its underlying implementation.

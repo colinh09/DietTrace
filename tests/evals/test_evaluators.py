@@ -3,8 +3,8 @@
 These pin the numeric, zero-LLM evaluators that hold the agent's macro accuracy
 to account. ``macro_pct_error`` computes a per-macro |%error| between
 the agent's logged totals and the case's USDA ground truth, returning an
-``EvalResult{score,label,explanation}`` (the shape ported from axon) with the
-raw per-macro magnitudes carried in ``metadata`` for the supervisor. The tests
+``EvalResult{score,label,explanation}`` with the raw per-macro magnitudes
+carried in ``metadata`` for the supervisor. The tests
 exercise known values so the arithmetic is locked, not just the plumbing. No DB
 or network is touched.
 """

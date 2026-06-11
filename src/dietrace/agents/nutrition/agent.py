@@ -3,7 +3,7 @@
 This module wires the five pipeline tools — ``parse_meal`` → ``search_nutrition``
 → ``estimate_portion`` → ``log_entry`` → ``check_against_goals`` — into
 an ADK ``Agent`` named ``dietrace_nutrition`` plus a ``Runner`` over an
-``InMemorySessionService``, mirroring axon's worker construction.
+``InMemorySessionService``.
 
 Each underlying tool function takes domain objects (a ``FoodRepository``, a
 Gemini client, ``Food``/``Nutrient`` models). The LLM, however, calls tools with
