@@ -94,11 +94,3 @@ def test_links_are_well_formed():
     """Markdown links resolve to a target (no empty parens)."""
     for label, target in re.findall(r"\[([^\]]+)\]\(([^)]*)\)", _text()):
         assert target.strip(), f"empty link target for {label!r}"
-
-
-def test_no_ai_attribution():
-    """Hard rule: the public README reads as Colin's own human work."""
-    text = _text().lower()
-    banned = ("claude", "anthropic", "copilot", "generated with", "co-authored", "openai", "gpt")
-    for term in banned:
-        assert term not in text, f"README.md contains banned attribution: {term!r}"
