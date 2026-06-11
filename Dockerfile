@@ -3,6 +3,17 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
+# Node + the Phoenix MCP server. The supervisor reads experiment results back
+# over MCP (npx @arizeai/phoenix-mcp), so the runtime needs Node; pre-install the
+# package so the first read doesn't pay a cold npm fetch.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g @arizeai/phoenix-mcp \
+    && apt-get purge -y curl gnupg && apt-get autoremove -y \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml README.md ./
