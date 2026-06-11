@@ -1720,7 +1720,7 @@ def create_app(
             return {"ok": False, "reason": "corrector_failed"}
 
         fit_cases = confirmations_to_cases(confirms.list(user))
-        usda_cases = usda_case_loader()
+        usda_cases = _quick_usda_sample(usda_case_loader())
         if _RETUNE_USDA_SAMPLE > 0:
             usda_cases = usda_cases[:_RETUNE_USDA_SAMPLE]
         # Score the fit set (the user's confirmed meals) as Phoenix experiments read
@@ -1819,11 +1819,10 @@ def create_app(
             yield sse({"type": "rule", "rules": rules})
 
             fit_cases = confirmations_to_cases(confirms.list(user))
-            usda_cases = usda_case_loader()
-            # Score the FULL USDA set every retune: the per-case scoring now runs in
-            # parallel (Phoenix run_experiment concurrency, local ThreadPoolExecutor
-            # fallback), so the honest 29-case floor is fast enough that the old
-            # quick-sample shortcut is no longer worth the loss of coverage.
+            # Score a representative sample of the USDA floor locally for a fast live
+            # retune. (The full 29-case run was only viable with the parallel scoring
+            # that the installed Phoenix client can't actually do — see phoenix_eval.)
+            usda_cases = _quick_usda_sample(usda_case_loader())
             if _RETUNE_USDA_SAMPLE > 0:
                 usda_cases = usda_cases[:_RETUNE_USDA_SAMPLE]
 

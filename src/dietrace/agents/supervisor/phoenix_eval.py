@@ -94,25 +94,23 @@ def _run_experiment(
         totals = logger_fn(_example_text(example), examples=ex_block).get("totals", [])
         return {"calories": calories_of(totals)}
 
-    async def task(example: Any) -> dict[str, Any]:
-        # Coroutine so Phoenix's run_experiment(concurrency=…) actually parallelizes:
-        # offload the SYNC agent call (Gemini + food-DB query) to a thread so the
-        # whole dataset's cases score concurrently within a single experiment.
-        return await asyncio.to_thread(_score_one, example)
-
     def calorie_accuracy(output: Any, expected: Any) -> float:
         return accuracy(
             (output or {}).get("calories", 0.0), (expected or {}).get("calories", 0.0)
         )
 
+    # NOTE: the installed arize-phoenix-client's run_experiment has no `concurrency`
+    # kwarg (that's the Arize AX API) — passing it raises TypeError, which the caller
+    # swallows fail-soft and silently degrades to local scoring (losing the per-meal
+    # experiment results read back over MCP). Keep the task SYNC and the call to the
+    # supported params only. The two SETS still run in parallel via ThreadPoolExecutor.
     ran = client.experiments.run_experiment(
         dataset=dataset,
-        task=task,
+        task=_score_one,
         evaluators=[calorie_accuracy],
         experiment_name=name,
         print_summary=False,
         timeout=180,
-        concurrency=15,
     )
     return (
         ran.get("experiment_id")
