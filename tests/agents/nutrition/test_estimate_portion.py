@@ -1,4 +1,4 @@
-"""Tests for estimate_portion — deterministic portion→grams (3.1; ).
+"""Tests for estimate_portion — deterministic portion→grams.
 
 ``estimate_portion(food, quantity, unit)`` resolves a household portion to a
 gram weight using the food's serving sizes first, then a generic fallback
@@ -195,8 +195,8 @@ def _granola() -> Food:
 
     USDA branded data often lists a whole-package serving before the FDA label
     (NLEA) serving; a bare count should scale by the edible NLEA serving, not the
-    whole package ( — "NLEA/edible-portion servings preferred over
-    oversized package servings").
+    whole package — NLEA/edible-portion servings are preferred over oversized
+    package servings.
     """
     return Food(
         fdc_id=42,
@@ -470,7 +470,7 @@ def test_per_piece_nfs_preferred_over_medium_sized_variant() -> None:
     assert est.source == "whole_item"
 
 
-# ──  per-portion basis strings ─────────────────────────────────────
+# ── Per-portion basis strings ────────────────────────────────────────────────
 # Each estimate must explain HOW the gram weight was derived so the UI can show
 # "why peanut butter got 100g" etc. The basis field is a plain-English string.
 

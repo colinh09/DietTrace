@@ -1,4 +1,4 @@
-"""Tests for check_against_goals — totals vs daily goals (3.4; ).
+"""Tests for check_against_goals — totals vs daily goals.
 
 ``check_against_goals(totals, goals)`` compares a meal's summed nutrient totals
 (as produced by ``log_entry``) against the user's daily goals and returns a
@@ -191,7 +191,7 @@ def test_unusable_tolerance_falls_back_to_default_band(bad: float) -> None:
     band silently mislabels an on-track nutrient: ``goal.tolerance * goal.target``
     is then ``NaN``/negative, so ``abs(consumed - target) <= band`` is always
     False and a meal sitting exactly on goal reads as "under" rather than "within"
-   . The unusable band must fall back to the default so the
+    (fail-soft). The unusable band must fall back to the default so the
     verdict stays correct.
     """
     totals = [Nutrient(code=_ENERGY, name="Energy", amount=2000.0, unit="kcal")]

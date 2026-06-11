@@ -77,7 +77,7 @@ _DEFICIT_CALORIE_CEILING = 800
 # "600 calories a day" / "600 calories of food per day", with the cadence next to
 # the target. The gap is bounded to a short window so an unrelated "... a day"
 # elsewhere in the sentence ("700 calories of trail mix ... 10k steps a day") can
-# no longer reach back and false-flag a benign log.
+# no longer reach back and false-flag a benign log (zero false positives).
 _DEFICIT_PATTERN = re.compile(
     r"(\d{1,3}(?:,\d{3})+|\d{2,4})\s*(?:k?cal(?:orie)?s?)\b"
     r"[^.]{0,25}?\b(a\s+day|per\s+day|daily|each\s+day|/\s*day)",

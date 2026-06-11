@@ -1,4 +1,4 @@
-"""Tests for search_nutrition — deterministic food lookup (3.3; ).
+"""Tests for search_nutrition — deterministic food lookup.
 
 ``search_nutrition(repository, food)`` is the search half of the
 search/calculation split: it turns free text into a reproducible

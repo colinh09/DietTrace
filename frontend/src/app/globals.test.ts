@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-// The 9.8 responsive contract lives in globals.css: a centered ~900px column on
+// The responsive contract lives in globals.css: a centered ~900px column on
 // desktop, tightening to ~full-width on mobile. jsdom can't
 // resolve media queries, so we assert the stylesheet encodes the contract.
 const css = readFileSync(

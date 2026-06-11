@@ -3,7 +3,7 @@
 Wires the GoogleADK, GoogleGenAI, and MCP OpenInference instrumentors onto a
 Phoenix-registered TracerProvider so the agent's reasoning is captured as spans.
 Fail-soft: when ``PHOENIX_API_KEY`` is absent, initialization is a silent no-op
-(see ) so the app and tests run with tracing disabled and zero spend.
+so the app and tests run with tracing disabled and zero spend.
 """
 
 import os

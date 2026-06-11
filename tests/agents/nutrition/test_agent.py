@@ -1,6 +1,6 @@
-"""Tests for the nutrition agent assembly (3.6; ).
+"""Tests for the nutrition agent assembly.
 
-wires the five deterministic/generative tools — ``parse_meal`` →
+The assembly wires the five deterministic/generative tools — ``parse_meal`` →
 ``search_nutrition`` → ``estimate_portion`` → ``log_entry`` →
 ``check_against_goals`` — into an ADK ``Agent`` named
 ``dietrace_nutrition`` plus a ``Runner`` over an ``InMemorySessionService``.
@@ -83,7 +83,7 @@ def test_agent_is_named_dietrace_nutrition(repository) -> None:
 
 
 def test_exposes_five_tools_in_pipeline_order(repository) -> None:
-    """The done criterion: five tools, exposed in the  pipeline order."""
+    """The done criterion: five tools, exposed in the pipeline order."""
     agent = NutritionAgent(repository, client=_client(None))
 
     assert [t.name for t in agent.tools] == _PIPELINE
@@ -228,7 +228,7 @@ def test_build_factory_is_fail_soft_without_phoenix(repository, monkeypatch) -> 
 
 
 def test_build_factory_survives_tracing_misconfig(repository, monkeypatch) -> None:
-    """A Phoenix misconfig must not block agent construction.
+    """A Phoenix misconfig must not block agent construction (fail-soft).
 
     With PHOENIX_API_KEY set but PHOENIX_COLLECTOR_ENDPOINT missing, init_tracer
     raises RuntimeError; the factory should swallow it like the web lifespan does,

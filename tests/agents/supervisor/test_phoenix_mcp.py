@@ -132,7 +132,7 @@ async def test_get_experiment_results_accepts_bare_list() -> None:
 
 async def test_get_experiment_results_scalar_payload_degrades_to_empty() -> None:
     """A payload that is neither a dict nor a list (a bare string) degrades to [] —
-    the supervisor reads no results rather than raising."""
+    the supervisor reads no results rather than raising (fail-soft)."""
     client = PhoenixMCPClient(_session=_FakeSession("unexpected"))
 
     assert await client.get_experiment_results("exp14") == []
@@ -245,7 +245,7 @@ async def test_session_without_injection_requires_creds(monkeypatch) -> None:
     """With no injected session and Phoenix creds absent, a read raises a clear
     RuntimeError before ever spawning the npx MCP server — callers are expected to
     gate on ``mcp_available()`` first, so reaching a read uncredentialed is a
-    misconfiguration, not a silent live attempt (; keeps the no-network path
+    misconfiguration, not a silent live attempt (keeps the no-network path
     closed in tests)."""
     monkeypatch.delenv("PHOENIX_API_KEY", raising=False)
     monkeypatch.delenv("PHOENIX_BASE_URL", raising=False)

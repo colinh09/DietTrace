@@ -186,7 +186,7 @@ def parse_meal(
             client = _default_client()
         except Exception:
             # A credentials/Vertex-init failure must not crash the /log path —
-            # degrade to an empty parse, matching web_nutrition's
+            # degrade to an empty parse (fail-soft), matching web_nutrition's
             # guard around the same lazy client build.
             return MealParse()
 
@@ -198,7 +198,7 @@ def parse_meal(
         )
     except Exception:
         # A transient API error (timeout, 429, 503) must not crash the /log path —
-        # degrade to an empty parse like every other failure axis,
+        # degrade to an empty parse like every other failure axis (fail-soft),
         # matching web_nutrition's guard around the same generate_content call.
         return MealParse()
 

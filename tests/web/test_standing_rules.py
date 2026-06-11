@@ -1,4 +1,4 @@
-"""Direct unit tests for SqliteStandingRuleStore (standing_rules.py, ).
+"""Direct unit tests for SqliteStandingRuleStore (standing_rules.py).
 
 The store's core contract is exercised only via HTTP integration tests today
 (test_freeform_feedback.py); none of the critical invariants below are directly

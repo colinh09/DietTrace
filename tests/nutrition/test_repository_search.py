@@ -1,11 +1,11 @@
-"""Tests for FoodRepository.search — alias-aware ranked lookup (2.4; ).
+"""Tests for FoodRepository.search — alias-aware ranked lookup.
 
- mandates ``FoodRepository.search(name) → candidates`` as an "alias-aware,
-ranked" lookup over the food DB's ``foods`` and ``food_aliases`` tables. These
+``FoodRepository.search(name) → candidates`` is an alias-aware, ranked lookup
+over the food DB's ``foods`` and ``food_aliases`` tables. These
 tests run against the tiny ``food_db`` fixture (egg, avocado, toast), never the
 real ``data/food.sqlite``. A query matches a food by its description (name) or
 any of its aliases; candidates come back ranked best-match-first so the
-deterministic ``search_nutrition`` tool (3.3) can pick a reproducible fdc_id.
+deterministic ``search_nutrition`` tool can pick a reproducible fdc_id.
 """
 
 from dietrace.nutrition.models import SearchCandidate
@@ -179,7 +179,7 @@ def test_search_peach_prefers_fruit_over_pie(food_db) -> None:
 
 
 def test_search_coffee_prefers_brewed_over_branded_soymilk(food_db) -> None:
-    """"coffee" resolves to brewed coffee, never a branded coffee soymilk (11.2).
+    """"coffee" resolves to brewed coffee, never a branded coffee soymilk.
 
     "Coffee, brewed" and the branded "Coffee soymilk" both carry "coffee" and
     tie on text relevance; without a product-form penalty the soymilk (the lower

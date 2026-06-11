@@ -8,7 +8,8 @@ orchestrates but never invents a number a lookup can return.
 
 It wraps :class:`FoodRepository`: ``search`` ranks candidates (alias-aware) and
 the best one's ``fdc_id`` is hydrated via ``get`` into the full per-100 g panel,
-keyed by USDA number code (208 kcal, 203 protein, 204 fat, 205 carb, … — ), never by name. A query that matches nothing returns ``None`` rather than
+keyed by USDA number code (208 kcal, 203 protein, 204 fat, 205 carb, …), never
+by name. A query that matches nothing returns ``None`` rather than
 raising, keeping the agent loop fail-soft.
 """
 

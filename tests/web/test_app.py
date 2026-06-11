@@ -441,7 +441,7 @@ def test_one_user_cannot_delete_anothers_meal(tmp_path) -> None:
 
 def test_trust_endpoint_rolls_up_logged_eval_results(tmp_path) -> None:
     # Each /log persists its online-eval result; /trust returns the rolling stats
-    # (count, mean confidence, % needs_review, source breakdown) — .
+    # (count, mean confidence, % needs_review, source breakdown).
     client, _ = _client(tmp_path, logger=_clean_logger)
 
     client.post("/log", json={"text": "a chicken breast"})
@@ -956,7 +956,7 @@ def test_stream_result_carries_safety_block(tmp_path, monkeypatch) -> None:
     assert result["safety"]["category"] == "disordered_eating"
 
 
-# ──  /correct rewrites the stored meal when meal_id is given ──────
+# ── /correct rewrites the stored meal when meal_id is given ──────
 
 def test_correction_with_meal_id_updates_stored_totals(tmp_path) -> None:
     """Giving meal_id to /correct rewrites the stored meal's totals."""
@@ -1051,7 +1051,7 @@ def test_correction_without_meal_id_leaves_store_unchanged(tmp_path) -> None:
     assert {t["code"]: t["amount"] for t in history[0]["totals"]}["208"] == 105.0
 
 
-# ──  trace persisted + rebuilt by /history ────────────────────────
+# ── trace persisted + rebuilt by /history ────────────────────────
 
 def test_history_returns_persisted_trace_per_meal(tmp_path) -> None:
     """POST /log persists the trace; GET /history returns it unchanged per meal."""
@@ -1096,7 +1096,7 @@ def test_history_rebuilds_trace_for_meals_without_persisted_trace(tmp_path) -> N
     assert steps[-1] == "log_entry", "last step must be log_entry"
 
 
-# ──  all four confidence axes in the /log response ─────────────────
+# ── all four confidence axes in the /log response ─────────────────
 
 def test_log_response_carries_all_four_axes(tmp_path) -> None:
     """POST /log response includes all 4 confidence axes with name/score/note."""
@@ -1131,7 +1131,7 @@ def test_history_returns_axes_per_meal(tmp_path) -> None:
     assert len(meal["axes"]) == 4
 
 
-# ──  per-portion basis in trace + per_item ─────────────────────────
+# ── per-portion basis in trace + per_item ─────────────────────────
 
 
 def test_build_trace_estimate_step_includes_basis() -> None:

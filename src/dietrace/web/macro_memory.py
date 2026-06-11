@@ -87,7 +87,7 @@ def split_of(targets: dict[str, float]) -> dict[str, float] | None:
     so pydantic admits ``NaN``/``Infinity``; a non-finite split would poison every
     consumer — it is persisted as a REAL (and NaN even violates the NOT NULL column,
     crashing ``remember``), recalled into ``macro_adherence``'s deltas, and pushed to
-    the Phoenix prefs dataset, all serializing as invalid JSON (fail-soft, /§9,
+    the Phoenix prefs dataset, all serializing as invalid JSON (fail-soft,
     mirrors :func:`dietrace.web.goals._valid_target`).
     """
     kcal = float(targets.get(_ENERGY, 0.0) or 0.0)

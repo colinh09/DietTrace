@@ -173,7 +173,7 @@ def test_empty_fit_set_scores_zero_without_dividing_by_zero() -> None:
 
 
 def test_retune_cannot_ship_without_a_held_out_fit_set() -> None:
-    """ / : the gate ships a retune only if it
+    """The gate ships a retune only if it
     *improves your data* — so with no held-out confirmations to prove fit against,
     a retune must never ship, however good the proposed block looks on USDA. An
     empty fit set scores 0.0 for both current and proposed, so the +fit_delta gain

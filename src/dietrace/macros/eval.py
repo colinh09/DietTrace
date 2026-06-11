@@ -159,7 +159,7 @@ def evaluate_macro_plan(
         }
 
     Deterministic, zero-LLM — only the structured plan data and the profile's
-    weight_kg are used.
+    weight_kg are used (no LLM, no network in evaluators).
     """
     c = _consistency(plan)
     s = _safety(profile, plan)

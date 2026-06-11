@@ -45,7 +45,7 @@ def _finite_amount(value: Any) -> float:
     surfacing in the UI and serializing as the invalid-JSON token ``NaN``/``Infinity``
     out of ``/analysis``. So a missing, uncoercible, or non-finite amount reads as
     nothing consumed (0.0), mirroring the isfinite guard in check_against_goals /
-    estimate_portion / parse_meal.
+    estimate_portion / parse_meal (fail-soft).
     """
     try:
         amount = float(value)
@@ -66,7 +66,7 @@ def micro_progress(totals: list[dict[str, Any]]) -> list[dict[str, Any]]:
     # Read the code defensively (.get, not [...]) so a partial/malformed total — a
     # code-less dict from a garbled tool-call or a corrupted aggregate — is skipped
     # rather than raising KeyError and taking down the whole panel; mirrors the
-    # already-defensive amount handling and online ``_totals_by_code``.
+    # already-defensive amount handling and online ``_totals_by_code`` (fail-soft).
     by_code = {
         code: _finite_amount(t.get("amount"))
         for t in totals

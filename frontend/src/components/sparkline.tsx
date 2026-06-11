@@ -1,7 +1,7 @@
 // A compact 7-day trend sparkline: an area+line of daily calorie totals with a
 // dashed target reference and a dot on the latest day. Pure SVG, no deps; the
-// caller supplies the data, so it stays a dumb chart ( day
-// summary "glance zone"). Stretched to its box via preserveAspectRatio="none".
+// caller supplies the data, so it stays a dumb chart for the day summary's
+// "glance zone". Stretched to its box via preserveAspectRatio="none".
 export function Sparkline({
   data,
   target,

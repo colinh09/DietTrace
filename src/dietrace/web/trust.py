@@ -6,7 +6,7 @@ This persists those results so ``GET /trust`` can show a user how trustworthy
 their logging has been over time: how many meals, the mean confidence, what
 fraction got flagged for review, and a breakdown of where the numbers came from
 (USDA vs a web-grounded lookup). One row per logged meal, scoped to a user (the
-per-user memory layer, /§7). This is the local/dev backend; the deployed
+per-user memory layer). This is the local/dev backend; the deployed
 app uses the Firestore backend behind the same interface.
 """
 
@@ -81,7 +81,7 @@ class TrustStore:
         """Persist one logged meal's eval result for *user_id*; return its row id.
 
         *text* and *review_reason* are kept so the dashboard can list a user's
-        recent low-confidence meals with enough context to revisit them (12.5).
+        recent low-confidence meals with enough context to revisit them.
         """
         when = created_at or datetime.datetime.now(tz=datetime.UTC)
         with self._connect() as conn:

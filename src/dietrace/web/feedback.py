@@ -213,7 +213,7 @@ class FeedbackStore:
         """*user_id*'s most recent corrections, newest first (the "what you've taught" panel).
 
         Each row carries the food and its before→after grams so the UI can show
-        what the user has taught the agent without re-deriving anything (12.8).
+        what the user has taught the agent without re-deriving anything.
         """
         with self._connect() as conn:
             rows = conn.execute(

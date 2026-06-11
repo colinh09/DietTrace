@@ -4,7 +4,7 @@ The food data itself (``data/food.sqlite``, ~3 GB, built by the obscured
 ``tools/`` pipeline) and its schema are gitignored; only this query layer is
 tracked. ``FoodRepository.get(fdc_id)`` hydrates a :class:`Food` aggregate —
 its nutrient panel keyed by USDA number code (208 kcal, 203 protein, 204 fat,
-205 carb — ), serving-size gram weights, and Atwater conversion factors —
+205 carb), serving-size gram weights, and Atwater conversion factors —
 so downstream tools read nutrients by code and never by name.
 ``FoodRepository.search(name)`` is the alias-aware, ranked entry point that
 turns free text into a reproducible ``fdc_id`` for ``get`` to hydrate.
@@ -238,7 +238,7 @@ _COOKING_METHODS = frozenset({
 # ingredient. When a query is a bare ingredient, a description carrying one of
 # these (the unrequested "Pie" of "Pie, peach", the "soymilk" of a branded
 # "Coffee soymilk") is the wrong resolution and is penalized so "peach" → the
-# fruit and "coffee" → brewed coffee — . Tokens are singularized, so the
+# fruit and "coffee" → brewed coffee. Tokens are singularized, so the
 # set holds singular stems ("candies" → "candie"). A form the user explicitly
 # asks for (e.g. "peach pie") is exempt, since it then appears in the query.
 _PRODUCT_FORMS = frozenset({
@@ -248,7 +248,7 @@ _PRODUCT_FORMS = frozenset({
 # Non-edible / non-flesh parts of a plant or animal. A descriptor naming the part
 # rather than the whole food is heavily penalized so "orange"/"lemon" resolve to
 # the fruit (not "Orange peel, raw") and "potato" to the tuber (not "Sweet potato
-# leaves, raw") — . Tokens are singularized, so the set holds the
+# leaves, raw"). Tokens are singularized, so the set holds the
 # singular stems ("leaves" → "leave"). "skin" is special-cased below: it names a
 # part only standing alone — USDA's "flesh and skin", "meat and skin", "with
 # skin", and "without skin" all describe the whole edible food, so those contexts

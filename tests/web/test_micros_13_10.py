@@ -221,7 +221,7 @@ def test_micro_progress_non_finite_amount_treated_as_zero() -> None:
     supply one; left unguarded it flows through to ``consumed`` and ``pct_dv``,
     where it both surfaces in the UI and serializes as the invalid-JSON token
     ``NaN``/``Infinity`` from ``/analysis``. Mirrors the isfinite guard in
-    check_against_goals / estimate_portion / parse_meal.
+    check_against_goals / estimate_portion / parse_meal (fail-soft).
     """
     import json
     import math
@@ -245,7 +245,7 @@ def test_micro_progress_non_finite_amount_treated_as_zero() -> None:
 
 
 def test_micro_progress_skips_total_without_code() -> None:
-    """A total missing its ``code`` key is skipped, not a crash.
+    """A total missing its ``code`` key is skipped, not a crash (fail-soft).
 
     ``micro_progress`` already coerces a junk/non-finite ``amount`` defensively via
     ``t.get("amount")``, but it read ``t["code"]`` directly — so one partial or

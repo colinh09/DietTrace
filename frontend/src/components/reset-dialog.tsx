@@ -1,7 +1,7 @@
 "use client";
 
-// The Reset confirmation as a PROPER modal (: kill the in-place
-// "Reset everything?" morph in the navbar). Wipes the current user's meals,
+// The Reset confirmation as a PROPER modal — kills the in-place
+// "Reset everything?" morph in the navbar. Wipes the current user's meals,
 // goals, and learned preferences (POST /session/reset), then fires onReset so the
 // page falls back to a clean slate / onboarding. ALWAYS fires onReset — even on a
 // failed call — so a hiccup never strands the user mid-reset.

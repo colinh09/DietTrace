@@ -3,7 +3,7 @@
 Separate from the read-only food DB: this persists what each user logged (the
 free text plus the computed nutrient totals) so ``/history`` and ``/analysis``
 can read it back. Small and append-mostly; one row per logged meal, scoped to a
-user (the per-user memory layer, ). This is the local/dev backend; the
+user (the per-user memory layer). This is the local/dev backend; the
 deployed app uses the Firestore backend behind the same interface.
 """
 

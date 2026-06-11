@@ -108,7 +108,7 @@ def test_calories_of_returns_zero_for_empty_list() -> None:
 # amount, a non-numeric value, or a non-finite NaN/inf — must degrade to "no
 # reliable calories" (0.0), not crash the retune or the endpoint, mirroring the
 # isfinite guards in parse_meal / web_nutrition / estimate_portion /
-# check_against_goals.
+# check_against_goals (fail-soft).
 
 
 def test_calories_of_returns_zero_when_208_amount_is_null() -> None:

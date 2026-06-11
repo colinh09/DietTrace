@@ -186,9 +186,9 @@ def test_llm_prompt_guides_with_heuristics_and_canonical_examples() -> None:
 
 
 def test_decision_carries_phoenix_mcp_detail_per_op() -> None:
-    """Each decision carries a short Phoenix-MCP direction + summary for the rail
-   : a dataset-point write, a retune's experiment read, none for a
-    local bank. Additive — the existing op/reason are untouched."""
+    """Each decision carries a short Phoenix-MCP direction + summary for the rail:
+    a dataset-point write, a retune's experiment read, none for a local bank.
+    Additive — the existing op/reason are untouched."""
     from dietrace.agents.supervisor.decide import phoenix_detail
 
     assert phoenix_detail(OP_ADD_DATASET_POINT) == "wrote 1 point to your Phoenix dataset"

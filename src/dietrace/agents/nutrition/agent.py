@@ -62,7 +62,7 @@ def build_nutrition_tools(
 
     *repository* backs the deterministic lookups; *client* is the Gemini client
     for ``parse_meal`` (injectable for tests, built lazily by ``parse_meal`` when
-    omitted). The tools are returned in the  pipeline order and present the
+    omitted). The tools are returned in pipeline order and present the
     JSON-friendly signatures the LLM calls them with — foods are addressed by the
     reproducible ``fdc_id`` returned from ``search_nutrition``.
     """
@@ -174,8 +174,8 @@ class NutritionAgent:
 
     * **Macro planning** (``self.plan_macros``) — a direct Python method that
       wraps the macro-planning service under the same agent identity, sharing the
-      Phoenix tracing spine that ``build_nutrition_agent`` initialises (,
-      ).  It is not an ADK FunctionTool so the runner's tool
+      Phoenix tracing spine that ``build_nutrition_agent`` initialises.  It is not
+      an ADK FunctionTool so the runner's tool
       contract (five tools, pipeline order) is unchanged.
     """
 

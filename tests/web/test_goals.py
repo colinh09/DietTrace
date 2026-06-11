@@ -33,7 +33,7 @@ def test_goals_are_env_overridable(monkeypatch) -> None:
 
 
 def test_non_numeric_env_override_falls_back_to_default(monkeypatch) -> None:
-    # A malformed override must not crash /goals or /analysis (fail-soft, /§9):
+    # A malformed override must not crash /goals or /analysis (fail-soft):
     # degrade to the built-in default rather than raising on the float() coercion.
     monkeypatch.setenv("DIETRACE_GOAL_PROTEIN", "abc")
     monkeypatch.setenv("DIETRACE_GOAL_CALORIES", "1800")

@@ -1,7 +1,7 @@
 "use client";
 
-// The account avatar + dropdown menu. Per , the navbar is
-// constant chrome: the destructive Reset and the modal-opener "Persona details"
+// The account avatar + dropdown menu. The navbar is constant chrome: the
+// destructive Reset and the modal-opener "Persona details"
 // move OUT of the primary tabs and fold in here, behind the avatar. The two
 // surfaces they open (the persona recap, the Reset confirmation) are rendered at
 // this level — siblings of the dropdown — so closing the menu never unmounts an

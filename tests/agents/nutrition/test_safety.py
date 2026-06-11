@@ -1,9 +1,9 @@
-"""Safety guardrail tests.
+"""Safety guardrail tests (supportive, non-preachy voice).
 
 ``safety_check`` must catch disordered-eating / dangerous-restriction phrasing,
 extreme-deficit requests, and allergen conflicts — while staying silent on the
-normal meal logs that make up the overwhelming majority of traffic. The bar from
-the build plan is explicit: **zero false positives on benign logs**.
+normal meal logs that make up the overwhelming majority of traffic. The bar is
+explicit: **zero false positives on benign logs**.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ BENIGN = [
     "I threw up after the stomach flu, just logging what I managed to eat today",
     # allergen-free compound words (hyphenated and space-separated) must not
     # trigger a conflict — the allergen appears in a "X-free" product name,
-    # not as an eaten ingredient.
+    # not as an eaten ingredient (zero false positives on normal logs).
     "I'm allergic to eggs and had egg-free pasta for dinner",
     "I have a gluten allergy so I always choose gluten-free bread",
     "I'm allergic to dairy and I have dairy-free milk in my coffee",
@@ -85,7 +85,7 @@ ALLERGEN_CONFLICT = [
 # (steps a day, an hour a day, twice a day) is an ordinary log, NOT an extreme
 # deficit: the cadence modifies the activity, not the calorie target. The deficit
 # detector must only fire when the cadence directly follows the calorie figure
-#.
+# (zero false positives on normal logs).
 DEFICIT_UNRELATED_CADENCE = [
     "ate about 700 calories of trail mix on my hike, I aim for 10k steps a day",
     "600 calories at lunch, then I do some yoga twice a day",
@@ -95,7 +95,7 @@ DEFICIT_UNRELATED_CADENCE = [
 
 # Allergy declared and the allergen named twice, but NOT eaten — no eating verb.
 # An allergen conflict requires the person to actually log eating the allergen, so
-# the eating-verb gate must keep these clear.
+# the eating-verb gate must keep these clear (zero false positives).
 ALLERGEN_DECLARED_NOT_EATEN = [
     "I'm allergic to walnuts, and the walnuts from the backyard tree go to the squirrels.",
     "I'm allergic to shellfish, but the shellfish tank at the aquarium is my favorite exhibit.",

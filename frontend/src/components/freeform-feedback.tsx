@@ -2,8 +2,8 @@
 
 // Free-form feedback for a logged meal — lets the user type a natural-language
 // comment ("fries were smaller, maybe half") that DietTrace interprets and
-// applies, then surfaces what it learned as a "DietTrace learned: …" panel
-//. Sits alongside the existing gram-edit correction
+// applies, then surfaces what it learned as a "DietTrace learned: …" panel.
+// Sits alongside the existing gram-edit correction
 // so both paths stay available.
 import { useState } from "react";
 import { Check } from "lucide-react";

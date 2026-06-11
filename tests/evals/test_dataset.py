@@ -38,7 +38,7 @@ def test_both_tiers_are_represented() -> None:
 
 
 def test_dataset_expanded_with_eight_more_cases() -> None:
-    """: the seed 8 grows by 8 more USDA-grounded cases."""
+    """The seed 8 grows by 8 more USDA-grounded cases."""
     assert len(list(DATASET.glob("*.json"))) >= 16
 
 
@@ -59,9 +59,9 @@ def test_every_case_pins_a_unique_fdc_id() -> None:
     assert len(set(fdc_ids)) == len(fdc_ids)
 
 
-# : eight more everyday whole-food cases (apple, banana, white
-# rice cooked, chicken breast cooked, broccoli, almonds, greek yogurt, egg),
-# each grounded to a distinct USDA food pulled from data/food.sqlite.
+# Eight more everyday whole-food cases (apple, banana, white rice cooked,
+# chicken breast cooked, broccoli, almonds, greek yogurt, egg), each grounded
+# to a distinct USDA food pulled from data/food.sqlite.
 _WHOLE_FOOD_11_4 = [
     "apple_peeled.json",
     "banana_ripe.json",

@@ -1,8 +1,8 @@
-"""Tests for src/dietrace/nutrition/repository.py — FoodRepository.get (2.3).
+"""Tests for src/dietrace/nutrition/repository.py — FoodRepository.get.
 
 The read layer hydrates a ``Food`` from the local SQLite food DB by
 ``fdc_id``: its nutrient panel keyed by USDA number code (208 kcal, 203 protein,
-204 fat, 205 carb — ), serving-size gram weights, and Atwater conversion
+204 fat, 205 carb), serving-size gram weights, and Atwater conversion
 factors. These tests run against the tiny ``food_db`` fixture (egg, avocado,
 toast), never the real 3 GB ``data/food.sqlite``.
 """
@@ -81,7 +81,7 @@ def test_get_unknown_fdc_id_returns_none(food_db) -> None:
 
 
 def test_get_fails_soft_when_db_missing(tmp_path) -> None:
-    """A missing DB file degrades to None instead of raising (fail-soft, )."""
+    """A missing DB file degrades to None instead of raising (fail-soft)."""
     missing = FoodRepository(tmp_path / "does_not_exist.sqlite")
 
     assert missing.get(1001) is None

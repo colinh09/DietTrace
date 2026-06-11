@@ -134,7 +134,7 @@ def test_stream_meal_emits_steps_then_result(tmp_path) -> None:
     assert result["trace"] == [e for e in events if e["type"] == "step"]
 
 
-# ──  per-portion basis ─────────────────────────────────────────────
+# ── Per-portion basis ────────────────────────────────────────────────────────
 
 
 def test_log_meal_items_carry_portion_basis(tmp_path) -> None:

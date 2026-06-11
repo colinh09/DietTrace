@@ -1,4 +1,4 @@
-"""— typed API client for the Next.js frontend.
+"""Typed API client for the Next.js frontend.
 
 Encodes the done-criterion as static checks on ``frontend/src/lib/api.ts``: the
 client reads its base URL from ``NEXT_PUBLIC_API_BASE`` (default
@@ -27,7 +27,7 @@ def test_base_url_from_env_with_localhost_default():
 
 
 def test_exposes_a_call_per_endpoint():
-    """One exported async function per endpoint the frontend needs (§9)."""
+    """One exported async function per endpoint the frontend needs."""
     src = API.read_text()
     for fn in ("logMeal", "getHistory", "getAnalysis", "getGoals"):
         assert f"export async function {fn}" in src, f"client call {fn}() missing"

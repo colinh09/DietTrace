@@ -12,7 +12,7 @@ from tests.nutrition.fixtures_food_db import build_food_db
 def food_db(tmp_path: Path) -> Path:
     """Build a throwaway SQLite food DB and yield its path.
 
-    Reusable by the FoodRepository.get / .search tests (2.3 / 2.4): each gets a
+    Reusable by the FoodRepository.get / .search tests: each gets a
     fresh, isolated file under the test's ``tmp_path``, seeded with the fixture
     foods (egg, avocado, toast) and never the real ``data/food.sqlite``.
     """

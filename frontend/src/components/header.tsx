@@ -2,7 +2,7 @@
 
 // The app's top navbar: the leaf wordmark on the left, the primary view tabs
 // (Today · Macros · Overview) right-aligned, and the account avatar on the far
-// right. Per  the navbar is CONSTANT chrome — the modal-opener
+// right. The navbar is CONSTANT chrome — the modal-opener
 // "Persona details" and the destructive "Reset" no longer sit among the tabs;
 // they fold into the avatar's account menu. The day/calendar navigation lives in
 // the day-summary card below, not here. The brand is the apple

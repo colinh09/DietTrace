@@ -7,7 +7,7 @@ JSON file. Nothing here is hand-authored — the confidence is the genuine mean 
 the four eval axes, so the "why this confidence" breakdown adds up. Loading the
 canned data keeps /demo/seed deterministic and offline (no Gemini call, no spend).
 
-Two selectable personas (the persona loader, ): an **endurance runner** who
+Two selectable personas (the persona loader): an **endurance runner** who
 under-logs her training carbs, and a **bodybuilder** who under-logs his post-lift
 protein portions. (Two more — a generalist **busy professional** and the creator's
 own dogfooded log — are kept defined but archived in ``ARCHIVED_PERSONAS`` so they

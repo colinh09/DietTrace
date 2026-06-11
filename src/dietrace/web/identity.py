@@ -1,4 +1,4 @@
-"""Per-user identity for the API (the per-user memory layer, ).
+"""Per-user identity for the API (the per-user memory layer).
 
 Every meal and correction is scoped to a user. Two identity sources, in priority:
 

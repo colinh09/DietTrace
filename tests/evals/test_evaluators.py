@@ -111,7 +111,7 @@ def test_macro_pct_error_zero_expected_macro() -> None:
 def test_macro_pct_error_honors_per_case_tolerance() -> None:
     """The pass/fail label respects a per-case ±band, not just the ±15% default.
 
-    : the tolerance is "configurable per case". The same mean error must
+    The tolerance is "configurable per case". The same mean error must
     fail a tighter band and pass a looser one, matching the other evaluators.
     """
     # Mean |%error| is 8.75% (see test_macro_pct_error_known_values).
@@ -138,13 +138,13 @@ def test_eval_result_to_phoenix_carries_metadata() -> None:
     assert payload["metadata"] == {"mean_pct_error": 0.5}
 
 
-# --- macro_mae -------------------------------------------------------
+# --- macro_mae ----------------------------------------------------------------
 
 
 def test_macro_mae_known_values() -> None:
     """MAE is the mean absolute error in native units; the score is NMAE-based.
 
-     pairs macro_mae with macro_pct_error: same accuracy signal, but the
+    macro_mae pairs with macro_pct_error: same accuracy signal, but the
     raw magnitude carried for the supervisor is the absolute error (g/kcal), not
     a percentage. The [0,1] score normalizes the MAE against the expected total
     (NMAE = Σ|err| / Σ|expected|), so it weights by magnitude rather than
@@ -235,7 +235,7 @@ def test_macro_mae_registered_in_phoenix_list() -> None:
     assert "macro_mae" in {fn.__name__ for fn in PHOENIX_EVALUATORS}
 
 
-# --- calorie_accuracy (4.3) ---------------------------------------------------
+# --- calorie_accuracy ---------------------------------------------------------
 
 
 def test_calorie_accuracy_normalizes_and_passes() -> None:
@@ -258,7 +258,7 @@ def test_calorie_accuracy_fails_outside_band() -> None:
     assert calorie_accuracy(output, expected).label == "fail"
 
 
-# --- within_tolerance (4.4) ---------------------------------------------------
+# --- within_tolerance ---------------------------------------------------------
 
 
 def test_within_tolerance_passes_when_all_macros_inside_band() -> None:
@@ -284,7 +284,7 @@ def test_within_tolerance_fails_when_one_macro_exceeds() -> None:
     assert "fat_g" in result.metadata["failing"]
 
 
-# --- portion_error (4.5) ------------------------------------------------------
+# --- portion_error ------------------------------------------------------------
 
 
 def test_portion_error_scores_grams() -> None:
@@ -309,7 +309,7 @@ def test_portion_error_na_without_ground_truth_grams() -> None:
     assert portion_error(output, expected).label == "n/a"
 
 
-# --- micro_panel_accuracy (4.6, two-tier dispatch) ----------------------------
+# --- micro_panel_accuracy (two-tier dispatch) ---------------------------------
 
 
 def test_micro_panel_na_for_label_tier() -> None:
@@ -376,7 +376,7 @@ def test_micro_panel_na_when_micros_key_absent() -> None:
     assert result.score == 1.0
 
 
-# --- fiber/sodium/sugar single-nutrient evaluators (10.2) ---------------------
+# --- fiber/sodium/sugar single-nutrient evaluators ----------------------------
 
 
 def test_fiber_accuracy_known_value() -> None:
@@ -467,15 +467,15 @@ def test_fiber_accuracy_accepts_expected_nutrition_model() -> None:
 
 
 def test_new_evaluators_registered_in_phoenix_list() -> None:
-    """The three new evaluators are wired into PHOENIX_EVALUATORS by name (10.2)."""
+    """The three new evaluators are wired into PHOENIX_EVALUATORS by name."""
     names = {fn.__name__ for fn in PHOENIX_EVALUATORS}
     assert {"fiber_accuracy", "sodium_accuracy", "total_sugars_accuracy"} <= names
 
 
-# --- non-finite output stays in the [0,1] contract -------------------
+# --- non-finite output stays in the [0,1] contract ---------------------------
 #
 # Every numeric evaluator funnels through ``_pct_error`` and normalizes its score
-# with ``1 - min(err, 1)``.  requires scores "normalized to [0,1] for
+# with ``1 - min(err, 1)``. Scores must be "normalized to [0,1] for
 # Phoenix charts" so "regressions flag". But ``min(nan, 1.0)`` is ``nan`` in
 # Python, so a non-finite agent total (a NaN/inf amount reaching an evaluator from
 # a replayed/stored output or an MCP-written dataset point) would yield a ``nan``
@@ -512,7 +512,7 @@ def test_macro_pct_error_non_finite_macro_keeps_score_finite(bad: float) -> None
     assert math.isfinite(result.metadata["mean_pct_error"])
 
 
-# --- a garbled per-case tolerance falls back to the default band -----
+# --- a garbled per-case tolerance falls back to the default band -------------
 #
 # The pass/fail band is overridable per case via ``metadata["tolerance"]``, and
 # that metadata can arrive from a replayed/stored case or an MCP-written dataset
@@ -553,7 +553,7 @@ def test_within_tolerance_garbled_tolerance_uses_default(bad: object) -> None:
 def test_macro_mae_non_finite_macro_is_worst_miss_not_nan(bad: float) -> None:
     # macro_mae scores ABSOLUTE error, so it bypasses _pct_error's guard entirely:
     # abs(nan - 20) is nan, the NMAE becomes nan, and 1 - min(nan, 1.0) is a nan
-    # score — off the [0,1] contract  promises, and a nan never flags as a
+    # score — off the [0,1] contract the evaluators promise, and a nan never flags as a
     # regression. An unusable macro must be a full miss (NMAE ≥ 1 → score 0.0), like
     # the percent-based evaluators above.
     output = _totals(calories=400.0, protein_g=bad, fat_g=40.0, carb_g=10.0)

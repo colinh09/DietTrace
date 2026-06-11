@@ -1,4 +1,4 @@
-"""— cache the static base seeding accuracy numbers.
+"""Cache the static base seeding accuracy numbers.
 
 The USDA experiment story (baseline → current measured numbers) never changes between
 Phoenix runs.  Caching the computed base report avoids re-running _measured_macro_scores

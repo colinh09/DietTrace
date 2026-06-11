@@ -1,6 +1,6 @@
 """Search-resolution regression basket.
 
-–11.3 each tuned ``_canonical_score`` so a bare common-food query
+Earlier ranking fixes each tuned ``_canonical_score`` so a bare common-food query
 resolves to the sensible whole/raw/ingredient form rather than a non-edible
 part, a prepared product, or a dehydrated variant. Those fixes are individually
 covered in ``test_repository_search.py``; this module pins a *basket* of
@@ -30,13 +30,13 @@ from tests.nutrition.fixtures_food_db import (
     RICE_RAW_FDC_ID,
 )
 
-# (query, canonical winner, the variant it must outrank) — one per common food
-# named in , each exercising a 11.1–11.3 pattern:
-#   apple  — bare ingredient beats a prepared product (sauce)        [11.2]
+# (query, canonical winner, the variant it must outrank) — one per common food,
+# each exercising a resolution pattern:
+#   apple  — bare ingredient beats a prepared product (sauce)        [product-form]
 #   rice   — staple prefers cooked over raw                          [cooked-staple]
-#   orange — whole fruit beats a non-edible part (peel)              [11.1]
-#   carrot — raw produce beats a dehydrated variant                 [11.3]
-#   peach  — bare ingredient beats a prepared product (pie)          [11.2]
+#   orange — whole fruit beats a non-edible part (peel)              [part]
+#   carrot — raw produce beats a dehydrated variant                 [raw-produce]
+#   peach  — bare ingredient beats a prepared product (pie)          [product-form]
 _BASKET = [
     ("apple", APPLE_RAW_FDC_ID, APPLE_SAUCE_FDC_ID),
     ("rice", RICE_COOKED_FDC_ID, RICE_RAW_FDC_ID),

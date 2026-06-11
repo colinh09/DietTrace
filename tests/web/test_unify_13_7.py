@@ -1,8 +1,8 @@
-""" nutritionist-agent unification — macro + meal under one identity.
+"""Nutritionist-agent unification — macro + meal under one identity.
 
 The macro planning capability must be reachable through the same NutritionAgent
 as meal logging (one Phoenix tracing spine, one per-user memory), and the
-existing logging path must remain byte-identical (regression guard, /§8).
+existing logging path must remain byte-identical (regression guard).
 """
 
 from __future__ import annotations

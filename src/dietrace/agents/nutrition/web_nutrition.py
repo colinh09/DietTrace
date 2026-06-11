@@ -1,4 +1,4 @@
-"""Grounded web lookup for foods the USDA DB doesn't carry.
+"""Grounded web lookup for foods the USDA DB doesn't carry — the fallback path.
 
 The USDA FoodData Central DB is excellent for whole and packaged foods but rarely
 carries restaurant meals (a "Five Guys bacon cheeseburger" has no FDC entry, so a
@@ -81,7 +81,7 @@ def web_nutrition(
         if client is None:
             client = _default_client()
     except Exception:
-        # A credentials failure must never crash a meal log.
+        # A credentials failure must never crash a meal log (fail-soft).
         return None
 
     for _ in range(max(1, attempts)):

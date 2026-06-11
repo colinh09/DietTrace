@@ -75,7 +75,7 @@ def test_empty_and_garbled_responses_degrade_to_none() -> None:
 
 
 def test_retry_succeeds_on_second_attempt() -> None:
-    """When the first lookup returns no text, the second attempt is used."""
+    """When the first lookup returns no text, the second attempt is used (retry)."""
     client = Mock()
     client.models.generate_content.side_effect = [
         SimpleNamespace(text=None),
@@ -88,7 +88,7 @@ def test_retry_succeeds_on_second_attempt() -> None:
 
 
 def test_credential_failure_is_fail_soft_none() -> None:
-    """A credentials exception during client init degrades to None."""
+    """A credentials exception during client init degrades to None (fail-soft)."""
     with patch(
         "dietrace.agents.nutrition.web_nutrition._default_client",
         side_effect=RuntimeError("no credentials"),
@@ -114,7 +114,7 @@ def test_nan_nutrient_value_is_dropped() -> None:
 
     ``nan < 0`` is False, so the negative-value guard never catches it; only the
     ``math.isfinite`` check drops it before a NaN amount reaches the per-100 g panel
-    and poisons every downstream macro total.
+    and poisons every downstream macro total (fail-soft).
     """
     payload = dict(_FIVE_GUYS)
     payload["protein_g"] = float("nan")
@@ -130,7 +130,7 @@ def test_non_finite_serving_grams_is_fail_soft_none() -> None:
 
     ``inf > 0`` is True, so an infinite ``serving_grams`` would pass the positivity
     check and make every per-100 g amount divide to 0; only ``math.isfinite`` rejects
-    it.
+    it (fail-soft).
     """
     payload = dict(_FIVE_GUYS)
     payload["serving_grams"] = float("inf")
@@ -147,7 +147,7 @@ def test_missing_description_falls_back_to_brand_food_label() -> None:
 
 
 def test_non_string_description_falls_back_instead_of_raising() -> None:
-    """A garbled non-string ``description`` must not crash the lookup.
+    """A garbled non-string ``description`` must not crash the lookup (fail-soft).
 
     ``Food.description`` is a ``str`` and pydantic v2 does NOT coerce a list/dict to
     one, so a truthy-but-wrong-type description (a plausible garbled-JSON shape)

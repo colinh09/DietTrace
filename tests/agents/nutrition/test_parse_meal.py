@@ -1,4 +1,4 @@
-"""Tests for parse_meal — free text → structured items (3.5; ).
+"""Tests for parse_meal — free text → structured items.
 
 ``parse_meal(text, client)`` is the only inherently generative step of the
 nutrition pipeline: it asks the (mocked here) Gemini client to turn
@@ -156,7 +156,7 @@ def test_default_client_build_failure_fails_soft() -> None:
     """A credentials/Vertex-init failure on the lazy client build yields an empty parse.
 
     The default path builds a Vertex client; missing GCP credentials must not crash
-    the /log path, matching web_nutrition's guard around the same
+    the /log path (fail-soft), matching web_nutrition's guard around the same
     lazy ``_default_client`` build.
     """
     with patch(
@@ -241,7 +241,7 @@ def test_drops_blank_food_names() -> None:
 
 
 def test_calls_client_with_model_and_text() -> None:
-    """The free text is sent to the model named by config."""
+    """The free text is sent to the model named by config (Gemini 3)."""
     from dietrace.llm.config import GEMINI_MODEL
 
     client = _client(_items_json([]))

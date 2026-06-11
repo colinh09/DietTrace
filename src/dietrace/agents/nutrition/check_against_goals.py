@@ -4,7 +4,7 @@
 pipeline: given the summed nutrient totals from ``log_entry`` and the
 user's daily :class:`NutrientGoal` targets, it reports a per-nutrient status —
 ``over``, ``under``, or ``within`` — plus a short, encouraging message in the
-non-preachy logging voice.
+non-preachy logging voice (e.g. "sodium 40% over goal").
 
 A nutrient counts as ``within`` when its total sits inside a tolerance band
 around the goal (default ±10%, overridable per goal); beyond the band it is
@@ -81,7 +81,7 @@ def _amount(totals: dict[str, Nutrient], code: str) -> float:
     LLM tool-call can supply, since ``check_against_goals`` is an ADK
     ``FunctionTool`` — is treated as nothing reliably consumed (0.0) rather than
     flowing into the percent maths, where ``round(nan)``/``round(inf)`` would
-    raise straight out of the tool ( fail-soft, mirroring the isfinite
+    raise straight out of the tool (fail-soft, mirroring the isfinite
     guards in parse_meal / web_nutrition / estimate_portion).
     """
     nutrient = totals.get(code)
@@ -99,7 +99,7 @@ def _band_tolerance(goal: NutrientGoal) -> float:
     makes ``abs(consumed - target) <= tolerance * target`` always False, so an
     on-track nutrient reads as "under"/"over", while ``+inf`` makes it always
     True, swallowing every real over/under as "within". An unusable tolerance
-    falls back to the default band rather than mislabelling ( fail-soft,
+    falls back to the default band rather than mislabelling (fail-soft,
     mirroring the ``target`` guard below and ``evals._tolerance``).
     """
     if math.isfinite(goal.tolerance) and goal.tolerance >= 0:
@@ -137,7 +137,7 @@ def check_against_goals(totals: list[Nutrient], goals: list[NutrientGoal]) -> Go
         # one is meaningless (you cannot aim for less than zero of a nutrient) —
         # it yields a negative tolerance band and a nonsensical "-3320% over … of
         # -100mg" message. Skip either rather than crash or surface garbage, the
-        # same way a total with no goal is left unreported. A
+        # same way a total with no goal is left unreported (fail-soft). A
         # zero target is valid (a limit goal like 0 added sugar) and handled below.
         if not math.isfinite(goal.target) or goal.target < 0:
             continue

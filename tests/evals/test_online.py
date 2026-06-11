@@ -408,7 +408,7 @@ def test_evaluate_log_with_nutrient_amount_none_does_not_raise() -> None:
     assert isinstance(result["confidence"], float)
 
 
-# ──  all four confidence axes ──────────────────────────────────────
+# ── all four confidence axes ─────────────────────────────────────────────────
 
 
 def test_all_four_axes_present() -> None:

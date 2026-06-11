@@ -1,7 +1,7 @@
 """Deterministic macro/micro math for a logged meal.
 
-``log_entry(items)`` is the calculation half of the search/calculation split
-: given foods already resolved to gram weights (by ``estimate_portion``),
+``log_entry(items)`` is the calculation half of the search/calculation split:
+given foods already resolved to gram weights (by ``estimate_portion``),
 it scales each food's per-100 g nutrient panel by its grams and sums the panels
 into meal totals — the agent never invents a number a tool can compute.
 

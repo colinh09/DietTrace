@@ -56,7 +56,7 @@ def calories_of(totals: list[dict[str, Any]]) -> float:
     (NaN/inf) value. This feeds the deterministic gate (gate.py) and the
     /history + /eval-case endpoints, so an unusable amount degrades to 0.0 ("no
     reliable calories") rather than raising — mirroring the isfinite guards in
-    parse_meal / estimate_portion / check_against_goals.
+    parse_meal / estimate_portion / check_against_goals (fail-soft).
     """
     for nutrient in totals:
         if nutrient.get("code") == "208":

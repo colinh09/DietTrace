@@ -145,7 +145,7 @@ def test_load_overlay_skips_bad_entries_keeping_the_valid_pins(
     A hand-maintained mappings file can carry a typo'd value. Building the table
     in a single dict comprehension meant one ``int(v)`` failure threw straight out
     and ``load_overlay`` fell back to ``{}`` — silently degrading *every* pinned
-    common food back to the ranked search,
+    common food (the permanent ranking-class fix) back to the ranked search,
     with no error. Each entry must fail soft on its own so the good pins survive.
     """
     f = tmp_path / "foods.json"

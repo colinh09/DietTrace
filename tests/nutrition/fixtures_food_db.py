@@ -5,11 +5,11 @@ built by the obscured ``tools/`` pipeline and never committed. Tests instead
 build a throwaway DB with a few whole foods (an egg, an avocado, a slice of
 toast) carrying USDA-grounded per-100 g nutrients, serving-size gram weights,
 Atwater conversion factors, and aliases. That is enough ground truth for the
-FoodRepository.get / .search tests (2.3 / 2.4) to run fully offline.
+FoodRepository.get / .search tests to run fully offline.
 
 The schema mirrors the tracked read layer's tables: ``foods`` keyed by
 ``fdc_id``, a ``nutrients`` catalog joined through ``food_nutrients`` by USDA
-number code (208 kcal, 203 protein, 204 fat, 205 carb — ),
+number code (208 kcal, 203 protein, 204 fat, 205 carb),
 ``serving_sizes``, ``nutrient_conversion_factors``, and ``food_aliases``.
 """
 
@@ -52,7 +52,7 @@ CARROT_DEHYDRATED_FDC_ID = 168153
 CARROT_RAW_FDC_ID = 170393
 # Basket anchors for the search-resolution regression test. Each
 # rounds out the set of common foods that must not regress: an apple (bare fruit
-# vs a prepared "Sauce, apple" — the 11.2 product-form pattern) and white rice (a
+# vs a prepared "Sauce, apple" — the product-form pattern) and white rice (a
 # staple, so cooked is canonical and raw is the wrong form). In both pairs the
 # wrong variant (sauce, raw rice) has the LOWER fdc_id, so absent the canonical
 # ranking it would win the tie — pinning that the ranking, not fdc_id order, wins.
@@ -169,7 +169,7 @@ _FOODS = [
     (CARROT_DEHYDRATED_FDC_ID, "Carrots, dehydrated", "sr_legacy_food"),
     (CARROT_RAW_FDC_ID, "Carrots, raw", "sr_legacy_food"),
     # "Sauce, apple" leads with a prepared product form ("sauce"), so the bare
-    # query "apple" must resolve to the fruit, not the sauce.
+    # query "apple" must resolve to the fruit, not the sauce (product-form pattern).
     (APPLE_SAUCE_FDC_ID, "Sauce, apple, canned, unsweetened", "sr_legacy_food"),
     (APPLE_RAW_FDC_ID, "Apples, raw, with skin", "sr_legacy_food"),
     # White rice is a staple — eaten cooked — so "rice" must resolve to the cooked
@@ -222,7 +222,7 @@ _CONVERSION_FACTORS = {
     AVOCADO_FDC_ID: (4.27, 8.37, 3.6),
 }
 
-# fdc_id -> list of alias names (alias-aware search, 2.4).
+# fdc_id -> list of alias names (alias-aware search).
 _ALIASES = {
     EGG_FDC_ID: ["egg", "eggs", "whole egg"],
     AVOCADO_FDC_ID: ["avocado", "avocados"],

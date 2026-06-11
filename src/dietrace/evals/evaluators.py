@@ -4,13 +4,13 @@ These hold the agent's macro/calorie accuracy to account against USDA ground
 truth. Each returns an :class:`EvalResult` — the ``{score, label, explanation}``
 shape extended with a ``metadata`` dict that carries the raw
 error magnitudes so the supervisor reads true error while Phoenix charts the
-normalized score (: "Normalize scores to [0,1] for Phoenix charts; carry
-raw magnitudes in metadata").
+normalized score: scores are normalized to [0,1] for Phoenix charts while raw
+magnitudes are carried in metadata.
 
-``macro_pct_error`` is the first of these: it computes the
-per-macro |%error| between the agent's logged totals and the case's expected
-macros, normalizes the mean to a [0,1] accuracy score, and labels pass/fail
-against the default ±15% band.
+``macro_pct_error`` is the first of these: it computes the per-macro |%error|
+between the agent's logged totals and the case's expected macros, normalizes the
+mean to a [0,1] accuracy score, and labels pass/fail against the default ±15%
+band.
 """
 
 from __future__ import annotations
@@ -81,8 +81,8 @@ def _pct_error(actual: float, expected: float) -> float:
     A non-finite operand (a NaN/inf amount reaching an evaluator from a replayed
     or MCP-written output) yields the worst error (1.0), not a non-finite value:
     every evaluator normalizes with ``1 - min(err, 1)`` and ``min(nan, 1.0)`` is
-    ``nan``, so an unguarded non-finite error would poison the [0,1] score 
-    requires for Phoenix charts and regression flagging. An unusable output is a
+    ``nan``, so an unguarded non-finite error would poison the [0,1] score
+    required for Phoenix charts and regression flagging. An unusable output is a
     full miss, not a silent ``nan``.
     """
     if expected == 0.0:
@@ -103,7 +103,7 @@ def macro_pct_error(
     (``1 - min(mean, 1)``). The per-macro and mean raw errors travel in
     ``metadata`` so the supervisor reads true magnitudes; the label passes when
     the mean stays within the case's ±band (default ±15%, overridable per case
-    via ``metadata["tolerance"]`` like the other evaluators — ).
+    via ``metadata["tolerance"]`` like the other evaluators).
     """
     by_code = _output_by_code(output)
     exp = _expected_macros(expected)
@@ -159,7 +159,7 @@ def macro_mae(
     expected total (NMAE = Σ|error| / Σ|expected|) so it weights by magnitude
     rather than equal-weighting percentages, and an all-zero ground truth scores
     perfect only on an exact zero. The label passes when the NMAE stays within the
-    case's ±band (default ±15%, overridable per case — ).
+    case's ±band (default ±15%, overridable per case).
     """
     per_macro_abs = _per_macro_abs_errors(output, expected)
     exp = _expected_macros(expected)
@@ -212,7 +212,7 @@ def _tolerance(metadata: dict[str, Any] | None) -> float:
     experiment), a non-finite one (``err <= nan`` always False flags a false
     regression; ``+inf`` masks real ones), or a negative band (flips pass/fail) is
     unusable, so it degrades to the default rather than crashing or corrupting the
-    label  relies on for regression flagging.
+    label relied on for regression flagging.
     """
     raw = (metadata or {}).get("tolerance", _DEFAULT_TOLERANCE)
     try:
@@ -392,8 +392,8 @@ def _micro_accuracy_evaluator(
     return evaluator
 
 
-# Label-friendly single-nutrient evaluators: fiber (291),
-# sodium (307), and total sugars (269), each scored against its micro-panel code.
+# Label-friendly single-nutrient evaluators: fiber (291), sodium (307), and
+# total sugars (269), each scored against its micro-panel code.
 fiber_accuracy = _micro_accuracy_evaluator("fiber", "291", "g")
 sodium_accuracy = _micro_accuracy_evaluator("sodium", "307", "mg")
 total_sugars_accuracy = _micro_accuracy_evaluator("total_sugars", "269", "g")

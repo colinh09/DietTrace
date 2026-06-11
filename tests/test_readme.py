@@ -1,9 +1,8 @@
-"""— README polish.
+"""README polish.
 
-Encodes the done-criterion: the public README is tightened so a
-reader gets clear run steps, the accuracy story, and the architecture — and carries
-no AI attribution. Faithful to  (overview), §3 (architecture), §6 (eval suite),
-and §7 (supervisor loop).
+Encodes the done-criterion: the public README is tightened so a reader gets clear
+run steps, the accuracy story, and the architecture — and carries no AI attribution.
+Faithful to the overview, architecture, eval suite, and supervisor loop.
 """
 
 import re

@@ -72,7 +72,7 @@ export interface Confidence {
 // macro breakdown reconciles to its calorie total (the Atwater identity
 // 4·protein + 4·carb + 9·fat ≈ kcal). A clean food match reconciles tightly →
 // High; a loose match diverges → Medium. (The agent also reports a per-portion
-// confidence per ; this is the summary the chip shows for a /history row,
+// confidence; this is the summary the chip shows for a /history row,
 // which carries totals but not that per-step detail.)
 export function confidenceOf(macros: MacroSummary): Confidence {
   if (macros.kcal <= 0) return { level: "High", pct: 90 };
@@ -85,8 +85,8 @@ export function confidenceOf(macros: MacroSummary): Confidence {
 // At or above this backend score the chip reads High.
 const HIGH_CONFIDENCE = 0.8;
 
-// The chip for a meal whose real online-eval confidence the backend reported
-//: the deterministic [0,1] score becomes a level + percent.
+// The chip for a meal whose real online-eval confidence the backend reported:
+// the deterministic [0,1] score becomes a level + percent.
 // This is the source of truth for a freshly logged meal — it supersedes the
 // macro-reconciliation heuristic in `confidenceOf`, which only stands in for a
 // meal read back from history without a backend score.

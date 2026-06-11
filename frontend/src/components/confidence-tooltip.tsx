@@ -3,9 +3,8 @@
 // The confidence chip's styled disclosure. Replaces the giant native `title`
 // string with a calm tooltip: the headline score, a one-line "what this is",
 // the four automatic checks (each axis → its %), and a "Learn more" link. Shown
-// on hover/focus via CSS (`.tip-anchor:hover .tip`), per 
-//. The four `axes` already ride along
-// on the meal detail; when a meal has none, the chip is rendered
+// on hover/focus via CSS (`.tip-anchor:hover .tip`). The four `axes` already
+// ride along on the meal detail; when a meal has none, the chip is rendered
 // bare (no tooltip) so older logs degrade gracefully.
 import type { ConfidenceAxis } from "@/lib/api";
 

@@ -1,7 +1,7 @@
-"""Per-meal supervisor decision: pick exactly one of three ops (design §1).
+"""Per-meal supervisor decision: pick exactly one of three ops.
 
 Conservative mode is a deterministic policy (here); powerful mode layers an
-LLM-reasoned variant on top (phase 6). The op is *what to do*; the deterministic
+LLM-reasoned variant on top. The op is *what to do*; the deterministic
 gate still decides whether a retune actually ships.
 """
 
@@ -108,7 +108,7 @@ def gather_signals(
     )
 
 
-# --- powerful mode: LLM-reasoned decision (phase 6) ------------------------
+# --- powerful mode: LLM-reasoned decision -----------------------------------
 
 
 class _LLMDecision(BaseModel):

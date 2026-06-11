@@ -1,7 +1,7 @@
 "use client";
 
 // A small hover/focus text tooltip — the calm, readable replacement for native
-// `title=` strings. Wraps
+// `title=` strings — no giant native title attributes. Wraps
 // any element and shows a styled bubble on hover/keyboard focus. For richer
 // disclosures (the confidence chip's four checks) use ConfidenceTooltip instead.
 export function Tooltip({

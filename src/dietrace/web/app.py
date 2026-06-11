@@ -3,7 +3,7 @@
 One Cloud Run service: log a meal, read history, see the aggregate analysis, and
 inspect the agent's reasoning spans from the in-process trace buffer. The
 meal-logging callable is injectable so the API is testable offline; the default
-runs one Gemini parse then the deterministic pipeline. Tracing is best-effort (§8).
+runs one Gemini parse then the deterministic pipeline. Tracing is best-effort.
 """
 
 from __future__ import annotations
@@ -160,7 +160,7 @@ class MacroSaveRequest(BaseModel):
 
 
 class FreeformFeedbackRequest(BaseModel):
-    """Free-form feedback for a logged meal — natural language → structured adaptation (14.12).
+    """Free-form feedback for a logged meal — natural language → structured adaptation.
 
     ``meal_id`` is the stored meal to rewrite in-place (like /correct).
     ``current_items`` is the meal's current per_item list — used to build the
@@ -176,7 +176,7 @@ class FreeformFeedbackRequest(BaseModel):
 
 class ConfirmRequest(BaseModel):
     """"Does this look right?" — a user-confirmed meal becomes a held-out
-    ground-truth datapoint for the gate (Input A, )."""
+    ground-truth datapoint for the gate (Input A)."""
 
     meal_text: str
     items: list[dict[str, Any]] = []
@@ -621,8 +621,8 @@ def create_app(
     learning = memory or build_memory()
     macro_learning = macro_memory or build_macro_memory()
     rules = standing_rule_store or build_standing_rules()
-    # Learning-loop stores: confirmations (Input A held-out
-    # set), the feedback log (Input B corrections), and the per-user preference block.
+    # Learning-loop stores: confirmations (Input A held-out set), the feedback log
+    # (Input B corrections), and the per-user preference block.
     if (
         confirmation_store is not None
         and feedback_log is not None
@@ -657,7 +657,7 @@ def create_app(
         phoenix_usda_scorer = score_usda_via_phoenix
     # In-memory experiment-run registry + per-user daily run counter. The supervisor
     # triggers experiments off the hot path; runs_today feeds the decision's budget
-    # guard (design §4). Both reset on restart — fine for a single Cloud Run service.
+    # guard. Both reset on restart — fine for a single Cloud Run service.
     experiments: dict[str, dict[str, Any]] = {}
     run_counts: dict[tuple[str, str], int] = {}
 
@@ -674,11 +674,10 @@ def create_app(
     def _user_context(user: str) -> list[dict[str, Any]]:
         """This user's few-shot corrections PLUS their standing-rule preferences,
         as a single examples list the parser injects into its prompt — so the
-        agent actually consults the rules a user has taught it (14.12 recall)."""
+        agent actually consults the rules a user has taught it (recall)."""
         examples: list[dict[str, Any]] = []
-        # The generalized preference block is the primary personalization signal
-        #. Few-shot corrections + standing rules ride
-        # alongside it as secondary signals.
+        # The generalized preference block is the primary personalization signal.
+        # Few-shot corrections + standing rules ride alongside it as secondary signals.
         block = prefs.block_text(user)
         if block:
             examples.append({"preference_block": block})
@@ -720,10 +719,10 @@ def create_app(
         user: str,
         text: str,
     ) -> None:
-        """Persist a logged meal's online-eval result for the /trust rollup (12.4).
+        """Persist a logged meal's online-eval result for the /trust rollup.
 
         Keeps the meal *text* and the review reason so /trust can list a user's
-        recent low-confidence meals with enough context to revisit them (12.5).
+        recent low-confidence meals with enough context to revisit them.
         """
         trust.record(
             confidence=quality["confidence"],
@@ -751,7 +750,7 @@ def create_app(
             )
             # Recalled meals bypass agent analysis (user-vouched, confidence=1.0).
             # The original fresh log already has a trust entry; recording a second
-            # one here inflates the count and mean_confidence artificially (14.5).
+            # one here inflates the count and mean_confidence artificially.
             return {
                 "id": entry_id,
                 "per_item": per_item,
@@ -765,8 +764,8 @@ def create_app(
                 "trace": trace,
             }
         # A recording span so the online-eval verdict (set on the current span by
-        # evaluate_log) rides this trace into Phoenix. The Gemini
-        # parse inside logger_fn nests under it.
+        # evaluate_log) rides this trace into Phoenix. The Gemini parse inside
+        # logger_fn nests under it.
         with _TRACER.start_as_current_span("meal_log"):
             result = logger_fn(req.text, examples=_user_context(user))
             totals = result.get("totals", [])
@@ -779,10 +778,10 @@ def create_app(
                 detail=_meal_detail(per_item, trace, quality, review),
             )
             _record_trust(per_item, quality, review, user, req.text)
-            # The supervisor's per-meal decision (design §1): a fresh, uncorrected
-            # meal is a clean dataset-point candidate unless enough new signal has
-            # accrued to retune. Cheap + deterministic here; the MCP write / retune
-            # execution runs off the hot path (phase 4).
+            # The supervisor's per-meal decision: a fresh, uncorrected meal is a
+            # clean dataset-point candidate unless enough new signal has accrued to
+            # retune. Cheap + deterministic here; the MCP write / retune execution
+            # runs off the hot path.
             decision = decide_op(
                 gather_signals(
                     fblog,
@@ -987,7 +986,7 @@ def create_app(
                     plan = personalize_plan(profile, plan.targets, client=macro_client)
                 eval_result = evaluate_macro_plan(profile, plan)
         # When personalized, score how well the served split matches the saved
-        # preference (the "tuned to you" alignment signal, Phase 2 P2.1).
+        # preference (the "tuned to you" alignment signal).
         adherence = macro_adherence(plan, pref) if pref else None
         plan = MacroPlan(
             targets=plan.targets,
@@ -1017,8 +1016,8 @@ def create_app(
         # Remember the user's preferred split so the next plan biases toward it
         # (the macro-learning closure) — derived only from the targets, no profile.
         macro_learning.remember(user, req.targets)
-        # Bank the preference in Phoenix as the user's macro ground truth (Phase 2
-        # P2.3) — fail-soft, profile-free, never blocks the save.
+        # Bank the preference in Phoenix as the user's macro ground truth —
+        # fail-soft, profile-free, never blocks the save.
         split = split_of(req.targets)
         banked = bool(split and macro_pref_pusher(user, split))
         return {"ok": True, "user": user, "targets": req.targets, "banked": banked}
@@ -1027,7 +1026,7 @@ def create_app(
     def macros_retune(
         req: MacroPlanRequest, user: str = Depends(current_user)
     ) -> dict[str, Any]:
-        """How much the user's saved preference tunes their plan (Phase 2 P2.2).
+        """How much the user's saved preference tunes their plan.
 
         The macro analogue of /retune: compares the generic goal-default plan
         (``before``) against the personalized plan (``after``) by adherence to the
@@ -1110,8 +1109,8 @@ def create_app(
         """The user's recent portion corrections — the "what you've taught" panel.
 
         Each item is a food with its before→after grams, newest first, so the UI
-        can show the user the ground truth they've contributed (,
-        /§7 — the self-supervision loop, made visible in-app).
+        can show the user the ground truth they've contributed — the
+        self-supervision loop, made visible in-app.
         """
         return {"corrections": corrections.recent(user_id=user)}
 
@@ -1119,7 +1118,7 @@ def create_app(
     def freeform_feedback_endpoint(
         req: FreeformFeedbackRequest, user: str = Depends(current_user)
     ) -> dict[str, Any]:
-        """Interpret free-form feedback, apply it to the meal, and surface the adaptation (14.12).
+        """Interpret free-form feedback, apply it to the meal, and surface the adaptation.
 
         ``interpret_feedback`` converts the user's comment into a StructuredFeedback;
         ``apply_feedback`` then applies it deterministically (portion_adjust /
@@ -1162,12 +1161,12 @@ def create_app(
         # Bank the raw feedback for the learning loop (Input B) so the corrector
         # can generalize it into the preference block on the next retune.
         fblog.add(user, req.feedback_text, structured.model_dump(), req.meal_text or "")
-        # XOR rule: a meal the user corrected is no
-        # longer a clean reference, so drop it from the held-out gate set.
+        # XOR rule: a meal the user corrected is no longer a clean reference, so
+        # drop it from the held-out gate set.
         if req.meal_text:
             confirms.delete_by_meal(user, req.meal_text)
 
-        # Feedback is the PRIMARY trigger for a retune (design §1): consult the
+        # Feedback is the PRIMARY trigger for a retune: consult the
         # supervisor now that this correction is banked, so the loop reacts to
         # feedback itself rather than waiting for the next incidental meal log.
         # was_corrected=False here — the bank already happened; we're deciding what
@@ -1291,7 +1290,7 @@ def create_app(
 
     @app.get("/feedback/standing-rules")
     def feedback_standing_rules(user: str = Depends(current_user)) -> dict[str, Any]:
-        """The user's standing rules — preferences stored from free-form feedback (14.12)."""
+        """The user's standing rules — preferences stored from free-form feedback."""
         return {"rules": rules.recent(user_id=user)}
 
     @app.post("/correct")
@@ -1340,7 +1339,7 @@ def create_app(
         """Rolling trust stats from each log's online-eval result.
 
         Count, mean confidence, the fraction flagged for review, and the source
-        breakdown — scoped to the calling user (the per-user memory layer, §6/§7).
+        breakdown — scoped to the calling user (the per-user memory layer).
         """
         return trust.stats(user_id=user)
 
@@ -1494,8 +1493,8 @@ def create_app(
             goals_set = True
 
         # Seed the rest of the learning-loop state so a judge can hit "retune"
-        # immediately: the dataset points (the held-out
-        # gate set) were added during insertion above; now bank a couple of
+        # immediately: the dataset points (the held-out gate set) were added during
+        # insertion above; now bank a couple of
         # corrections to generalize. The stores were cleared up front so the retune
         # starts from a fresh preference block and ships.
         for f in persona.feedback:
@@ -1573,7 +1572,7 @@ def create_app(
                 cleared[name] = -1
         return {"reset": True, "user": user, "cleared": cleared}
 
-    # ── Learning loop ──────────────────────────────────
+    # ── Learning loop ──────────────────────────────────────────────────────────
     _MIN_CORRECTIONS = 1  # corrections needed before a retune is offered
     # The gate scores the FULL USDA set by default (the honest floor check); the
     # retune is live so it's slow, which is fine — the observability shows real
@@ -1701,7 +1700,7 @@ def create_app(
                 "have": fblog.count(user),
                 "need": _MIN_CORRECTIONS,
             }
-        # Budget guard (design §4): a retune runs live experiments, so cap how many
+        # Budget guard: a retune runs live experiments, so cap how many
         # fire per user per day; the decision layer already avoids over-recommending.
         if _runs_today(user) >= supervisor_config.max_runs_per_day:
             return {

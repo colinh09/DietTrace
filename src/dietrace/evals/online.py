@@ -5,8 +5,8 @@ truth offline. This is the *online* counterpart: it scores a single logged meal
 *as it is logged*, with no ground truth and no LLM — only deterministic
 heuristics over what the pipeline already produced. The web layer can surface
 the resulting ``confidence`` next to a meal and the supervisor can watch it
-trend, the same way the numeric evaluators feed Phoenix (: deterministic,
-zero-LLM scoring; normalize to [0,1]).
+trend, the same way the numeric evaluators feed Phoenix — deterministic,
+zero-LLM scoring, normalized to [0,1].
 
 ``evaluate_log(text, per_item, totals)`` judges four things, each a sub-score in
 [0,1] that averages into the overall confidence:
@@ -52,7 +52,7 @@ _MAX_GRAMS = 4000.0
 _MAX_ITEM_KCAL = 1800.0
 
 # Calorie total may diverge from the macro-derived Atwater estimate by this much
-# before it reads as inconsistent (mirrors the evaluators' default ±band, §6).
+# before it reads as inconsistent (mirrors the evaluators' default ±band).
 _CALORIE_TOLERANCE = 0.15
 
 # Source hints (explicit or inferred) → a trust weight in [0,1]. USDA whole-food
@@ -77,8 +77,8 @@ _SOURCE_QUALITY: dict[str, float] = {
 _SOURCE_FLAG_THRESHOLD = 0.8
 
 # Below this overall confidence a log is flagged for the user to glance at — the
-# meal row offers a calm "review?" affordance into the correction editor
-#.
+# meal row offers a calm "review?" affordance into the correction editor —
+# the eval gates what the agent asks the user to check.
 REVIEW_THRESHOLD = 0.6
 
 # Delimiters that separate the foods named in a free-text meal. Crude but
@@ -225,7 +225,8 @@ def _calorie_plausibility(totals: Any) -> dict[str, Any] | None:
         # macros. Scoring it the worst miss is essential: `1 - min(nan, 1.0)` is
         # `nan`, and the final confidence clamp `min(1.0, nan)` silently returns
         # 1.0 — so without this a garbage-calorie meal would score a *perfect*
-        # confidence and never flag for review.
+        # confidence and never flag for review (the score must stay [0,1] and
+        # deterministic).
         return {
             "score": 0.0,
             "flag": "calorie_mismatch",
@@ -266,14 +267,14 @@ def evaluate_log(
     per_item: list[Any],
     totals: Any,
 ) -> dict[str, Any]:
-    """Score a single logged meal's quality from deterministic heuristics (§6).
+    """Score a single logged meal's quality from deterministic heuristics.
 
     Returns ``{"confidence": float in [0,1], "flags": [str], "reasons": [str],
     "axes": [{"name", "score", "note"}]}``.
     ``confidence`` is the mean of the applicable sub-scores (resolution
     completeness, source quality, portion sanity, calorie plausibility); each
-    axis always appears in ``axes`` with a ✓/⚠ note — not only when failing
-   .  No LLM, no network — only the structured pipeline output.
+    axis always appears in ``axes`` with a ✓/⚠ note — not only when failing.
+    No LLM, no network — only the structured pipeline output.
     """
     per_item = list(per_item or [])
     rc = _resolution_completeness(text, per_item)

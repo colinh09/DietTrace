@@ -1,7 +1,7 @@
 """Daily macro/calorie goals for the web surface.
 
 A small config of daily targets — calories, protein, carbohydrate, fat — keyed by
-USDA number code (208/203/205/204, ) so they line up with the nutrient totals
+USDA number code (208/203/205/204) so they line up with the nutrient totals
 ``log_entry`` produces. Defaults are env-overridable (``DIETRACE_GOAL_*``), exposed
 at ``GET /goals``, and drive the remaining-vs-target figures in ``/analysis``.
 """
@@ -26,7 +26,7 @@ def _target(env_var: str, default: float) -> float:
 
     A non-numeric override (e.g. ``DIETRACE_GOAL_PROTEIN=abc``) must not crash
     ``/goals`` or ``/analysis`` — degrade to the built-in default rather than
-    letting ``float()`` raise. ``nan``/``inf`` parse
+    letting ``float()`` raise (fail-soft). ``nan``/``inf`` parse
     without raising but are equally malformed: a non-finite target poisons the
     ``/analysis`` remaining-vs-target math and serializes as invalid JSON
     (``NaN``/``Infinity``), so they fall back to the default too. A zero or
@@ -89,7 +89,7 @@ def targets_to_goals(targets: dict[str, float]) -> list[dict[str, Any]]:
     the output always matches what ``load_goals`` produces. A malformed saved
     target (non-finite or non-positive) degrades to that code's built-in default
     rather than shipping a value that poisons the ``/analysis`` math or
-    serializes as invalid JSON (fail-soft, /§9 — mirrors :func:`_target`).
+    serializes as invalid JSON (fail-soft — mirrors :func:`_target`).
     """
     result = []
     for _, code, name, unit, default in _GOAL_DEFS:

@@ -1,8 +1,8 @@
-"""— shadcn components + sage design tokens in the Next.js frontend.
+"""shadcn components + sage design tokens in the Next.js frontend.
 
 Encodes the done-criterion: button/card/input are added under src/components/ui,
 the cn() util exists, and src/app/globals.css carries the sage palette + fonts +
-density tokens ported from /project/DietTrace.html. The Next build itself
+density tokens. The Next build itself
 is verified separately via `cd frontend && npm run build`.
 """
 

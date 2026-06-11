@@ -34,8 +34,8 @@ export interface GoalProgress extends Goal {
 
 // One logged food's portion and its scaled nutrient panel (`LoggedItem`).
 // `portion_basis` explains how the gram weight was derived — e.g. "matched
-// serving: 1 cup" — so the UI can show why each food got its gram value
-//. Absent on older stored meals.
+// serving: 1 cup" — so the UI can show why each food got its gram value.
+// Absent on older stored meals.
 export interface LoggedItem {
   fdc_id: number;
   description: string;
@@ -398,7 +398,7 @@ export interface FreeformFeedbackInput {
   current_items: LoggedItem[];
 }
 
-// What DietTrace learned from the free-form feedback (14.12): the structured
+// What DietTrace learned from the free-form feedback: the structured
 // interpretation (kind / target_food / adjustment / rationale) plus the updated
 // per_item + totals so the UI can refresh without a history reload.
 export interface FreeformFeedbackResult {
@@ -709,7 +709,7 @@ export async function resetSession(): Promise<SessionResetResult> {
   return request<SessionResetResult>("/session/reset", { method: "POST" });
 }
 
-// ── Learning loop ──────────────────────────────────
+// ── Learning loop ──────────────────────────────────────────────────────────
 
 // One generalized rule the corrector wrote, with provenance back to the
 // corrections that produced it.

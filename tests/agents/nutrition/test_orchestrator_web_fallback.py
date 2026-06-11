@@ -110,8 +110,8 @@ def test_unbranded_db_match_never_calls_the_web(tmp_path) -> None:
 
 
 def test_weak_db_match_is_logged_when_the_web_lookup_comes_back_empty(tmp_path) -> None:
-    # The last-resort branch (: "keeps the DB match as a last resort over
-    # dropping the item"): a substring-only match ("read" → "Bread", score 1) is too
+    # The last-resort branch keeps the DB match as a last resort over dropping the
+    # item: a substring-only match ("read" → "Bread", score 1) is too
     # weak to win outright, so the web is tried — but when the grounded lookup itself
     # returns nothing, dropping the item would lose nutrition the DB *can* approximate.
     # The weak DB match must be logged rather than the meal coming back empty.

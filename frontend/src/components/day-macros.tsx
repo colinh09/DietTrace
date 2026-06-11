@@ -1,10 +1,9 @@
 // The day-macros band: calories as a big ring (consumed vs target with the number
 // in the center), then protein, carb, and fat each as a smaller ring. Wired to
-// /analysis (consumed + target) with /goals as the initial-target fallback
-//.
+// /analysis (consumed + target) with /goals as the initial-target fallback.
 import type { GoalProgress } from "@/lib/api";
 
-// USDA number codes for the four tracked macros.
+// USDA number codes for the four tracked macros (matches goals.py).
 // Each ring carries its own colour so the four are distinguishable at a glance —
 // a muted, palette-friendly take on the common convention (protein green, carbs
 // blue, fat gold, calories a warm clay). There's no universal standard.

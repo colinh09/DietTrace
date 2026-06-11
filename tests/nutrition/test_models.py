@@ -3,7 +3,7 @@
 These pin the food-domain value objects that the read layer hydrates
 from the local SQLite food DB: Food, Nutrient, ServingSize, ConversionFactors.
 The agent reads nutrients by USDA number code (208 kcal, 203 protein, 204 fat,
-205 carb — ), so the by-code accessor is the load-bearing behavior here.
+205 carb), so the by-code accessor is the load-bearing behavior here.
 No DB or network is touched; these are plain construction tests.
 """
 

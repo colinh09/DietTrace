@@ -1,4 +1,4 @@
-"""Free-form feedback interpreter: natural language → StructuredFeedback (14.11).
+"""Free-form feedback interpreter: natural language → StructuredFeedback.
 
 ``interpret_feedback(meal_context, feedback_text, client)`` is the generative
 step of the feedback loop: it asks Gemini to turn a user's comment about a
@@ -7,7 +7,7 @@ preworkout, aim for 80g carbs") into a typed action that the deterministic
 ``apply_feedback`` function can execute without any further LLM involvement.
 
 Mirrors ``agents/nutrition/parse_meal.py``:
-- Injectable client so tests never hit Vertex (offline + mocked, ).
+- Injectable client so tests never hit Vertex (offline + mocked).
 - ``response_schema=StructuredFeedback`` so Gemini returns schema-valid JSON.
 - Fail-soft on every axis: model exception, missing text, non-JSON, wrong
   shape — all return ``None`` rather than raising, so the caller can fall back

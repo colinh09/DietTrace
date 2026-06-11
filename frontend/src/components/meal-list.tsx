@@ -2,8 +2,8 @@
 
 // The day's logged meals as compact rows. Each row is
 // one line: ✦ meal text · time, then kcal · P/C/F inline, a confidence chip, an
-// edit affordance, and an expand chevron. Layout follows 
-// (`.meals` / `.meal`). Expanding a row reveals the agent's-work trace — its
+// edit affordance, and an expand chevron. Layout follows
+// `.meals` / `.meal`. Expanding a row reveals the agent's-work trace — its
 // ordered steps plus the per-item editable table — from that meal's `/log`
 // detail when we have it.
 import { useRef, useState } from "react";
@@ -19,8 +19,7 @@ import type { AgentActivity } from "@/components/agent-decision";
 
 // The agent's-work detail for a meal, captured from its `/log` response: the
 // reconstructed trace steps, the per-item nutrient panels, and the online
-// quality eval (`confidence` in [0,1] + `reasons`) the backend reported
-//.
+// quality eval (`confidence` in [0,1] + `reasons`) the backend reported.
 export interface MealDetail {
   trace: TraceStep[];
   perItem: LoggedItem[];

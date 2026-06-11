@@ -1,4 +1,4 @@
-"""Tests for log_entry — deterministic macro/micro math (3.2; ).
+"""Tests for log_entry — deterministic macro/micro math.
 
 ``log_entry(items)`` takes foods already resolved to gram weights and scales
 each food's per-100 g nutrient panel by its grams, then sums the panel across

@@ -1,4 +1,4 @@
-""" end-to-end nutritionist journey integration test.
+"""End-to-end nutritionist journey integration test.
 
 Covers the full arc under one user/memory, all externals mocked:
   plan macros → save targets → /goals reflects plan →

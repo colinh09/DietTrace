@@ -93,7 +93,7 @@ describe("MealTrace", () => {
     expect(screen.getByText(/75% confidence/i)).toBeInTheDocument();
   });
 
-  // ── Portion reasoning recap ───
+  // ── Portion reasoning recap (now consolidated at the bottom) ───
 
   it("shows the 'why these portions' card when basis is present", () => {
     const itemsWithBasis: LoggedItem[] = [

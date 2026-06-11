@@ -28,7 +28,7 @@ _EXPECTED_TABLES = {
 
 
 def test_fixture_creates_expected_tables(food_db) -> None:
-    """The fixture builds the read-layer schema."""
+    """The fixture builds the read-layer schema tables."""
     conn = sqlite3.connect(food_db)
     try:
         names = {

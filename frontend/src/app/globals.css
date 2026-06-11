@@ -248,7 +248,7 @@ body {
 .dm-bar-fill { height: 100%; border-radius: 100px; transition: width 1.1s cubic-bezier(.2,.7,.2,1); }
 
 /* Glance zone (3rd band column): kcal remaining + a 7-day sparkline. Earns the
-   card's width that used to be dead whitespace. */
+   card's width that used to be dead whitespace in the day summary. */
 .dm-glance { flex: none; width: clamp(210px, 25vw, 290px); align-self: stretch; display: flex;
   flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   padding-left: clamp(12px, 2.4vw, 30px); border-left: 1px solid var(--line); text-align: center; }
@@ -348,7 +348,7 @@ body {
 .conf-chip.med .conf-dot { background: var(--amber); }
 .conf-dot { width: 6px; height: 6px; border-radius: 50%; }
 .conf-chip[tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Confidence chip's styled disclosure:
+/* Confidence chip's styled disclosure (the confidence tooltip):
    a calm dark popover with the four axis checks + a Learn-more line, shown on
    hover/focus — replaces the giant native `title`. */
 .tip-anchor { position: relative; display: inline-flex; }
@@ -393,13 +393,13 @@ body {
 .meal-exp-inner { overflow: hidden; min-height: 0; }
 .meal-exp-empty { margin-left: 25px; padding: 4px 0 calc(var(--meal-py) + 4px); font-size: 13px; color: var(--muted-ink); }
 
-/* agent's-work trace */
+/* agent's-work trace (.mealtrace / trace.jsx) */
 /* The expanded meal: one bubble of sub-bubble cards (items · review · agent's
    work · why foods · why confidence), mirroring the Observability column. */
 .mealtrace { margin: 6px 0 calc(var(--meal-py) + 4px); padding: 12px; background: var(--accent-softer); border-radius: 14px; display: flex; flex-direction: column; gap: 10px; }
 /* A sub-section of the expanded meal: a white tile FLOATING on the drawer tint
    (soft shadow, no forced hairline border) — the container-hierarchy fix from
-    (sub-groups are tiles on a tint, not boxes on white). */
+   the container hierarchy (sub-groups are tiles on a tint, not boxes on white). */
 .mt-card { background: var(--surface); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(27,26,22,0.04), 0 8px 22px -14px rgba(27,26,22,0.22); }
 .mt-card-head { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
 .mealtrace-head { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-bottom: 12px; }
@@ -1889,7 +1889,7 @@ body {
 .phoenix-code { font-family: var(--mono); font-size: 10.5px; color: var(--macro-carb); letter-spacing: .01em; }
 
 /* ============================================================
-   RE-TUNING · LIVE — two parallel scoring panels
+   RE-TUNING · LIVE — two parallel scoring panels (namespaced rt-)
    ============================================================ */
 .rt-live { margin: 14px 0 6px; padding: 15px 16px; border: 1px solid var(--accent-soft);
   border-radius: 14px; background: var(--accent-softer); }

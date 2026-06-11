@@ -4,7 +4,7 @@ These pin the EvalCase JSON contract: every dataset case is an
 ``{input, expected, metadata}`` object whose ``metadata.nutrient_tier`` selects
 the two-tier scoring path — ``"full"`` (whole foods, full micro panel) or
 ``"label"`` (branded, label subset). The schema is what the numeric evaluators
- and the dataset loader (4.7/4.9) build on, so loading and
+and the dataset loader build on, so loading and
 validating a case from JSON is the load-bearing behavior here. No DB or network
 is touched.
 """

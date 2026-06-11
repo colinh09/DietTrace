@@ -9,7 +9,7 @@ evaluators score against; ``metadata`` selects the **two-tier scoring** path via
 ``"label"`` (branded foods scored on the label subset, micros ``n/a``).
 
 This module is just the validated schema plus a file loader; the evaluators
- and the dataset loader/uploader (4.7/4.9) build on it.
+and the dataset loader/uploader build on it.
 Models are ``extra="forbid"`` so a mistyped field in a hand-authored case fails
 loudly instead of being silently ignored.
 """
